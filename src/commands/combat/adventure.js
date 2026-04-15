@@ -36,7 +36,6 @@ module.exports = {
     const user = await requireProfile(interaction);
     if (!user) return;
     const sub = interaction.options.getSubcommand();
-    const user = await getOrCreateUser(interaction.user);
 
     if (sub === "start") {
       if (user.adventure.isActive) {

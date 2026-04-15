@@ -40,7 +40,6 @@ module.exports = {
     if (!user) return;
 
     const sub = interaction.options.getSubcommand();
-    const user = await getOrCreateUser(interaction.user);
 
     if (sub === "view") return showTeam(interaction, user);
 
