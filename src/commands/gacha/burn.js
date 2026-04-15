@@ -1,3 +1,4 @@
+const { requireProfile } = require("../../utils/requireProfile");
 const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
 const PlayerCard = require("../../models/PlayerCard");
 const Card = require("../../models/Card");
@@ -22,6 +23,9 @@ module.exports = {
 
   async execute(interaction) {
     await interaction.deferReply();
+
+    const user = await requireProfile(interaction);
+    if (!user) return;
 
     const cardObjId = interaction.options.getString("card_id");
     const pc = await PlayerCard.findOne({

@@ -1,3 +1,4 @@
+const { requireProfile } = require("../../utils/requireProfile");
 const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
 const { getOrCreateUser } = require("../../utils/getOrCreateUser");
 const PlayerCard = require("../../models/PlayerCard");
@@ -33,6 +34,9 @@ module.exports = {
 
   async execute(interaction) {
     await interaction.deferReply();
+
+    const profileCheck = await requireProfile(interaction);
+    if (!profileCheck) return;
 
     const target = interaction.options.getUser("user") ?? interaction.user;
     const user = await getOrCreateUser(target);

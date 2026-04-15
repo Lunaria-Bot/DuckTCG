@@ -1,3 +1,4 @@
+const { requireProfile } = require("../../utils/requireProfile");
 const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
 const { getOrCreateUser } = require("../../utils/getOrCreateUser");
 const PlayerCard = require("../../models/PlayerCard");
@@ -21,6 +22,9 @@ module.exports = {
 
   async execute(interaction) {
     await interaction.deferReply();
+
+    const user = await requireProfile(interaction);
+    if (!user) return;
     const sub = interaction.options.getSubcommand();
 
     const raid = await Raid.findOne({ status: "active" });

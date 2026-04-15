@@ -1,3 +1,4 @@
+const { requireProfile } = require("../../utils/requireProfile");
 const {
   SlashCommandBuilder, EmbedBuilder,
   ActionRowBuilder, ButtonBuilder, ButtonStyle,
@@ -33,6 +34,9 @@ module.exports = {
 
   async execute(interaction) {
     await interaction.deferReply();
+
+    const user = await requireProfile(interaction);
+    if (!user) return;
 
     const filter = interaction.options.getString("filter") ?? "all";
     const userId = interaction.user.id;
