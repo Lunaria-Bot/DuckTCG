@@ -42,6 +42,10 @@ function formatDate(date) {
   return date.toLocaleDateString("en-GB").replace(/\//g, "/");
 }
 
+function isValidUrl(str) {
+  try { return Boolean(new URL(str)); } catch { return false; }
+}
+
 function buildBannerEmbed(banner) {
   const start = formatDate(banner.startsAt);
   const end   = formatDate(banner.endsAt);
@@ -49,7 +53,7 @@ function buildBannerEmbed(banner) {
     .setTitle(banner.name)
     .setColor(banner.type === "pickup" ? 0xAB47BC : 0x42A5F5)
     .addFields({ name: "\u200b", value: `From ${start} - ${end}` });
-  if (banner.imageUrl) embed.setImage(banner.imageUrl);
+  if (banner.imageUrl && isValidUrl(banner.imageUrl)) embed.setImage(banner.imageUrl);
   return embed;
 }
 
@@ -77,7 +81,7 @@ function buildInfoEmbed(banner) {
       },
       { name: "Gacha duration", value: `From ${start} - ${end}` },
     );
-  if (banner.imageUrl) embed.setImage(banner.imageUrl);
+  if (banner.imageUrl && isValidUrl(banner.imageUrl)) embed.setImage(banner.imageUrl);
   return embed;
 }
 
@@ -95,7 +99,7 @@ async function buildViewCardsEmbed(banner, page, userId) {
     .setColor(RARITY_COLOR[card?.rarity] ?? 0x9E9E9E)
     .addFields({ name: banner.name, value: `ID: ${cardId}\nPrint total: ${card?.totalPrints ?? 0}` })
     .setFooter({ text: `${RARITY_EMOJI[card?.rarity] ?? ""} page ${page + 1} of ${allCardIds.length} | You Own: ${owned}` });
-  if (card?.imageUrl) embed.setImage(card.imageUrl);
+  if (card?.imageUrl && isValidUrl(card.imageUrl)) embed.setImage(card.imageUrl);
   return { embed, total: allCardIds.length };
 }
 
@@ -126,12 +130,13 @@ function cardsNavRow(bannerId, page, total) {
 function buildPullResultEmbed(results, banner, remaining) {
   if (results.length === 1) {
     const { card, playerCard, rarity } = results[0];
-    return new EmbedBuilder()
+    const embed = new EmbedBuilder()
       .setTitle(RARITY_LABEL[rarity])
       .setDescription(`**${card.name}** — *${card.anime}*\nPrint **#${playerCard.printNumber}**`)
       .setColor(RARITY_COLOR[rarity])
-      .setThumbnail(card.imageUrl)
       .setFooter({ text: `Remaining tickets: ${remaining}` });
+    if (card.imageUrl && isValidUrl(card.imageUrl)) embed.setThumbnail(card.imageUrl);
+    return embed;
   }
   const rarityOrder = ["exceptional", "special", "rare", "common"];
   const best = rarityOrder.find(r => results.some(res => res.rarity === r));
