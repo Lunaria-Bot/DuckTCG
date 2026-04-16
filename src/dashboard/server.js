@@ -99,6 +99,7 @@ function renderPage(title, content, token = "") {
     <a href="/cards${t}">Cards</a>
     <a href="/raids${t}">Raids</a>
     <a href="/players${t}">Players</a>
+    <a href="/media${t}">Media</a>
   </nav>
   <div class="container">
     <h1>${title}</h1>
@@ -675,6 +676,120 @@ app.post("/players/:id/give", auth, async (req, res) => {
     { $inc: { [`currency.${type}`]: parseInt(amount) } }
   );
   res.redirect(`/players${t}`);
+});
+
+// ─── MEDIA ────────────────────────────────────────────────────────────────────
+const multer = require("multer");
+const fs = require("fs");
+
+const UPLOADS_DIR = path.join(__dirname, "uploads");
+if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+
+// Serve uploaded files publicly at /uploads/filename
+app.use("/uploads", express.static(UPLOADS_DIR));
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, UPLOADS_DIR),
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    const name = path.basename(file.originalname, ext)
+      .replace(/[^a-z0-9_-]/gi, "_")
+      .toLowerCase();
+    const unique = `${name}_${Date.now()}${ext}`;
+    cb(null, unique);
+  },
+});
+
+const upload = multer({
+  storage,
+  limits: { fileSize: 8 * 1024 * 1024 }, // 8MB max
+  fileFilter: (req, file, cb) => {
+    const allowed = [".jpg", ".jpeg", ".png", ".gif", ".webp"];
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (allowed.includes(ext)) return cb(null, true);
+    cb(new Error("Only image files are allowed (jpg, png, gif, webp)"));
+  },
+});
+
+app.get("/media", auth, (req, res) => {
+  const t = q(req.token);
+
+  const files = fs.existsSync(UPLOADS_DIR)
+    ? fs.readdirSync(UPLOADS_DIR).filter(f => /\.(jpg|jpeg|png|gif|webp)$/i.test(f))
+    : [];
+
+  // Build base URL from request
+  const baseUrl = `${req.protocol}://${req.get("host")}`;
+
+  const grid = files.length
+    ? files.reverse().map(f => {
+        const url = `${baseUrl}/uploads/${f}`;
+        return `
+        <div style="background:#0f0f13;border:1px solid #2d2d3d;border-radius:8px;overflow:hidden">
+          <img src="/uploads/${f}" style="width:100%;height:140px;object-fit:cover;display:block"/>
+          <div style="padding:10px">
+            <div style="font-size:11px;color:#666;margin-bottom:8px;word-break:break-all">${f}</div>
+            <div style="display:flex;gap:6px">
+              <input
+                type="text"
+                value="${url}"
+                readonly
+                onclick="this.select()"
+                style="flex:1;font-size:11px;padding:4px 8px;cursor:pointer"
+                title="Click to select"
+              />
+              <button onclick="navigator.clipboard.writeText('${url}');this.textContent='✓';setTimeout(()=>this.textContent='Copy',1200)"
+                class="btn btn-sm" style="white-space:nowrap">Copy</button>
+            </div>
+            <form method="POST" action="/media/delete${t}" style="margin-top:6px">
+              <input type="hidden" name="filename" value="${f}"/>
+              <button type="submit" class="btn btn-sm btn-red" style="width:100%"
+                onclick="return confirm('Delete ${f}?')">Delete</button>
+            </form>
+          </div>
+        </div>`;
+      }).join("")
+    : `<p style="color:#666;grid-column:1/-1">No images uploaded yet.</p>`;
+
+  res.send(renderPage("Media", `
+    <div class="card" style="max-width:500px;margin-bottom:24px">
+      <h2>Upload Image</h2>
+      <form method="POST" action="/media/upload${t}" enctype="multipart/form-data">
+        <div>
+          <label>Select image (jpg, png, gif, webp — max 8MB)</label>
+          <input type="file" name="image" accept="image/*" required/>
+        </div>
+        <button type="submit">Upload</button>
+      </form>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px">
+      ${grid}
+    </div>
+  `, req.token));
+});
+
+app.post("/media/upload", auth, (req, res) => {
+  const t = q(req.token);
+  upload.single("image")(req, res, (err) => {
+    if (err) {
+      return res.send(renderPage("Upload Error", `
+        <div class="alert alert-red">${err.message}</div>
+        <a href="/media${t}" class="btn">Back</a>
+      `, req.token));
+    }
+    res.redirect(`/media${t}`);
+  });
+});
+
+app.post("/media/delete", auth, (req, res) => {
+  const t = q(req.token);
+  const { filename } = req.body;
+  // Safety: only allow simple filenames, no path traversal
+  if (filename && /^[a-z0-9_\-.]+$/i.test(filename)) {
+    const filepath = path.join(UPLOADS_DIR, filename);
+    if (fs.existsSync(filepath)) fs.unlinkSync(filepath);
+  }
+  res.redirect(`/media${t}`);
 });
 
 // ─── Start ────────────────────────────────────────────────────────────────────
