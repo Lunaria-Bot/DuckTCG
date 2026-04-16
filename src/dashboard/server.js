@@ -97,8 +97,49 @@ function renderPage(title, content, user = null) {
         <span style="font-size:13px;color:#a78bfa">${user.username}</span>
         <span style="font-size:11px;color:#666">(${user.role})</span>
       </span>
+      <span id="notif-bell" style="cursor:pointer;font-size:18px;position:relative" onclick="toggleNotif()">
+        🔔<span id="notif-count" style="display:none;position:absolute;top:-4px;right:-6px;background:#ef4444;color:#fff;font-size:9px;font-weight:700;padding:1px 4px;border-radius:999px"></span>
+      </span>
+      <div id="notif-panel" style="display:none;position:absolute;top:48px;right:80px;width:320px;background:#1a1a24;border:1px solid #2d2d3d;border-radius:8px;z-index:999;max-height:400px;overflow-y:auto;box-shadow:0 8px 24px #0008">
+        <div style="padding:10px 14px;border-bottom:1px solid #2d2d3d;font-size:13px;font-weight:600;color:#e0e0e0">Recent Activity</div>
+        <div id="notif-list" style="padding:8px 0"></div>
+      </div>
       <a href="/logout" style="color:#ef4444;font-size:13px">Logout</a>
-    </nav>` : "";
+    </nav>
+    <script>
+    async function toggleNotif() {
+      const panel = document.getElementById("notif-panel");
+      const isOpen = panel.style.display !== "none";
+      panel.style.display = isOpen ? "none" : "block";
+      if (!isOpen) {
+        const res = await fetch("/api/notifications");
+        const data = await res.json();
+        const list = document.getElementById("notif-list");
+        const badge = { create:"#16a34a", update:"#2563eb", delete:"#dc2626" };
+        list.innerHTML = data.map(n => \`<div style="padding:8px 14px;border-bottom:1px solid #2d2d3d;font-size:12px">
+          <span style="background:\${badge[n.action]||"#374151"};color:#fff;padding:1px 6px;border-radius:3px;font-size:10px;font-weight:600">\${n.action}</span>
+          <span style="color:#a78bfa;margin:0 4px">\${n.performedBy}</span>
+          <span style="color:#e0e0e0">\${n.description}</span>
+          <div style="color:#666;font-size:10px;margin-top:2px">\${new Date(n.createdAt).toLocaleString("en-GB")}</div>
+        </div>\`).join("") || "<div style='padding:12px 14px;color:#666;font-size:12px'>No recent activity</div>";
+      }
+    }
+    // Poll notification count every 30s
+    async function updateNotifCount() {
+      try {
+        const res = await fetch("/api/notifications/count");
+        const { count } = await res.json();
+        const el = document.getElementById("notif-count");
+        if (count > 0) { el.textContent = count > 9 ? "9+" : count; el.style.display = "inline"; }
+        else { el.style.display = "none"; }
+      } catch {}
+    }
+    updateNotifCount();
+    setInterval(updateNotifCount, 30000);
+    document.addEventListener("click", e => {
+      if (!e.target.closest("#notif-bell")) document.getElementById("notif-panel").style.display = "none";
+    });
+    </script>` : "";
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -109,7 +150,7 @@ function renderPage(title, content, user = null) {
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
     body{font-family:system-ui,sans-serif;background:#0f0f13;color:#e0e0e0;min-height:100vh}
     a{color:#a78bfa;text-decoration:none}a:hover{text-decoration:underline}
-    nav{background:#1a1a24;border-bottom:1px solid #2d2d3d;padding:10px 24px;display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+    nav{background:#1a1a24;border-bottom:1px solid #2d2d3d;padding:10px 24px;display:flex;gap:16px;align-items:center;flex-wrap:wrap;position:relative}
     nav .brand{font-weight:700;color:#a78bfa;font-size:17px;margin-right:8px}
     nav a{color:#c4b5fd;font-size:13px}
     .container{max-width:1200px;margin:0 auto;padding:28px 24px}
@@ -164,6 +205,30 @@ function renderPage(title, content, user = null) {
 </body>
 </html>`;
 }
+
+
+// ─── API ──────────────────────────────────────────────────────────────────────
+app.get("/api/notifications", auth, async (req, res) => {
+  const logs = await AuditLog.find().sort({ createdAt: -1 }).limit(20);
+  res.json(logs);
+});
+
+app.get("/api/notifications/count", auth, async (req, res) => {
+  const since = new Date(Date.now() - 60 * 60 * 1000); // last hour
+  const count = await AuditLog.countDocuments({ createdAt: { $gte: since } });
+  res.json({ count });
+});
+
+app.get("/api/pull-stats", auth, async (req, res) => {
+  const now = new Date();
+  const todayStart  = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const weekStart   = new Date(todayStart); weekStart.setDate(weekStart.getDate() - 7);
+  const [today, week] = await Promise.all([
+    PlayerCard.countDocuments({ createdAt: { $gte: todayStart } }),
+    PlayerCard.countDocuments({ createdAt: { $gte: weekStart } }),
+  ]);
+  res.json({ today, week });
+});
 
 // ─── Discord OAuth2 ───────────────────────────────────────────────────────────
 app.get("/login", (req, res) => {
@@ -259,10 +324,15 @@ app.get("/logout", (req, res) => {
 
 // ─── DASHBOARD ────────────────────────────────────────────────────────────────
 app.get("/", auth, async (req, res) => {
-  const [userCount, cardCount, bannerCount, pcCount] = await Promise.all([
+  const now = new Date();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const weekStart  = new Date(todayStart); weekStart.setDate(weekStart.getDate() - 7);
+  const [userCount, cardCount, bannerCount, pcCount, pullsToday, pullsWeek] = await Promise.all([
     User.countDocuments(), Card.countDocuments(),
     Banner.countDocuments({ isActive: true }),
     PlayerCard.countDocuments({ isBurned: false }),
+    PlayerCard.countDocuments({ createdAt: { $gte: todayStart } }),
+    PlayerCard.countDocuments({ createdAt: { $gte: weekStart } }),
   ]);
   const topPlayers = await User.find().sort({ combatPower: -1 }).limit(5);
   const recentLogs = await AuditLog.find().sort({ createdAt: -1 }).limit(6);
@@ -295,6 +365,8 @@ app.get("/", auth, async (req, res) => {
       <div class="stat"><div class="value">${cardCount}</div><div class="label">Cards</div></div>
       <div class="stat"><div class="value">${bannerCount}</div><div class="label">Active Banners</div></div>
       <div class="stat"><div class="value">${pcCount}</div><div class="label">Cards Owned</div></div>
+      <div class="stat"><div class="value">${pullsToday}</div><div class="label">Pulls Today</div></div>
+      <div class="stat"><div class="value">${pullsWeek}</div><div class="label">Pulls This Week</div></div>
     </div>
     <div class="row" style="gap:18px">
       <div>
@@ -551,11 +623,19 @@ app.get("/messages/new", auth, async (req, res) => {
 
         <hr style="border-color:#2d2d3d;margin:12px 0"/>
         <h2>Embed (optional)</h2>
-        <div><label>Embed Title</label><input name="embedTitle" placeholder="Pick Up! Naruto is now live!"/></div>
-        <div><label>Embed Description</label><textarea name="embedDesc" rows="4" placeholder="New banner featuring Naruto characters..."></textarea></div>
+        <div><label>Embed Title</label><input name="embedTitle" id="prev-title" oninput="updatePreview()" placeholder="Pick Up! Naruto is now live!"/></div>
+        <div><label>Embed Description</label><textarea name="embedDesc" id="prev-desc" oninput="updatePreview()" rows="4" placeholder="New banner featuring Naruto characters..."></textarea></div>
         <div class="row">
-          <div><label>Embed Color</label><input type="color" name="embedColor" value="#7c3aed" style="height:38px;padding:2px 6px"/></div>
-          <div><label>Embed Image URL</label><input name="embedImage" placeholder="https://..."/></div>
+          <div><label>Embed Color</label><input type="color" name="embedColor" value="#7c3aed" id="prev-color" oninput="updatePreview()" style="height:38px;padding:2px 6px"/></div>
+          <div><label>Embed Image URL</label><input name="embedImage" id="prev-image" oninput="updatePreview()" placeholder="https://..."/></div>
+        </div>
+
+        <hr style="border-color:#2d2d3d;margin:12px 0"/>
+        <h2>Preview</h2>
+        <div id="embed-preview" style="border-left:4px solid #7c3aed;background:#2b2d31;border-radius:4px;padding:12px 16px;max-width:480px;margin-bottom:12px">
+          <div id="prev-title-display" style="font-weight:700;color:#fff;font-size:15px;margin-bottom:6px"></div>
+          <div id="prev-desc-display" style="color:#dbdee1;font-size:14px;white-space:pre-line;margin-bottom:8px"></div>
+          <img id="prev-img-display" src="" style="display:none;max-width:100%;border-radius:6px;margin-top:6px"/>
         </div>
 
         <hr style="border-color:#2d2d3d;margin:12px 0"/>
@@ -580,7 +660,21 @@ app.get("/messages/new", auth, async (req, res) => {
       document.querySelector('[name=embedTitle]').value = opt.dataset.name + ' is now live!';
       document.querySelector('[name=embedImage]').value = opt.dataset.image || '';
       document.querySelector('[name=title]').value = opt.dataset.name + ' Announcement';
+      updatePreview();
     }
+    function updatePreview() {
+      const title = document.getElementById("prev-title")?.value || "";
+      const desc  = document.getElementById("prev-desc")?.value || "";
+      const color = document.getElementById("prev-color")?.value || "#7c3aed";
+      const img   = document.getElementById("prev-image")?.value || "";
+      document.getElementById("prev-title-display").textContent = title;
+      document.getElementById("prev-desc-display").textContent  = desc;
+      document.getElementById("embed-preview").style.borderLeftColor = color;
+      const imgEl = document.getElementById("prev-img-display");
+      if (img) { imgEl.src = img; imgEl.style.display = "block"; }
+      else { imgEl.style.display = "none"; }
+    }
+    updatePreview();
     </script>
   `, req.user));
 });
@@ -627,6 +721,7 @@ app.get("/banners", auth, editorOrAdmin, async (req, res) => {
       <td>
         <a href="/banners/${b.bannerId}/edit" class="btn btn-sm">Edit</a>
         <a href="/banners/${b.bannerId}/pool" class="btn btn-sm btn-green">Pool</a>
+        <a href="/banners/${b.bannerId}/stats" class="btn btn-sm btn-gray">Stats</a>
         <a href="/banners/${b.bannerId}/toggle" class="btn btn-sm btn-red">${b.isActive?"Disable":"Enable"}</a>
       </td>
     </tr>`;
@@ -721,13 +816,17 @@ app.get("/banners/:id/pool", auth, editorOrAdmin, async (req, res) => {
   const cardRows = allCards.map(c => {
     const inPool = poolIds.has(c.cardId);
     const isFeatured = featuredIds.has(c.cardId);
-    return `<tr><td><strong>${c.name}</strong></td><td>${c.anime}</td><td><span class="badge ${rarityBadge[c.rarity]}">${c.rarity}</span></td><td>${c.role}</td>
-    <td>
-      <form method="POST" action="/banners/${banner.bannerId}/pool" style="display:inline"><input type="hidden" name="cardId" value="${c.cardId}"/><input type="hidden" name="action" value="${inPool?"remove":"add"}"/><button type="submit" class="btn btn-sm ${inPool?"btn-red":"btn-green"}">${inPool?"Remove":"Add"}</button></form>
-      ${inPool?`<form method="POST" action="/banners/${banner.bannerId}/featured" style="display:inline"><input type="hidden" name="cardId" value="${c.cardId}"/><input type="hidden" name="action" value="${isFeatured?"unfeature":"feature"}"/><button type="submit" class="btn btn-sm ${isFeatured?"":"btn-green"}">${isFeatured?"★ Featured":"☆ Feature"}</button></form>`:""}
-    </td></tr>`;
+    return `<tr>
+      <td>${c.imageUrl ? `<img src="${c.imageUrl}" style="width:32px;height:32px;object-fit:cover;border-radius:4px"/>` : "—"}</td>
+      <td><strong>${c.name}</strong></td><td>${c.anime}</td><td><span class="badge ${rarityBadge[c.rarity]}">${c.rarity}</span></td><td>${c.role}</td>
+      <td>
+        ${c.imageUrl ? `<button type="button" class="btn btn-sm btn-gray" onclick="navigator.clipboard.writeText('${c.imageUrl}');this.textContent='✓ Copied';setTimeout(()=>this.textContent='Copy URL',1500)">Copy URL</button>` : ""}
+        <form method="POST" action="/banners/${banner.bannerId}/pool" style="display:inline"><input type="hidden" name="cardId" value="${c.cardId}"/><input type="hidden" name="action" value="${inPool?"remove":"add"}"/><button type="submit" class="btn btn-sm ${inPool?"btn-red":"btn-green"}">${inPool?"Remove":"Add"}</button></form>
+        ${inPool?`<form method="POST" action="/banners/${banner.bannerId}/featured" style="display:inline"><input type="hidden" name="cardId" value="${c.cardId}"/><input type="hidden" name="action" value="${isFeatured?"unfeature":"feature"}"/><button type="submit" class="btn btn-sm ${isFeatured?"":"btn-green"}">${isFeatured?"★ Featured":"☆ Feature"}</button></form>`:""}
+      </td>
+    </tr>`;
   }).join("");
-  res.send(renderPage(`Pool — ${banner.name}`, `<p style="color:#888;margin-bottom:16px">Pool: ${poolIds.size} cards — Featured: ${featuredIds.size} <a href="/banners" class="btn btn-sm" style="margin-left:16px">← Back</a></p><div class="card"><table><thead><tr><th>Name</th><th>Anime</th><th>Rarity</th><th>Role</th><th>Action</th></tr></thead><tbody>${cardRows||"<tr><td colspan='5' style='color:#666'>No cards yet</td></tr>"}</tbody></table></div>`, req.user));
+  res.send(renderPage(`Pool — ${banner.name}`, `<p style="color:#888;margin-bottom:16px">Pool: ${poolIds.size} cards — Featured: ${featuredIds.size} <a href="/banners" class="btn btn-sm" style="margin-left:16px">← Back</a></p><div class="card"><table><thead><tr><th>Art</th><th>Name</th><th>Anime</th><th>Rarity</th><th>Role</th><th>Actions</th></tr></thead><tbody>${cardRows||"<tr><td colspan='5' style='color:#666'>No cards yet</td></tr>"}</tbody></table></div>`, req.user));
 });
 
 app.post("/banners/:id/pool", auth, editorOrAdmin, async (req, res) => {
@@ -750,6 +849,96 @@ app.post("/banners/:id/featured", auth, editorOrAdmin, async (req, res) => {
   res.redirect(`/banners/${req.params.id}/pool`);
 });
 
+
+// ─── BANNER STATS ─────────────────────────────────────────────────────────────
+app.get("/banners/:id/stats", auth, editorOrAdmin, async (req, res) => {
+  const banner = await Banner.findOne({ bannerId: req.params.id });
+  if (!banner) return res.redirect("/banners");
+
+  // Cards obtained from this banner = PlayerCards whose cardId is in the pool
+  const poolIds = [...banner.pool.common,...banner.pool.rare,...banner.pool.special,...banner.pool.exceptional];
+  
+  const [totalPulls, cardDist, topPullers] = await Promise.all([
+    PlayerCard.countDocuments({ cardId: { $in: poolIds } }),
+    PlayerCard.aggregate([
+      { $match: { cardId: { $in: poolIds } } },
+      { $lookup: { from: "cards", localField: "cardId", foreignField: "cardId", as: "card" } },
+      { $unwind: "$card" },
+      { $group: { _id: { cardId: "$cardId", name: "$card.name", rarity: "$card.rarity" }, count: { $sum: 1 } } },
+      { $sort: { count: -1 } },
+      { $limit: 15 }
+    ]),
+    PlayerCard.aggregate([
+      { $match: { cardId: { $in: poolIds } } },
+      { $group: { _id: "$userId", pulls: { $sum: 1 } } },
+      { $sort: { pulls: -1 } },
+      { $limit: 10 },
+      { $lookup: { from: "users", localField: "_id", foreignField: "userId", as: "user" } },
+      { $unwind: { path: "$user", preserveNullAndEmpty: true } },
+    ])
+  ]);
+
+  // Rarity breakdown
+  const rarityCount = { common: 0, rare: 0, special: 0, exceptional: 0 };
+  for (const d of cardDist) rarityCount[d._id.rarity] = (rarityCount[d._id.rarity] || 0) + d.count;
+  const rarityBadge = { common:"badge-gray",rare:"badge-blue",special:"badge-purple",exceptional:"badge-yellow" };
+
+  // Actual vs theoretical rates
+  const theoreticalRates = banner.rates || {};
+  const rarityRows = Object.entries(rarityCount).map(([r, count]) => {
+    const actual = totalPulls > 0 ? ((count/totalPulls)*100).toFixed(1) : "0.0";
+    const theory = theoreticalRates[r] ?? 0;
+    return `<tr>
+      <td><span class="badge ${rarityBadge[r]}">${r}</span></td>
+      <td>${count}</td>
+      <td><strong>${actual}%</strong></td>
+      <td>${theory}%</td>
+      <td style="color:${parseFloat(actual) > theory ? "#86efac" : "#fca5a5"}">${(parseFloat(actual) - theory).toFixed(1)}%</td>
+    </tr>`;
+  }).join("");
+
+  const topCardRows = cardDist.map(d => `<tr>
+    <td><strong>${d._id.name}</strong></td>
+    <td><span class="badge ${rarityBadge[d._id.rarity]}">${d._id.rarity}</span></td>
+    <td>${d.count}</td>
+    <td>${totalPulls > 0 ? ((d.count/totalPulls)*100).toFixed(1) : 0}%</td>
+  </tr>`).join("");
+
+  const topPullerRows = topPullers.map((p, i) => `<tr>
+    <td>${i+1}</td>
+    <td><strong>${p.user?.username || p._id}</strong></td>
+    <td>${p.pulls}</td>
+  </tr>`).join("");
+
+  res.send(renderPage(`Stats — ${banner.name}`, `
+    <div style="margin-bottom:16px"><a href="/banners" class="btn btn-sm btn-gray">← Back to Banners</a></div>
+    <div class="grid" style="grid-template-columns:repeat(3,1fr)">
+      <div class="stat"><div class="value">${totalPulls.toLocaleString()}</div><div class="label">Total Pulls</div></div>
+      <div class="stat"><div class="value">${poolIds.length}</div><div class="label">Cards in Pool</div></div>
+      <div class="stat"><div class="value">${rarityCount.exceptional}</div><div class="label">Exceptionals Pulled</div></div>
+    </div>
+    <div class="row" style="gap:18px">
+      <div>
+        <div class="card">
+          <h2>Rarity Distribution</h2>
+          <table><thead><tr><th>Rarity</th><th>Obtained</th><th>Actual %</th><th>Theory %</th><th>Diff</th></tr></thead>
+          <tbody>${rarityRows}</tbody></table>
+        </div>
+        <div class="card">
+          <h2>Top Pullers</h2>
+          <table><thead><tr><th>#</th><th>Player</th><th>Pulls</th></tr></thead>
+          <tbody>${topPullerRows||"<tr><td colspan='3' style='color:#666'>No data</td></tr>"}</tbody></table>
+        </div>
+      </div>
+      <div class="card">
+        <h2>Most Pulled Cards</h2>
+        <table><thead><tr><th>Card</th><th>Rarity</th><th>Obtained</th><th>Rate</th></tr></thead>
+        <tbody>${topCardRows||"<tr><td colspan='4' style='color:#666'>No pulls yet</td></tr>"}</tbody></table>
+      </div>
+    </div>
+  `, req.user));
+});
+
 // ─── CARDS ────────────────────────────────────────────────────────────────────
 app.get("/cards", auth, editorOrAdmin, async (req, res) => {
   const cards = await Card.find().sort({ anime: 1, rarity: 1, name: 1 });
@@ -760,7 +949,7 @@ app.get("/cards", auth, editorOrAdmin, async (req, res) => {
     <td><strong>${c.name}</strong><br/><small style="color:#666">${c.cardId}</small></td>
     <td>${c.anime}</td><td><span class="badge ${rarityBadge[c.rarity]}">${c.rarity}</span></td>
     <td><span class="badge ${roleBadge[c.role]}">${c.role}</span></td><td>${c.totalPrints}</td>
-    <td><a href="/cards/${c.cardId}/edit" class="btn btn-sm">Edit</a></td>
+    <td><a href="/cards/${c.cardId}/detail" class="btn btn-sm btn-gray">Detail</a> <a href="/cards/${c.cardId}/edit" class="btn btn-sm">Edit</a></td>
   </tr>`).join("");
   res.send(renderPage("Cards", `<a href="/cards/new" class="btn" style="margin-bottom:20px;display:inline-block">+ New Card</a><div class="card"><table><thead><tr><th>Art</th><th>Card</th><th>Anime</th><th>Rarity</th><th>Role</th><th>Prints</th><th>Actions</th></tr></thead><tbody>${rows||"<tr><td colspan='7' style='color:#666;text-align:center'>No cards yet</td></tr>"}</tbody></table></div>`, req.user));
 });
@@ -819,6 +1008,74 @@ app.post("/cards/:id/edit", auth, editorOrAdmin, async (req, res) => {
   res.redirect("/cards");
 });
 
+
+// ─── CARD DETAIL ──────────────────────────────────────────────────────────────
+app.get("/cards/:id/detail", auth, editorOrAdmin, async (req, res) => {
+  const card = await Card.findOne({ cardId: req.params.id });
+  if (!card) return res.redirect("/cards");
+
+  const [totalPrints, topPrints, ownerCount] = await Promise.all([
+    PlayerCard.countDocuments({ cardId: card.cardId, isBurned: false }),
+    PlayerCard.find({ cardId: card.cardId, isBurned: false })
+      .sort({ printNumber: 1 })
+      .limit(10)
+      .lean(),
+    PlayerCard.aggregate([
+      { $match: { cardId: card.cardId, isBurned: false } },
+      { $group: { _id: "$userId" } },
+      { $count: "total" }
+    ])
+  ]);
+
+  // Enrich top prints with username
+  const userIds = [...new Set(topPrints.map(p => p.userId))];
+  const users = await User.find({ userId: { $in: userIds } }).select("userId username").lean();
+  const userMap = Object.fromEntries(users.map(u => [u.userId, u.username]));
+
+  const rarityBadge = { common:"badge-gray",rare:"badge-blue",special:"badge-purple",exceptional:"badge-yellow" };
+  const roleBadge = { dps:"badge-red",support:"badge-green",tank:"badge-blue" };
+  const totalOwners = ownerCount[0]?.total ?? 0;
+
+  const printRows = topPrints.map(p => `<tr>
+    <td><strong>#${p.printNumber}</strong>${p.printNumber===1?" 👑":""}</td>
+    <td>${userMap[p.userId] || p.userId}</td>
+    <td>Lv.${p.level}${p.isAscended?" ✨":""}</td>
+    <td>${(p.cachedStats?.combatPower ?? 0).toLocaleString()}</td>
+  </tr>`).join("");
+
+  res.send(renderPage(`Card — ${card.name}`, `
+    <div style="margin-bottom:16px"><a href="/cards" class="btn btn-sm btn-gray">← Back to Cards</a></div>
+    <div class="row" style="gap:20px;align-items:flex-start">
+      <div style="max-width:260px">
+        ${card.imageUrl ? `<img src="${card.imageUrl}" style="width:100%;border-radius:10px;margin-bottom:14px"/>` : ""}
+        <div class="card" style="margin-bottom:0">
+          <table style="font-size:13px">
+            <tr><td style="color:#888">Rarity</td><td><span class="badge ${rarityBadge[card.rarity]}">${card.rarity}</span></td></tr>
+            <tr><td style="color:#888">Role</td><td><span class="badge ${roleBadge[card.role]}">${card.role}</span></td></tr>
+            <tr><td style="color:#888">Anime</td><td>${card.anime}</td></tr>
+            <tr><td style="color:#888">Base DMG</td><td>${card.baseStats?.damage ?? 0}</td></tr>
+            <tr><td style="color:#888">Base Mana</td><td>${card.baseStats?.mana ?? 0}</td></tr>
+            <tr><td style="color:#888">Base HP</td><td>${card.baseStats?.hp ?? 0}</td></tr>
+            <tr><td style="color:#888">Total Prints</td><td><strong>${card.totalPrints}</strong></td></tr>
+          </table>
+        </div>
+      </div>
+      <div style="flex:1">
+        <div class="grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:16px">
+          <div class="stat"><div class="value">${totalPrints}</div><div class="label">Copies Owned</div></div>
+          <div class="stat"><div class="value">${totalOwners}</div><div class="label">Unique Owners</div></div>
+          <div class="stat"><div class="value">${card.totalPrints}</div><div class="label">Total Ever Printed</div></div>
+        </div>
+        <div class="card">
+          <h2>Lowest Prints (rarest)</h2>
+          <table><thead><tr><th>Print</th><th>Owner</th><th>Level</th><th>CP</th></tr></thead>
+          <tbody>${printRows||"<tr><td colspan='4' style='color:#666'>No copies in circulation</td></tr>"}</tbody></table>
+        </div>
+      </div>
+    </div>
+  `, req.user));
+});
+
 // ─── RAIDS (admin only) ───────────────────────────────────────────────────────
 app.get("/raids", auth, adminOnly, async (req, res) => {
   const raids = await Raid.find().sort({ createdAt: -1 }).limit(20);
@@ -850,7 +1107,19 @@ app.post("/raids/new", auth, adminOnly, async (req, res) => {
 
 // ─── PLAYERS (admin only) ─────────────────────────────────────────────────────
 app.get("/players", auth, adminOnly, async (req, res) => {
-  const players = await User.find().sort({ createdAt: -1 });
+  const search  = (req.query.q || "").trim();
+  const sortBy  = req.query.sort || "createdAt";
+  const sortDir = req.query.dir === "asc" ? 1 : -1;
+  const sortMap = { cp: "combatPower", gold: "currency.gold", date: "createdAt", streak: "loginStreak" };
+  const sortField = sortMap[sortBy] || "createdAt";
+  const query = search ? { username: { $regex: search, $options: "i" } } : {};
+  const players = await User.find(query).sort({ [sortField]: sortDir }).limit(100);
+  const sortLink = (field, label) => {
+    const active = sortBy === field;
+    const dir = active && req.query.dir !== "asc" ? "asc" : "desc";
+    const arrow = active ? (dir === "asc" ? " ↑" : " ↓") : "";
+    return `<a href="/players?q=${encodeURIComponent(search)}&sort=${field}&dir=${dir}" style="color:${active?"#a78bfa":"#888"}">${label}${arrow}</a>`;
+  };
   const rows = players.map(p => `<tr>
     <td><strong>${p.username}</strong><br/><small style="color:#666">${p.userId}</small></td>
     <td>${p.currency.gold.toLocaleString()}</td><td>${p.currency.regularTickets} / ${p.currency.pickupTickets}</td>
@@ -860,7 +1129,26 @@ app.get("/players", auth, adminOnly, async (req, res) => {
       <a href="/players/${p.userId}/give-card" class="btn btn-sm">Give Card</a>
     </td>
   </tr>`).join("");
-  res.send(renderPage("Players", `<div class="card"><table><thead><tr><th>Player</th><th>Duckcoin</th><th>Tickets (R/P)</th><th>CP</th><th>Streak</th><th>Actions</th></tr></thead><tbody>${rows||"<tr><td colspan='6' style='color:#666;text-align:center'>No players yet</td></tr>"}</tbody></table></div>`, req.user));
+  res.send(renderPage("Players", `
+    <form method="GET" action="/players" style="display:flex;gap:10px;margin-bottom:16px;align-items:flex-end">
+      <div style="flex:1"><label>Search by username</label><input name="q" value="${search}" placeholder="Search..." autofocus/></div>
+      <input type="hidden" name="sort" value="${sortBy}"/>
+      <button type="submit">Search</button>
+      ${search ? `<a href="/players" class="btn btn-red">Clear</a>` : ""}
+    </form>
+    <div class="card"><table>
+      <thead><tr>
+        <th>Player</th>
+        <th>${sortLink("gold","Duckcoin")}</th>
+        <th>Tickets (R/P)</th>
+        <th>${sortLink("cp","CP")}</th>
+        <th>${sortLink("streak","Streak")}</th>
+        <th>${sortLink("date","Joined")}</th>
+        <th>Actions</th>
+      </tr></thead>
+      <tbody>${rows||"<tr><td colspan='7' style='color:#666;text-align:center'>No players found</td></tr>"}</tbody>
+    </table></div>
+  `, req.user));
 });
 
 app.get("/players/:id/give", auth, adminOnly, async (req, res) => {
