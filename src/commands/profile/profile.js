@@ -1,6 +1,7 @@
 const { requireProfile } = require("../../utils/requireProfile");
 const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
 const { getOrCreateUser } = require("../../utils/getOrCreateUser");
+const User = require("../../models/User");
 const PlayerCard = require("../../models/PlayerCard");
 const Card = require("../../models/Card");
 
@@ -39,7 +40,19 @@ module.exports = {
     if (!profileCheck) return;
 
     const target = interaction.options.getUser("user") ?? interaction.user;
-    const user = await getOrCreateUser(target);
+
+    // If viewing someone else's profile, check they exist — don't create
+    let user;
+    if (target.id !== interaction.user.id) {
+      user = await User.findOne({ userId: target.id });
+      if (!user) {
+        return interaction.editReply({
+          content: `**${target.username}** doesn't have a profile yet.`,
+        });
+      }
+    } else {
+      user = profileCheck;
+    }
 
     // Favorite card
     let favoriteField = "*No favorite card set*";
