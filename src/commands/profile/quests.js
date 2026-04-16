@@ -15,8 +15,8 @@ const User = require("../../models/User");
 function fmtReward(r) {
   const parts = [];
   if (r.gold)           parts.push(`<:duck_coin:1494344514465431614> ${r.gold.toLocaleString()} Duckcoin`);
-  if (r.regularTickets) parts.push(`<:perma_ticket:1494292877491310666> ${r.regularTickets} Regular`);
-  if (r.pickupTickets)  parts.push(`<:pickup_ticket:1494294616495620128> ${r.pickupTickets} Pick Up`);
+  if (r.regularTickets) parts.push(`<:perma_ticket:1494344593863344258> ${r.regularTickets} Regular`);
+  if (r.pickupTickets)  parts.push(`<:pickup_ticket:1494344547046523091> ${r.pickupTickets} Pick Up`);
   if (r.accountExp)     parts.push(`⭐ ${r.accountExp} XP`);
   return parts.join(" · ");
 }

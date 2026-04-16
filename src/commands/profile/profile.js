@@ -23,19 +23,16 @@ const BADGE_LABEL = {
   duck_nuclear:    "🦆 Nuclear Duck",
 };
 
-// Thin XP progress bar using block chars
+const DUCK_COIN  = "<:duck_coin:1494344514465431614>";
+const PERMA      = "<:perma_ticket:1494344593863344258>";
+const PICKUP     = "<:pickup_ticket:1494344547046523091>";
+
 function buildExpBar(current, needed) {
   const pct = Math.min(current / needed, 1);
   const filled = Math.round(pct * 15);
   const empty = 15 - filled;
   const bar = "▰".repeat(filled) + "▱".repeat(empty);
-  const pctStr = Math.round(pct * 100);
-  return `${bar} ${pctStr}%\n\`${current.toLocaleString()} / ${needed.toLocaleString()} XP\``;
-}
-
-// Two-column key/value table using zero-width spaces for alignment
-function twoCol(rows) {
-  return rows.map(([k, v]) => `**${k}** \u200b\n${v}`).join("\n");
+  return `${bar} ${Math.round(pct * 100)}%\n\`${current.toLocaleString()} / ${needed.toLocaleString()} XP\``;
 }
 
 module.exports = {
@@ -77,13 +74,13 @@ module.exports = {
       ? user.badges.map(b => BADGE_LABEL[b.badgeId] ?? b.badgeId).join("  ")
       : "*No badges yet*";
 
-    // Level & XP
+    // XP
     const expNeeded = Math.round(100 * Math.pow(user.accountLevel, 1.4));
     const expBar = buildExpBar(user.accountExp, expNeeded);
 
-    // CP with duck badge
+    // CP label
     const duckBadge = user.badges.find(b => b.badgeId.startsWith("duck_"));
-    const cpLabel = duckBadge ? `${BADGE_LABEL[duckBadge.badgeId]}` : "⚔️ Combat Power";
+    const cpLabel = duckBadge ? BADGE_LABEL[duckBadge.badgeId] : "Combat Power";
 
     const embed = new EmbedBuilder()
       .setColor(0x5B21B6)
@@ -93,68 +90,52 @@ module.exports = {
       })
       .setThumbnail(target.displayAvatarURL())
 
-      // ── Level + XP bar ──
+      // Level + XP bar
       .addFields({
         name: `✦ Level ${user.accountLevel}`,
         value: expBar,
         inline: false,
       })
 
-      // ── 3 stat pills inline ──
+      // 3 stat pills
       .addFields(
-        {
-          name: cpLabel,
-          value: `**${user.combatPower.toLocaleString()}**`,
-          inline: true,
-        },
-        {
-          name: "🔥 Login Streak",
-          value: `**${user.loginStreak}** day${user.loginStreak !== 1 ? "s" : ""}`,
-          inline: true,
-        },
-        {
-          name: "🎰 Total Pulls",
-          value: `**${user.stats.totalPullsDone}**`,
-          inline: true,
-        },
+        { name: cpLabel,        value: `**${user.combatPower.toLocaleString()}**`, inline: true },
+        { name: "🔥 Login Streak", value: `**${user.loginStreak}** day${user.loginStreak !== 1 ? "s" : ""}`, inline: true },
+        { name: "Total Pulls",  value: `**${user.stats.totalPullsDone}**`, inline: true },
       )
 
-      // ── Divider + Favorite card ──
+      // Favorite card
       .addFields({
-        name: "⸻⸻⸻  Favorite Card",
+        name: "Favorite Card",
         value: favoriteValue,
         inline: false,
       })
 
-      // ── Statistics ──
-      .addFields({
-        name: "📊 Statistics",
-        value: [
-          `📦 Cards obtained  **${user.stats.totalCardsEverObtained}**`,
-          `<:duck_coin:1494344514465431614> Duckcoin earned  **${user.stats.totalGoldEverEarned.toLocaleString()}**`,
-          `⚔️ Raid damage  **${user.stats.raidDamageTotal.toLocaleString()}**`,
-        ].join("\n"),
-        inline: true,
-      })
+      // Statistics + Wallet side by side
+      .addFields(
+        {
+          name: "Statistics",
+          value: [
+            `📦 Cards obtained: **${user.stats.totalCardsEverObtained}**`,
+            `${DUCK_COIN} Duckcoin earned: **${user.stats.totalGoldEverEarned.toLocaleString()}**`,
+            `⚔️ Raid damage: **${user.stats.raidDamageTotal.toLocaleString()}**`,
+          ].join("\n"),
+          inline: true,
+        },
+        {
+          name: "Wallet",
+          value: [
+            `${DUCK_COIN} **${user.currency.gold.toLocaleString()}** Duckcoin`,
+            `💎 **${user.currency.premiumCurrency}** Premium`,
+            `${PICKUP} **${user.currency.pickupTickets}** Pick Up`,
+            `${PERMA} **${user.currency.regularTickets}** Regular`,
+          ].join("\n"),
+          inline: true,
+        },
+      )
 
-      // ── Wallet ──
-      .addFields({
-        name: "👛 Wallet",
-        value: [
-          `<:duck_coin:1494344514465431614> Duckcoin  **${user.currency.gold.toLocaleString()}**`,
-          `💎 Premium  **${user.currency.premiumCurrency}**`,
-          `<:pickup_ticket:1494294616495620128> Pick Up  **${user.currency.pickupTickets}**`,
-          `<:perma_ticket:1494292877491310666> Regular  **${user.currency.regularTickets}**`,
-        ].join("\n"),
-        inline: true,
-      })
-
-      // ── Badges ──
-      .addFields({
-        name: "🏆 Badges",
-        value: badgeStr,
-        inline: false,
-      })
+      // Badges
+      .addFields({ name: "Badges", value: badgeStr, inline: false })
 
       .setFooter({ text: `Member since ${user.firstJoinDate.toLocaleDateString("en-US")}` });
 
