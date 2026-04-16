@@ -45,10 +45,13 @@ for (const file of fs.readdirSync(eventsPath).filter(f => f.endsWith(".js"))) {
   }
 }
 
+const { startDashboard } = require("./dashboard/server");
+
 // Start
 (async () => {
   await connectMongo();
   await connectRedis();
+  startDashboard();
   await client.login(process.env.DISCORD_TOKEN);
 })();
 

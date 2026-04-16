@@ -5,6 +5,8 @@ services:
     build: .
     restart: unless-stopped
     env_file: .env
+    expose:
+      - "3000"
     depends_on:
       mongo:
         condition: service_healthy
