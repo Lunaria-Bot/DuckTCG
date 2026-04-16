@@ -61,11 +61,15 @@ module.exports = {
 
     // Favorite card
     let favoriteValue = "*No favorite card set*";
+    let favoriteImageUrl = null;
     if (user.favoriteCardId) {
       const pc = await PlayerCard.findById(user.favoriteCardId);
       if (pc) {
         const card = await Card.findOne({ cardId: pc.cardId });
-        if (card) favoriteValue = `🃏 **${card.name}**\n${card.anime} · Lv.${pc.level} · Print #${pc.printNumber}`;
+        if (card) {
+          favoriteValue = `🃏 **${card.name}**\n${card.anime} · Lv.${pc.level} · Print #${pc.printNumber}`;
+          if (card.imageUrl) favoriteImageUrl = card.imageUrl;
+        }
       }
     }
 
@@ -88,7 +92,7 @@ module.exports = {
         name: `${target.username}'s Profile`,
         iconURL: target.displayAvatarURL(),
       })
-      .setThumbnail(target.displayAvatarURL());
+      .setThumbnail(favoriteImageUrl ?? target.displayAvatarURL());
 
     // Bio (if set)
     if (user.bio) {
