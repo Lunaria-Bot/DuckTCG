@@ -99,9 +99,11 @@ module.exports = {
         {
           name: "Getting Started",
           value: [
-            "`/banners` — view active gacha banners",
-            "`/pull` — perform a pull",
+            "`/banners` — view active gacha banners and pull",
+            "`/inventory` — view your card collection",
             "`/profile` — view your profile",
+            "`/daily` — claim your daily rewards",
+            "`/quests` — view your daily & weekly quests",
           ].join("\n"),
           inline: false,
         }
