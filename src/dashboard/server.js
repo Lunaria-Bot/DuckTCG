@@ -450,8 +450,13 @@ app.get("/cards", auth, async (req, res) => {
   `, req.token));
 });
 
-app.get("/cards/new", auth, (req, res) => {
+app.get("/cards/new", auth, async (req, res) => {
   const t = q(req.token);
+  const banners = await Banner.find({ isActive: true }).sort({ type: -1, name: 1 });
+  const bannerOptions = banners.map(b =>
+    `<option value="${b.bannerId}">[${b.type === "pickup" ? "Pick Up" : "Regular"}] ${b.name}</option>`
+  ).join("");
+
   res.send(renderPage("New Card", `
     <div class="card" style="max-width:600px">
       <form method="POST" action="/cards/new${t}">
@@ -461,7 +466,7 @@ app.get("/cards/new", auth, (req, res) => {
         </div>
         <div class="row">
           <div><label>Anime</label><input name="anime" placeholder="Naruto" required/></div>
-          <div><label>Image URL</label><input name="imageUrl" placeholder="https://..." required/></div>
+          <div><label>Image URL</label><input name="imageUrl" placeholder="https://..."/></div>
         </div>
         <div class="row">
           <div><label>Rarity</label>
@@ -480,10 +485,10 @@ app.get("/cards/new", auth, (req, res) => {
             </select>
           </div>
         </div>
-        <div><label>Banner Type</label>
-          <select name="bannerType">
-            <option value="regular">Regular</option>
-            <option value="pickup">Pick Up</option>
+        <div><label>Add to Banner (optional)</label>
+          <select name="addToBanner">
+            <option value="">— Don't add to any banner —</option>
+            ${bannerOptions}
           </select>
         </div>
         <div class="row3">
@@ -503,11 +508,30 @@ app.get("/cards/new", auth, (req, res) => {
 app.post("/cards/new", auth, async (req, res) => {
   const t = q(req.token);
   try {
-    const { cardId, name, anime, imageUrl, rarity, role, bannerType, baseDamage, baseMana, baseHp } = req.body;
+    const { cardId, name, anime, imageUrl, rarity, role, addToBanner, baseDamage, baseMana, baseHp } = req.body;
+
+    // Determine bannerType from selected banner
+    let bannerType = "regular";
+    if (addToBanner) {
+      const banner = await Banner.findOne({ bannerId: addToBanner });
+      if (banner) bannerType = banner.type;
+    }
+
     await Card.create({
-      cardId, name, anime, imageUrl, rarity, role, bannerType,
+      cardId, name, anime,
+      imageUrl: imageUrl || null,
+      rarity, role, bannerType,
       baseStats: { damage: parseInt(baseDamage), mana: parseInt(baseMana), hp: parseInt(baseHp) },
     });
+
+    // Auto-add to banner pool if selected
+    if (addToBanner) {
+      await Banner.findOneAndUpdate(
+        { bannerId: addToBanner },
+        { $addToSet: { [`pool.${rarity}`]: cardId } }
+      );
+    }
+
     res.redirect(`/cards${t}`);
   } catch (err) {
     res.send(renderPage("Error", `<div class="alert alert-red">${err.message}</div><a href="/cards/new${t}" class="btn">Back</a>`, req.token));
@@ -685,7 +709,7 @@ const fs = require("fs");
 const UPLOADS_DIR = path.join(__dirname, "uploads");
 if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 
-// Serve uploaded files publicly at /uploads/filename
+// Serve uploaded files publicly — supports /uploads/banner/file.jpg etc.
 app.use("/uploads", express.static(UPLOADS_DIR));
 
 const storage = multer.diskStorage({
@@ -713,48 +737,61 @@ const upload = multer({
 
 app.get("/media", auth, (req, res) => {
   const t = q(req.token);
+  const category = req.query.cat || "banner";
+  const CATS = ["banner", "card", "other"];
 
-  const files = fs.existsSync(UPLOADS_DIR)
-    ? fs.readdirSync(UPLOADS_DIR).filter(f => /\.(jpg|jpeg|png|gif|webp)$/i.test(f))
-    : [];
+  const catDir = path.join(UPLOADS_DIR, category);
+  if (!fs.existsSync(catDir)) fs.mkdirSync(catDir, { recursive: true });
 
-  // Build base URL from request
+  const files = fs.readdirSync(catDir).filter(f => /\.(jpg|jpeg|png|gif|webp)$/i.test(f));
   const baseUrl = `${req.protocol}://${req.get("host")}`;
 
+  const tabs = CATS.map(c => `
+    <a href="/media${t}&cat=${c}" class="tab ${c === category ? "active" : ""}"
+      style="text-decoration:none;padding:8px 20px;border-radius:6px 6px 0 0;font-size:14px;
+      background:${c === category ? "#1a1a24" : "transparent"};
+      color:${c === category ? "#a78bfa" : "#888"};
+      border:${c === category ? "1px solid #2d2d3d" : "1px solid transparent"};
+      border-bottom:${c === category ? "1px solid #1a1a24" : "1px solid transparent"};
+      margin-bottom:-1px">
+      ${c.charAt(0).toUpperCase() + c.slice(1)}
+    </a>`
+  ).join("");
+
   const grid = files.length
-    ? files.reverse().map(f => {
-        const url = `${baseUrl}/uploads/${f}`;
+    ? [...files].reverse().map(f => {
+        const url = `${baseUrl}/uploads/${category}/${f}`;
         return `
         <div style="background:#0f0f13;border:1px solid #2d2d3d;border-radius:8px;overflow:hidden">
-          <img src="/uploads/${f}" style="width:100%;height:140px;object-fit:cover;display:block"/>
+          <img src="/uploads/${category}/${f}" style="width:100%;height:140px;object-fit:cover;display:block"/>
           <div style="padding:10px">
             <div style="font-size:11px;color:#666;margin-bottom:8px;word-break:break-all">${f}</div>
             <div style="display:flex;gap:6px">
-              <input
-                type="text"
-                value="${url}"
-                readonly
-                onclick="this.select()"
-                style="flex:1;font-size:11px;padding:4px 8px;cursor:pointer"
-                title="Click to select"
-              />
+              <input type="text" value="${url}" readonly onclick="this.select()"
+                style="flex:1;font-size:11px;padding:4px 8px;cursor:pointer" title="Click to select"/>
               <button onclick="navigator.clipboard.writeText('${url}');this.textContent='✓';setTimeout(()=>this.textContent='Copy',1200)"
                 class="btn btn-sm" style="white-space:nowrap">Copy</button>
             </div>
             <form method="POST" action="/media/delete${t}" style="margin-top:6px">
               <input type="hidden" name="filename" value="${f}"/>
+              <input type="hidden" name="category" value="${category}"/>
               <button type="submit" class="btn btn-sm btn-red" style="width:100%"
                 onclick="return confirm('Delete ${f}?')">Delete</button>
             </form>
           </div>
         </div>`;
       }).join("")
-    : `<p style="color:#666;grid-column:1/-1">No images uploaded yet.</p>`;
+    : `<p style="color:#666;grid-column:1/-1;padding:20px 0">No images in this category yet.</p>`;
 
   res.send(renderPage("Media", `
     <div class="card" style="max-width:500px;margin-bottom:24px">
       <h2>Upload Image</h2>
       <form method="POST" action="/media/upload${t}" enctype="multipart/form-data">
+        <div><label>Category</label>
+          <select name="category">
+            ${CATS.map(c => `<option value="${c}" ${c === category ? "selected" : ""}>${c.charAt(0).toUpperCase() + c.slice(1)}</option>`).join("")}
+          </select>
+        </div>
         <div>
           <label>Select image (jpg, png, gif, webp — max 8MB)</label>
           <input type="file" name="image" accept="image/*" required/>
@@ -762,6 +799,7 @@ app.get("/media", auth, (req, res) => {
         <button type="submit">Upload</button>
       </form>
     </div>
+    <div style="display:flex;gap:0;border-bottom:1px solid #2d2d3d;margin-bottom:20px">${tabs}</div>
     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px">
       ${grid}
     </div>
@@ -770,26 +808,59 @@ app.get("/media", auth, (req, res) => {
 
 app.post("/media/upload", auth, (req, res) => {
   const t = q(req.token);
-  upload.single("image")(req, res, (err) => {
+  const CATS = ["banner", "card", "other"];
+
+  // Read category from body before multer processes file
+  // We use a temp multer to grab category field first
+  const tempUpload = multer({ storage: multer.memoryStorage() }).none();
+
+  // Custom storage that uses category subfolder
+  const catStorage = multer.diskStorage({
+    destination: (req, file, cb) => {
+      const cat = CATS.includes(req.body?.category) ? req.body.category : "other";
+      const dir = path.join(UPLOADS_DIR, cat);
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      cb(null, dir);
+    },
+    filename: (req, file, cb) => {
+      const ext = path.extname(file.originalname).toLowerCase();
+      const name = path.basename(file.originalname, ext).replace(/[^a-z0-9_-]/gi, "_").toLowerCase();
+      cb(null, `${name}_${Date.now()}${ext}`);
+    },
+  });
+
+  const catUpload = multer({
+    storage: catStorage,
+    limits: { fileSize: 8 * 1024 * 1024 },
+    fileFilter: (req, file, cb) => {
+      const allowed = [".jpg", ".jpeg", ".png", ".gif", ".webp"];
+      if (allowed.includes(path.extname(file.originalname).toLowerCase())) return cb(null, true);
+      cb(new Error("Only image files are allowed (jpg, png, gif, webp)"));
+    },
+  });
+
+  catUpload.single("image")(req, res, (err) => {
     if (err) {
       return res.send(renderPage("Upload Error", `
         <div class="alert alert-red">${err.message}</div>
         <a href="/media${t}" class="btn">Back</a>
       `, req.token));
     }
-    res.redirect(`/media${t}`);
+    const cat = CATS.includes(req.body?.category) ? req.body.category : "other";
+    res.redirect(`/media${t}&cat=${cat}`);
   });
 });
 
 app.post("/media/delete", auth, (req, res) => {
   const t = q(req.token);
-  const { filename } = req.body;
-  // Safety: only allow simple filenames, no path traversal
+  const { filename, category } = req.body;
+  const CATS = ["banner", "card", "other"];
+  const cat = CATS.includes(category) ? category : "other";
   if (filename && /^[a-z0-9_\-.]+$/i.test(filename)) {
-    const filepath = path.join(UPLOADS_DIR, filename);
+    const filepath = path.join(UPLOADS_DIR, cat, filename);
     if (fs.existsSync(filepath)) fs.unlinkSync(filepath);
   }
-  res.redirect(`/media${t}`);
+  res.redirect(`/media${t}&cat=${cat}`);
 });
 
 // ─── Start ────────────────────────────────────────────────────────────────────
