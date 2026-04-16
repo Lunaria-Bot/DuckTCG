@@ -452,10 +452,13 @@ app.get("/cards", auth, async (req, res) => {
 
 app.get("/cards/new", auth, async (req, res) => {
   const t = q(req.token);
-  const banners = await Banner.find({ isActive: true }).sort({ type: -1, name: 1 });
-  const bannerOptions = banners.map(b =>
-    `<option value="${b.bannerId}">[${b.type === "pickup" ? "Pick Up" : "Regular"}] ${b.name}</option>`
-  ).join("");
+  // Include all banners — active or not — so permanent Regular always shows
+  const banners = await Banner.find().sort({ type: 1, name: 1 }); // regular first, then pickup
+  const bannerOptions = banners.map(b => {
+    const typeLabel = b.type === "pickup" ? "Pick Up" : "Regular";
+    const statusLabel = b.isActive ? "" : " (inactive)";
+    return `<option value="${b.bannerId}">[${typeLabel}] ${b.name}${statusLabel}</option>`;
+  }).join("");
 
   res.send(renderPage("New Card", `
     <div class="card" style="max-width:600px">
