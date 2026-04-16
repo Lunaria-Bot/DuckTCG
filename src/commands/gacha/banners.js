@@ -104,10 +104,14 @@ async function buildViewCardsEmbed(banner, page, userId) {
   return { embed, total: allCardIds.length };
 }
 
-function bannerMainRow(bannerId) {
+const EMOJI_REGULAR = { id: "1494292877491310666", name: "perma_ticket" };
+const EMOJI_PICKUP  = { id: "1494294616495620128", name: "pickup_ticket" };
+
+function bannerMainRow(bannerId, bannerType = "regular") {
+  const ticketEmoji = bannerType === "pickup" ? EMOJI_PICKUP : EMOJI_REGULAR;
   return new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId(`pull_single_${bannerId}`).setLabel("Single").setStyle(ButtonStyle.Primary).setEmoji({ id: "1494292877491310666", name: "perma_ticket" }),
-    new ButtonBuilder().setCustomId(`pull_multi_${bannerId}`).setLabel("x10").setStyle(ButtonStyle.Primary).setEmoji({ id: "1494292877491310666", name: "perma_ticket" }),
+    new ButtonBuilder().setCustomId(`pull_single_${bannerId}`).setLabel("Single").setStyle(ButtonStyle.Primary).setEmoji(ticketEmoji),
+    new ButtonBuilder().setCustomId(`pull_multi_${bannerId}`).setLabel("x10").setStyle(ButtonStyle.Primary).setEmoji(ticketEmoji),
     new ButtonBuilder().setCustomId(`banner_info_${bannerId}`).setLabel("Info").setStyle(ButtonStyle.Success),
     new ButtonBuilder().setCustomId("banner_list").setLabel("Banners").setStyle(ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId(`banner_cards_${bannerId}_0`).setLabel("View Cards").setStyle(ButtonStyle.Danger),
@@ -172,14 +176,14 @@ async function handleBannerInteraction(interaction, banners) {
     const bannerId = interaction.values[0];
     const banner = banners.find(b => b.bannerId === bannerId);
     if (!banner) return interaction.update({ content: "Banner not found.", embeds: [], components: [] });
-    return interaction.update({ embeds: [buildBannerEmbed(banner)], components: [bannerMainRow(bannerId)] });
+    return interaction.update({ embeds: [buildBannerEmbed(banner)], components: [bannerMainRow(bannerId, banner.type)] });
   }
 
   if (id.startsWith("banner_view_")) {
     const bannerId = id.replace("banner_view_", "");
     const banner = banners.find(b => b.bannerId === bannerId);
     if (!banner) return interaction.update({ content: "Banner not found.", embeds: [], components: [] });
-    return interaction.update({ embeds: [buildBannerEmbed(banner)], components: [bannerMainRow(bannerId)] });
+    return interaction.update({ embeds: [buildBannerEmbed(banner)], components: [bannerMainRow(bannerId, banner.type)] });
   }
 
   if (id.startsWith("banner_info_")) {
@@ -211,7 +215,7 @@ async function handleBannerInteraction(interaction, banners) {
     await user.save();
     const results = await doPulls(interaction.user.id, banner, 1);
     await processBadges(user, interaction, "realtime");
-    return interaction.update({ embeds: [buildPullResultEmbed(results, banner, user.currency[ticketKey])], components: [bannerMainRow(bannerId)] });
+    return interaction.update({ embeds: [buildPullResultEmbed(results, banner, user.currency[ticketKey])], components: [bannerMainRow(bannerId, banner.type)] });
   }
 
   if (id.startsWith("pull_multi_")) {
@@ -226,7 +230,7 @@ async function handleBannerInteraction(interaction, banners) {
     await user.save();
     const results = await doPulls(interaction.user.id, banner, 10);
     await processBadges(user, interaction, "realtime");
-    return interaction.update({ embeds: [buildPullResultEmbed(results, banner, user.currency[ticketKey])], components: [bannerMainRow(bannerId)] });
+    return interaction.update({ embeds: [buildPullResultEmbed(results, banner, user.currency[ticketKey])], components: [bannerMainRow(bannerId, banner.type)] });
   }
 }
 
@@ -247,7 +251,7 @@ module.exports = {
     const first = banners[0];
     const msg = await interaction.editReply({
       embeds: [buildBannerEmbed(first)],
-      components: [bannerMainRow(first.bannerId)],
+      components: [bannerMainRow(first.bannerId, first.type)],
     });
 
     const collector = msg.createMessageComponentCollector({
