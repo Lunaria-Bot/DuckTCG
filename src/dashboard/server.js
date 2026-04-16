@@ -87,9 +87,8 @@ function renderPage(title, content, user = null) {
     <nav>
       <span class="brand">🦆 DuckyTCG</span>
       <a href="/">Dashboard</a>
-      ${isEditor ? `<a href="/banners">Banners</a><a href="/cards">Cards</a><a href="/media">Media</a>` : ""}
+      ${isEditor ? `<a href="/banners">Banners</a><a href="/cards">Cards</a><a href="/media">Media</a><a href="/calendar">Calendar</a>` : ""}
       ${isAdmin ? `<a href="/raids">Raids</a><a href="/players">Players</a>` : ""}
-      <a href="/calendar">Calendar</a>
       <a href="/messages">Messages</a>
       ${isAdmin ? `<a href="/team">Team</a>` : ""}
       <a href="/audit">Audit</a>
@@ -327,7 +326,7 @@ app.get("/", auth, async (req, res) => {
 });
 
 // ─── CALENDAR ────────────────────────────────────────────────────────────────
-app.get("/calendar", auth, async (req, res) => {
+app.get("/calendar", auth, editorOrAdmin, async (req, res) => {
   const now = new Date();
   const year  = parseInt(req.query.year  || now.getFullYear());
   const month = parseInt(req.query.month || now.getMonth());
@@ -421,7 +420,7 @@ app.get("/calendar", auth, async (req, res) => {
   `, req.user));
 });
 
-app.get("/calendar/new", auth, async (req, res) => {
+app.get("/calendar/new", auth, editorOrAdmin, async (req, res) => {
   const banners = await Banner.find().sort({ name: 1 });
   res.send(renderPage("New Event", `
     <div class="card" style="max-width:560px">
@@ -451,7 +450,7 @@ app.get("/calendar/new", auth, async (req, res) => {
   `, req.user));
 });
 
-app.post("/calendar/new", auth, async (req, res) => {
+app.post("/calendar/new", auth, editorOrAdmin, async (req, res) => {
   const { title, type, color, startDate, endDate, bannerId, description } = req.body;
   await ScheduledEvent.create({
     title, type, color, description,
@@ -464,7 +463,7 @@ app.post("/calendar/new", auth, async (req, res) => {
   res.redirect("/calendar");
 });
 
-app.get("/calendar/:id/edit", auth, async (req, res) => {
+app.get("/calendar/:id/edit", auth, editorOrAdmin, async (req, res) => {
   const event = await ScheduledEvent.findById(req.params.id);
   if (!event) return res.redirect("/calendar");
   const banners = await Banner.find().sort({ name: 1 });
@@ -496,7 +495,7 @@ app.get("/calendar/:id/edit", auth, async (req, res) => {
   `, req.user));
 });
 
-app.post("/calendar/:id/edit", auth, async (req, res) => {
+app.post("/calendar/:id/edit", auth, editorOrAdmin, async (req, res) => {
   const { title, type, color, startDate, endDate, bannerId, description } = req.body;
   await ScheduledEvent.findByIdAndUpdate(req.params.id, {
     title, type, color, description,
@@ -508,7 +507,7 @@ app.post("/calendar/:id/edit", auth, async (req, res) => {
   res.redirect("/calendar");
 });
 
-app.get("/calendar/:id/delete", auth, async (req, res) => {
+app.get("/calendar/:id/delete", auth, editorOrAdmin, async (req, res) => {
   const event = await ScheduledEvent.findByIdAndDelete(req.params.id);
   if (event) await audit(req.user, "delete", "event", req.params.id, `Deleted event "${event.title}"`, null, null);
   res.redirect("/calendar");
