@@ -4,6 +4,7 @@ const { getOrCreateUser } = require("../../utils/getOrCreateUser");
 const PlayerCard = require("../../models/PlayerCard");
 const Raid = require("../../models/Raid");
 const { calculateRaidDamage } = require("../../services/cardStats");
+const { processBadges } = require("../../services/badges");
 
 const RAID_COOLDOWN_SECONDS = 3600;
 
@@ -128,6 +129,11 @@ async function doAttack(interaction, raid) {
   };
   if (droppedPull) updateData.$inc["currency.regularTickets"] = 1;
   await user.updateOne(updateData);
+
+  // Reload user for badge check
+  const User = require("../../models/User");
+  const freshUser = await User.findOne({ userId: interaction.user.id });
+  if (freshUser) await processBadges(freshUser, interaction, "daily");
 
   await redis.set(cooldownKey, "1", "EX", RAID_COOLDOWN_SECONDS);
 

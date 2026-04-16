@@ -12,6 +12,7 @@ const Card = require("../../models/Card");
 const PlayerCard = require("../../models/PlayerCard");
 const User = require("../../models/User");
 const { doPulls } = require("../../services/gacha");
+const { processBadges } = require("../../services/badges");
 const { requireProfile } = require("../../utils/requireProfile");
 
 const RARITY_COLOR = {
@@ -209,6 +210,7 @@ async function handleBannerInteraction(interaction, banners) {
     user.currency[ticketKey] -= 1;
     await user.save();
     const results = await doPulls(interaction.user.id, banner, 1);
+    await processBadges(user, interaction, "realtime");
     return interaction.update({ embeds: [buildPullResultEmbed(results, banner, user.currency[ticketKey])], components: [bannerMainRow(bannerId)] });
   }
 
@@ -223,6 +225,7 @@ async function handleBannerInteraction(interaction, banners) {
     user.currency[ticketKey] -= 10;
     await user.save();
     const results = await doPulls(interaction.user.id, banner, 10);
+    await processBadges(user, interaction, "realtime");
     return interaction.update({ embeds: [buildPullResultEmbed(results, banner, user.currency[ticketKey])], components: [bannerMainRow(bannerId)] });
   }
 }

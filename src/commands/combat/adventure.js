@@ -1,6 +1,7 @@
 const { requireProfile } = require("../../utils/requireProfile");
 const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
 const { getOrCreateUser } = require("../../utils/getOrCreateUser");
+const { processBadges } = require("../../services/badges");
 
 const ADVENTURE_DURATION_MS = 6 * 60 * 60 * 1000;
 
@@ -125,6 +126,9 @@ module.exports = {
       user.adventure.startedAt = null;
       user.adventure.endsAt = null;
       await user.save();
+
+      // Check gold + CP badges
+      await processBadges(user, interaction, "daily");
 
       const embed = new EmbedBuilder()
         .setTitle("Adventure Complete!")

@@ -1,6 +1,7 @@
 const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
 const { requireProfile } = require("../../utils/requireProfile");
 const User = require("../../models/User");
+const { processBadges } = require("../../services/badges");
 
 // ─── Reward table (28-day cycle) ─────────────────────────────────────────────
 // Each entry = rewards for that day in the cycle (1-indexed)
@@ -128,6 +129,9 @@ module.exports = {
 
     // Reload for accurate wallet display
     const updatedUser = await User.findOne({ userId: interaction.user.id });
+
+    // Check all badges on daily (gold + collector + duck CP)
+    await processBadges(updatedUser, interaction, "all");
 
     const streakReset = newStreak === 1 && lastUTC && lastUTC !== yesterdayStr;
     const milestone = isMilestone(cycleDay);
