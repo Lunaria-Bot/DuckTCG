@@ -30,8 +30,8 @@ function getDayRewards(cycleDay) {
 function formatRewards(r) {
   const lines = [];
   if (r.gold)            lines.push(`💰 **${r.gold.toLocaleString()} Gold**`);
-  if (r.regularTickets)  lines.push(`🎟️ **${r.regularTickets} Regular Ticket${r.regularTickets > 1 ? "s" : ""}**`);
-  if (r.pickupTickets)   lines.push(`✨ **${r.pickupTickets} Pick Up Ticket${r.pickupTickets > 1 ? "s" : ""}**`);
+  if (r.regularTickets)  lines.push(`<:perma_ticket:1494292877491310666> **${r.regularTickets} Regular Ticket${r.regularTickets > 1 ? "s" : ""}**`);
+  if (r.pickupTickets)   lines.push(`<:pickup_ticket:1494294616495620128> **${r.pickupTickets} Pick Up Ticket${r.pickupTickets > 1 ? "s" : ""}**`);
   if (r.premiumCurrency) lines.push(`💎 **${r.premiumCurrency} Premium**`);
   return lines.join("\n");
 }
@@ -55,8 +55,8 @@ function buildWeekPreview(currentStreak) {
 
     const marker = isToday ? "▶ " : (isMile ? "⭐ " : "   ");
     const label = isToday ? `**Day ${currentStreak + i}**` : `Day ${currentStreak + i}`;
-    const reward = r.pickupTickets   ? "✨ Pickup Ticket"
-                 : r.regularTickets  ? "🎟️ Regular Ticket"
+    const reward = r.pickupTickets   ? "<:pickup_ticket:1494294616495620128> Pickup Ticket"
+                 : r.regularTickets  ? "<:perma_ticket:1494292877491310666> Regular Ticket"
                  : `💰 ${r.gold.toLocaleString()} Gold`;
 
     lines.push(`${marker}${label} — ${reward}`);
@@ -157,7 +157,7 @@ module.exports = {
           name: "Wallet",
           value: [
             `💰 ${updatedUser.currency.gold.toLocaleString()} Gold`,
-            `🎟️ ${updatedUser.currency.regularTickets} Regular  ✨ ${updatedUser.currency.pickupTickets} Pick Up`,
+            `<:perma_ticket:1494292877491310666> ${updatedUser.currency.regularTickets} Regular  <:pickup_ticket:1494294616495620128> ${updatedUser.currency.pickupTickets} Pick Up`,
             `💎 ${updatedUser.currency.premiumCurrency} Premium`,
           ].join("\n"),
           inline: false,

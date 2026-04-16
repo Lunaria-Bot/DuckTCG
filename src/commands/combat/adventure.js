@@ -135,7 +135,7 @@ module.exports = {
         .setColor(0x66BB6A)
         .addFields(
           { name: "Gold Earned", value: `**${gold.toLocaleString()}** 💰`, inline: true },
-          { name: "EXP per Card", value: `**+${expPerCard}** ✨`, inline: true },
+          { name: "EXP per Card", value: `**+${expPerCard}** ⭐`, inline: true },
         );
 
       if (levelUps.length) {

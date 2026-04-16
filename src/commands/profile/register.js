@@ -91,7 +91,7 @@ module.exports = {
         {
           name: "Welcome Rewards",
           value: [
-            `🎟️ **${WELCOME_TICKETS} Regular Tickets** — enough for 1 free multi pull`,
+            `<:perma_ticket:1494292877491310666> **${WELCOME_TICKETS} Regular Tickets** — enough for 1 free multi pull`,
             `💰 **${WELCOME_GOLD.toLocaleString()} Gold**`,
           ].join("\n"),
           inline: false,

@@ -60,7 +60,7 @@ function buildBannerEmbed(banner) {
 
 function buildInfoEmbed(banner) {
   const featuredList = banner.featuredCards.length
-    ? banner.featuredCards.map((id, i) => `${i + 1}. ✨ ${id}`).join("\n")
+    ? banner.featuredCards.map((id, i) => `${i + 1}. <:pickup_ticket:1494294616495620128> ${id}`).join("\n")
     : "*No featured cards*";
   const start = formatDate(banner.startsAt);
   const end   = formatDate(banner.endsAt);
@@ -106,8 +106,8 @@ async function buildViewCardsEmbed(banner, page, userId) {
 
 function bannerMainRow(bannerId) {
   return new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId(`pull_single_${bannerId}`).setLabel("Single").setStyle(ButtonStyle.Primary).setEmoji("🎟️"),
-    new ButtonBuilder().setCustomId(`pull_multi_${bannerId}`).setLabel("x10").setStyle(ButtonStyle.Primary).setEmoji("🎟️"),
+    new ButtonBuilder().setCustomId(`pull_single_${bannerId}`).setLabel("Single").setStyle(ButtonStyle.Primary).setEmoji({ id: "1494292877491310666", name: "perma_ticket" }),
+    new ButtonBuilder().setCustomId(`pull_multi_${bannerId}`).setLabel("x10").setStyle(ButtonStyle.Primary).setEmoji({ id: "1494292877491310666", name: "perma_ticket" }),
     new ButtonBuilder().setCustomId(`banner_info_${bannerId}`).setLabel("Info").setStyle(ButtonStyle.Success),
     new ButtonBuilder().setCustomId("banner_list").setLabel("Banners").setStyle(ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId(`banner_cards_${bannerId}_0`).setLabel("View Cards").setStyle(ButtonStyle.Danger),
