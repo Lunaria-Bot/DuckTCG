@@ -14,7 +14,9 @@ const RARITY_EMOJI = { exceptional: "🌟", special: "🟪", rare: "🟦", commo
 const RARITY_LABEL = { exceptional: "Exceptional ✦✦✦", special: "Special ✦✦", rare: "Rare ✦", common: "Common" };
 const RARITY_COLOR = { exceptional: 0xFFD700, special: 0xAB47BC, rare: 0x42A5F5, common: 0x78909C };
 const ROLE_EMOJI   = { dps: "⚔️", support: "💚", tank: "🛡️" };
+const PAGE_SIZE    = 10;
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 function sortCards(pairs, sortBy) {
   return [...pairs].sort((a, b) => {
     switch (sortBy) {
@@ -36,7 +38,39 @@ function filterCards(pairs, filterRarity, filterRole) {
   });
 }
 
-// ─── Card embed ───────────────────────────────────────────────────────────────
+// ─── LIST embed ───────────────────────────────────────────────────────────────
+function buildListEmbed(pairs, page, username, sortBy, filterRarity, filterRole) {
+  const totalPages = Math.max(1, Math.ceil(pairs.length / PAGE_SIZE));
+  const slice = pairs.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+
+  const lines = slice.map(({ pc, card }, i) => {
+    const num = page * PAGE_SIZE + i + 1;
+    const rar = RARITY_EMOJI[card.rarity] ?? "⬜";
+    const rol = ROLE_EMOJI[card.role] ?? "";
+    return `\`${String(num).padStart(3," ")}.\` ${rar}${rol} **${card.name}** — Lv.**${pc.level}** · Print **#${pc.printNumber}**`;
+  });
+
+  const activeFilters = [
+    filterRarity ? filterRarity : null,
+    filterRole   ? filterRole   : null,
+  ].filter(Boolean);
+
+  const sortLabel = { rarity:"Rarity", level:"Level", print:"Print", anime:"Anime", date:"Recent" }[sortBy] ?? sortBy;
+
+  const footerParts = [
+    `Page ${page + 1}/${totalPages} · ${pairs.length} card${pairs.length !== 1 ? "s" : ""}`,
+    `Sort: ${sortLabel}`,
+    activeFilters.length ? `Filter: ${activeFilters.join(", ")}` : null,
+  ].filter(Boolean);
+
+  return new EmbedBuilder()
+    .setTitle(`${username}'s Collection`)
+    .setDescription(lines.join("\n") || "*No cards match your filters.*")
+    .setColor(0x5B21B6)
+    .setFooter({ text: footerParts.join(" · ") });
+}
+
+// ─── CARD embed ───────────────────────────────────────────────────────────────
 function buildCardEmbed(pairs, index, username) {
   if (!pairs.length) {
     return new EmbedBuilder()
@@ -46,69 +80,82 @@ function buildCardEmbed(pairs, index, username) {
   }
 
   const { pc, card } = pairs[index];
-  const rarEmoji  = RARITY_EMOJI[card.rarity] ?? "⬜";
-  const roleEmoji = ROLE_EMOJI[card.role] ?? "";
-  const color     = RARITY_COLOR[card.rarity] ?? 0x5B21B6;
-
-  // XP bar for the card level
   const maxLevel  = pc.isAscended ? 125 : 100;
-  const lvlPct    = Math.round((pc.level / maxLevel) * 100);
-  const lvlFilled = Math.round(lvlPct / 10);
+  const lvlFilled = Math.round((pc.level / maxLevel) * 10);
   const lvlBar    = "█".repeat(lvlFilled) + "░".repeat(10 - lvlFilled);
 
   const embed = new EmbedBuilder()
-    .setTitle(`${rarEmoji} ${card.name}`)
-    .setColor(color)
+    .setTitle(`${RARITY_EMOJI[card.rarity] ?? "⬜"} ${card.name}`)
     .setDescription(`*${card.anime}*`)
+    .setColor(RARITY_COLOR[card.rarity] ?? 0x5B21B6)
     .addFields(
-      { name: "Rarity",         value: RARITY_LABEL[card.rarity] ?? card.rarity, inline: true },
-      { name: "Role",           value: `${roleEmoji} ${card.role.toUpperCase()}`, inline: true },
-      { name: "Print",          value: `**#${pc.printNumber}**`, inline: true },
-      { name: "Level",          value: `**${pc.level}** / ${maxLevel}\n\`[${lvlBar}]\``, inline: true },
-      { name: "Combat Power",   value: `**${(pc.cachedStats?.combatPower ?? 0).toLocaleString()}**`, inline: true },
-      { name: pc.isAscended ? "✨ Ascended" : "Ascension", value: pc.isAscended ? "Yes" : pc.level >= 100 ? "Available!" : `At level 100`, inline: true },
+      { name: "Rarity",       value: RARITY_LABEL[card.rarity] ?? card.rarity,          inline: true },
+      { name: "Role",         value: `${ROLE_EMOJI[card.role] ?? ""} ${card.role.toUpperCase()}`, inline: true },
+      { name: "Print",        value: `**#${pc.printNumber}**`,                           inline: true },
+      { name: "Level",        value: `**${pc.level}** / ${maxLevel}\n\`[${lvlBar}]\``,  inline: true },
+      { name: "Combat Power", value: `**${(pc.cachedStats?.combatPower ?? 0).toLocaleString()}**`, inline: true },
+      { name: pc.isAscended ? "✨ Ascended" : "Ascension",
+        value: pc.isAscended ? "Yes" : pc.level >= 100 ? "Available!" : `At level 100`, inline: true },
     )
     .setFooter({ text: `${username}'s Collection · ${index + 1} / ${pairs.length}` });
 
   if (card.imageUrl) embed.setImage(card.imageUrl);
-
   return embed;
 }
 
 // ─── Rows ─────────────────────────────────────────────────────────────────────
-function buildNavRow(index, total) {
+
+// Row 1 — Navigation + view toggle
+function buildNavRow(index, total, view, page, totalPages) {
+  const isCard = view === "card";
+  const cur    = isCard ? index : page;
+  const last   = isCard ? total - 1 : totalPages - 1;
+
   return new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId("inv_first").setEmoji("⏮").setStyle(ButtonStyle.Secondary).setDisabled(cur === 0),
+    new ButtonBuilder().setCustomId("inv_prev").setEmoji("◀").setStyle(ButtonStyle.Primary).setDisabled(cur === 0),
+    new ButtonBuilder().setCustomId("inv_next").setEmoji("▶").setStyle(ButtonStyle.Primary).setDisabled(cur >= last),
+    new ButtonBuilder().setCustomId("inv_last").setEmoji("⏭").setStyle(ButtonStyle.Secondary).setDisabled(cur >= last),
     new ButtonBuilder()
-      .setCustomId("inv_first").setEmoji("⏮").setStyle(ButtonStyle.Secondary).setDisabled(index === 0),
-    new ButtonBuilder()
-      .setCustomId("inv_prev").setEmoji("◀").setStyle(ButtonStyle.Primary).setDisabled(index === 0),
-    new ButtonBuilder()
-      .setCustomId("inv_next").setEmoji("▶").setStyle(ButtonStyle.Primary).setDisabled(index >= total - 1),
-    new ButtonBuilder()
-      .setCustomId("inv_last").setEmoji("⏭").setStyle(ButtonStyle.Secondary).setDisabled(index >= total - 1),
+      .setCustomId("inv_toggle_view")
+      .setLabel(isCard ? "📋 List" : "🖼️ Card")
+      .setStyle(ButtonStyle.Success),
   );
 }
 
-function buildFilterRow() {
+// Row 2 — Filter + Sort buttons (open dropdown)
+function buildControlRow(activeSort, activeRarity, activeRole) {
+  const sortLabel    = { rarity:"Rarity ↕", level:"Level ↕", print:"Print ↕", anime:"Anime ↕", date:"Recent ↕" }[activeSort] ?? "Sort ↕";
+  const rarityLabel  = activeRarity ? `${RARITY_EMOJI[activeRarity]} ${activeRarity}` : "Rarity";
+  const roleLabel    = activeRole   ? `${ROLE_EMOJI[activeRole] ?? ""} ${activeRole}`  : "Role";
+
   return new ActionRowBuilder().addComponents(
-    new StringSelectMenuBuilder()
-      .setCustomId("inv_filter_rarity")
-      .setPlaceholder("🌟 Filter by rarity")
-      .addOptions([
-        new StringSelectMenuOptionBuilder().setLabel("All rarities").setValue("all").setEmoji("✨"),
-        new StringSelectMenuOptionBuilder().setLabel("Exceptional").setValue("exceptional").setEmoji("🌟"),
-        new StringSelectMenuOptionBuilder().setLabel("Special").setValue("special").setEmoji("🟪"),
-        new StringSelectMenuOptionBuilder().setLabel("Rare").setValue("rare").setEmoji("🟦"),
-        new StringSelectMenuOptionBuilder().setLabel("Common").setValue("common").setEmoji("⬜"),
-      ])
+    new ButtonBuilder()
+      .setCustomId("inv_open_sort")
+      .setLabel(sortLabel)
+      .setStyle(activeSort !== "rarity" ? ButtonStyle.Primary : ButtonStyle.Secondary),
+    new ButtonBuilder()
+      .setCustomId("inv_open_rarity")
+      .setLabel(rarityLabel)
+      .setStyle(activeRarity ? ButtonStyle.Primary : ButtonStyle.Secondary),
+    new ButtonBuilder()
+      .setCustomId("inv_open_role")
+      .setLabel(roleLabel)
+      .setStyle(activeRole ? ButtonStyle.Primary : ButtonStyle.Secondary),
+    new ButtonBuilder()
+      .setCustomId("inv_reset_filters")
+      .setLabel("✕ Reset")
+      .setStyle(ButtonStyle.Danger)
+      .setDisabled(!activeRarity && !activeRole && activeSort === "rarity"),
   );
 }
 
-function buildSortRoleRow() {
+// Sort dropdown
+function buildSortDropdown() {
   return new ActionRowBuilder().addComponents(
     new StringSelectMenuBuilder()
       .setCustomId("inv_sort")
-      .setPlaceholder("↕️ Sort by...")
+      .setPlaceholder("Sort by...")
       .addOptions([
         new StringSelectMenuOptionBuilder().setLabel("Rarity (best first)").setValue("rarity").setEmoji("🌟"),
         new StringSelectMenuOptionBuilder().setLabel("Level (highest first)").setValue("level").setEmoji("⬆️"),
@@ -119,11 +166,28 @@ function buildSortRoleRow() {
   );
 }
 
-function buildRoleRow() {
+// Rarity dropdown
+function buildRarityDropdown() {
+  return new ActionRowBuilder().addComponents(
+    new StringSelectMenuBuilder()
+      .setCustomId("inv_filter_rarity")
+      .setPlaceholder("Filter by rarity...")
+      .addOptions([
+        new StringSelectMenuOptionBuilder().setLabel("All rarities").setValue("all").setEmoji("✨"),
+        new StringSelectMenuOptionBuilder().setLabel("Exceptional").setValue("exceptional").setEmoji("🌟"),
+        new StringSelectMenuOptionBuilder().setLabel("Special").setValue("special").setEmoji("🟪"),
+        new StringSelectMenuOptionBuilder().setLabel("Rare").setValue("rare").setEmoji("🟦"),
+        new StringSelectMenuOptionBuilder().setLabel("Common").setValue("common").setEmoji("⬜"),
+      ])
+  );
+}
+
+// Role dropdown
+function buildRoleDropdown() {
   return new ActionRowBuilder().addComponents(
     new StringSelectMenuBuilder()
       .setCustomId("inv_filter_role")
-      .setPlaceholder("⚔️ Filter by role")
+      .setPlaceholder("Filter by role...")
       .addOptions([
         new StringSelectMenuOptionBuilder().setLabel("All roles").setValue("all"),
         new StringSelectMenuOptionBuilder().setLabel("DPS").setValue("dps").setEmoji("⚔️"),
@@ -131,6 +195,28 @@ function buildRoleRow() {
         new StringSelectMenuOptionBuilder().setLabel("Tank").setValue("tank").setEmoji("🛡️"),
       ])
   );
+}
+
+// ─── Message builder ──────────────────────────────────────────────────────────
+function buildMessage(state, pairs) {
+  const { view, page, cardIndex, sortBy, filterRarity, filterRole, openDropdown } = state;
+  const totalPages = Math.max(1, Math.ceil(pairs.length / PAGE_SIZE));
+
+  const embed = view === "card"
+    ? buildCardEmbed(pairs, cardIndex, state.username)
+    : buildListEmbed(pairs, page, state.username, sortBy, filterRarity, filterRole);
+
+  const rows = [
+    buildNavRow(cardIndex, pairs.length, view, page, totalPages),
+    buildControlRow(sortBy, filterRarity, filterRole),
+  ];
+
+  // Show active dropdown if one is open
+  if (openDropdown === "sort")   rows.push(buildSortDropdown());
+  if (openDropdown === "rarity") rows.push(buildRarityDropdown());
+  if (openDropdown === "role")   rows.push(buildRoleDropdown());
+
+  return { embeds: [embed], components: rows };
 }
 
 // ─── Command ──────────────────────────────────────────────────────────────────
@@ -166,28 +252,22 @@ module.exports = {
       .map(pc => ({ pc, card: cardMap[pc.cardId] }));
 
     // State
-    let sortBy       = "rarity";
-    let filterRarity = "";
-    let filterRole   = "";
-    let index        = 0;
+    const state = {
+      username:     targetUser.username,
+      view:         "list",   // "list" | "card"
+      page:         0,        // list page
+      cardIndex:    0,        // card view index
+      sortBy:       "rarity",
+      filterRarity: "",
+      filterRole:   "",
+      openDropdown: null,     // "sort" | "rarity" | "role" | null
+    };
 
     function getVisible() {
-      const filtered = filterCards(allPairs, filterRarity, filterRole);
-      return sortCards(filtered, sortBy);
+      return sortCards(filterCards(allPairs, state.filterRarity, state.filterRole), state.sortBy);
     }
 
-    function buildMessage() {
-      const pairs = getVisible();
-      index = Math.min(index, Math.max(0, pairs.length - 1));
-      return {
-        embeds: [buildCardEmbed(pairs, index, targetUser.username)],
-        components: pairs.length > 0
-          ? [buildNavRow(index, pairs.length), buildFilterRow(), buildSortRoleRow(), buildRoleRow()]
-          : [],
-      };
-    }
-
-    const msg = await interaction.editReply(buildMessage());
+    const msg = await interaction.editReply(buildMessage(state, getVisible()));
 
     const collector = msg.createMessageComponentCollector({
       filter: i => i.user.id === interaction.user.id,
@@ -196,16 +276,81 @@ module.exports = {
 
     collector.on("collect", async i => {
       await i.deferUpdate();
+      const id = i.customId;
 
-      if      (i.customId === "inv_first") index = 0;
-      else if (i.customId === "inv_prev")  index = Math.max(0, index - 1);
-      else if (i.customId === "inv_next")  index = Math.min(getVisible().length - 1, index + 1);
-      else if (i.customId === "inv_last")  index = getVisible().length - 1;
-      else if (i.customId === "inv_filter_rarity") { filterRarity = i.values[0] === "all" ? "" : i.values[0]; index = 0; }
-      else if (i.customId === "inv_sort")           { sortBy = i.values[0]; index = 0; }
-      else if (i.customId === "inv_filter_role")    { filterRole = i.values[0] === "all" ? "" : i.values[0]; index = 0; }
+      const pairs = getVisible();
+      const totalPages = Math.max(1, Math.ceil(pairs.length / PAGE_SIZE));
 
-      await interaction.editReply(buildMessage());
+      // Navigation
+      if (id === "inv_first") {
+        if (state.view === "card") state.cardIndex = 0;
+        else state.page = 0;
+      } else if (id === "inv_prev") {
+        if (state.view === "card") state.cardIndex = Math.max(0, state.cardIndex - 1);
+        else state.page = Math.max(0, state.page - 1);
+      } else if (id === "inv_next") {
+        if (state.view === "card") state.cardIndex = Math.min(pairs.length - 1, state.cardIndex + 1);
+        else state.page = Math.min(totalPages - 1, state.page + 1);
+      } else if (id === "inv_last") {
+        if (state.view === "card") state.cardIndex = pairs.length - 1;
+        else state.page = totalPages - 1;
+      }
+
+      // View toggle
+      else if (id === "inv_toggle_view") {
+        if (state.view === "list") {
+          // Switch to card — jump to same approximate position
+          state.cardIndex = state.page * PAGE_SIZE;
+          state.view = "card";
+        } else {
+          // Switch to list — go to page containing current card
+          state.page = Math.floor(state.cardIndex / PAGE_SIZE);
+          state.view = "list";
+        }
+        state.openDropdown = null;
+      }
+
+      // Dropdown toggle buttons
+      else if (id === "inv_open_sort") {
+        state.openDropdown = state.openDropdown === "sort" ? null : "sort";
+      } else if (id === "inv_open_rarity") {
+        state.openDropdown = state.openDropdown === "rarity" ? null : "rarity";
+      } else if (id === "inv_open_role") {
+        state.openDropdown = state.openDropdown === "role" ? null : "role";
+      }
+
+      // Reset
+      else if (id === "inv_reset_filters") {
+        state.sortBy = "rarity";
+        state.filterRarity = "";
+        state.filterRole = "";
+        state.page = 0;
+        state.cardIndex = 0;
+        state.openDropdown = null;
+      }
+
+      // Dropdowns
+      else if (id === "inv_sort") {
+        state.sortBy = i.values[0];
+        state.page = 0; state.cardIndex = 0;
+        state.openDropdown = null;
+      } else if (id === "inv_filter_rarity") {
+        state.filterRarity = i.values[0] === "all" ? "" : i.values[0];
+        state.page = 0; state.cardIndex = 0;
+        state.openDropdown = null;
+      } else if (id === "inv_filter_role") {
+        state.filterRole = i.values[0] === "all" ? "" : i.values[0];
+        state.page = 0; state.cardIndex = 0;
+        state.openDropdown = null;
+      }
+
+      // Clamp indices after filter change
+      const newPairs = getVisible();
+      state.cardIndex = Math.min(state.cardIndex, Math.max(0, newPairs.length - 1));
+      const newTotalPages = Math.max(1, Math.ceil(newPairs.length / PAGE_SIZE));
+      state.page = Math.min(state.page, newTotalPages - 1);
+
+      await interaction.editReply(buildMessage(state, newPairs));
     });
 
     collector.on("end", () => {
