@@ -2,6 +2,8 @@ const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
 const { requireProfile } = require("../../utils/requireProfile");
 const User = require("../../models/User");
 const { processBadges } = require("../../services/badges");
+const { incrementProgress } = require("../../services/quests");
+const { getRedis } = require("../../services/redis");
 
 // ─── Reward table (28-day cycle) ─────────────────────────────────────────────
 // Each entry = rewards for that day in the cycle (1-indexed)
@@ -29,7 +31,7 @@ function getDayRewards(cycleDay) {
 
 function formatRewards(r) {
   const lines = [];
-  if (r.gold)            lines.push(`💰 **${r.gold.toLocaleString()} Gold**`);
+  if (r.gold)            lines.push(`<:duck_coin:1494344514465431614> **${r.gold.toLocaleString()} Duckcoin**`);
   if (r.regularTickets)  lines.push(`<:perma_ticket:1494292877491310666> **${r.regularTickets} Regular Ticket${r.regularTickets > 1 ? "s" : ""}**`);
   if (r.pickupTickets)   lines.push(`<:pickup_ticket:1494294616495620128> **${r.pickupTickets} Pick Up Ticket${r.pickupTickets > 1 ? "s" : ""}**`);
   if (r.premiumCurrency) lines.push(`💎 **${r.premiumCurrency} Premium**`);
@@ -57,7 +59,7 @@ function buildWeekPreview(currentStreak) {
     const label = isToday ? `**Day ${currentStreak + i}**` : `Day ${currentStreak + i}`;
     const reward = r.pickupTickets   ? "<:pickup_ticket:1494294616495620128> Pickup Ticket"
                  : r.regularTickets  ? "<:perma_ticket:1494292877491310666> Regular Ticket"
-                 : `💰 ${r.gold.toLocaleString()} Gold`;
+                 : `<:duck_coin:1494344514465431614> ${r.gold.toLocaleString()} Duckcoin`;
 
     lines.push(`${marker}${label} — ${reward}`);
   }
@@ -132,6 +134,8 @@ module.exports = {
 
     // Check all badges on daily (gold + collector + duck CP)
     await processBadges(updatedUser, interaction, "all");
+    const _redis = getRedis();
+    await incrementProgress(_redis, interaction.user.id, "daily", "daily", 1);
 
     const streakReset = newStreak === 1 && lastUTC && lastUTC !== yesterdayStr;
     const milestone = isMilestone(cycleDay);
@@ -156,7 +160,7 @@ module.exports = {
         {
           name: "Wallet",
           value: [
-            `💰 ${updatedUser.currency.gold.toLocaleString()} Gold`,
+            `<:duck_coin:1494344514465431614> ${updatedUser.currency.gold.toLocaleString()} Duckcoin`,
             `<:perma_ticket:1494292877491310666> ${updatedUser.currency.regularTickets} Regular  <:pickup_ticket:1494294616495620128> ${updatedUser.currency.pickupTickets} Pick Up`,
             `💎 ${updatedUser.currency.premiumCurrency} Premium`,
           ].join("\n"),

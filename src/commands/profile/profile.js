@@ -13,8 +13,8 @@ const BADGE_LABEL = {
   collector_1:     "📦 Collector I",
   collector_2:     "📦 Collector II",
   collector_3:     "📦 Collector III",
-  gold_small_lord: "💰 Small Lord",
-  gold_lord:       "💰 Lord",
+  gold_small_lord: "<:duck_coin:1494344514465431614> Small Lord",
+  gold_lord:       "<:duck_coin:1494344514465431614> Lord",
   gold_king:       "👑 King",
   gold_emperor:    "👑 Emperor",
   gold_god:        "🌕 God of Wealth",
@@ -131,7 +131,7 @@ module.exports = {
         name: "📊 Statistics",
         value: [
           `📦 Cards obtained  **${user.stats.totalCardsEverObtained}**`,
-          `💰 Gold earned  **${user.stats.totalGoldEverEarned.toLocaleString()}**`,
+          `<:duck_coin:1494344514465431614> Duckcoin earned  **${user.stats.totalGoldEverEarned.toLocaleString()}**`,
           `⚔️ Raid damage  **${user.stats.raidDamageTotal.toLocaleString()}**`,
         ].join("\n"),
         inline: true,
@@ -141,7 +141,7 @@ module.exports = {
       .addFields({
         name: "👛 Wallet",
         value: [
-          `💰 Gold  **${user.currency.gold.toLocaleString()}**`,
+          `<:duck_coin:1494344514465431614> Duckcoin  **${user.currency.gold.toLocaleString()}**`,
           `💎 Premium  **${user.currency.premiumCurrency}**`,
           `<:pickup_ticket:1494294616495620128> Pick Up  **${user.currency.pickupTickets}**`,
           `<:perma_ticket:1494292877491310666> Regular  **${user.currency.regularTickets}**`,

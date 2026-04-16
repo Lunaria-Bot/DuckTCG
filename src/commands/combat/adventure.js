@@ -2,6 +2,8 @@ const { requireProfile } = require("../../utils/requireProfile");
 const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
 const { getOrCreateUser } = require("../../utils/getOrCreateUser");
 const { processBadges } = require("../../services/badges");
+const { incrementProgress } = require("../../services/quests");
+const { getRedis } = require("../../services/redis");
 
 const ADVENTURE_DURATION_MS = 6 * 60 * 60 * 1000;
 
@@ -129,12 +131,15 @@ module.exports = {
 
       // Check gold + CP badges
       await processBadges(user, interaction, "daily");
+      const _redis = getRedis();
+      await incrementProgress(_redis, interaction.user.id, "daily", "adventure", 1);
+      await incrementProgress(_redis, interaction.user.id, "weekly", "adventure", 1);
 
       const embed = new EmbedBuilder()
         .setTitle("Adventure Complete!")
         .setColor(0x66BB6A)
         .addFields(
-          { name: "Gold Earned", value: `**${gold.toLocaleString()}** 💰`, inline: true },
+          { name: "Duckcoin Earned", value: `**${gold.toLocaleString()}** <:duck_coin:1494344514465431614>`, inline: true },
           { name: "EXP per Card", value: `**+${expPerCard}** ⭐`, inline: true },
         );
 

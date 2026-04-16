@@ -1,4 +1,6 @@
 const { requireProfile } = require("../../utils/requireProfile");
+const { incrementProgress } = require("../../services/quests");
+const { getRedis } = require("../../services/redis");
 const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
 const PlayerCard = require("../../models/PlayerCard");
 const Card = require("../../models/Card");
@@ -14,7 +16,7 @@ const BURN_VALUE = {
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("burn")
-    .setDescription("Burn a card to receive Gold")
+    .setDescription("Burn a card to receive Duckcoin")
     .addStringOption(opt =>
       opt.setName("card_id")
         .setDescription("ObjectId of the PlayerCard to burn")
@@ -54,12 +56,15 @@ module.exports = {
       { userId: interaction.user.id },
       { $inc: { "currency.gold": gold, "stats.totalGoldEverEarned": gold } }
     );
+    const _redis = getRedis();
+    await incrementProgress(_redis, interaction.user.id, "daily", "burn", 1);
+    await incrementProgress(_redis, interaction.user.id, "weekly", "burn", 1);
 
     const embed = new EmbedBuilder()
       .setTitle("Card Burned")
       .setDescription(`**${card.name}** (Print #${pc.printNumber}) has been destroyed.`)
       .setColor(0xFF7043)
-      .addFields({ name: "Gold Received", value: `**${gold.toLocaleString()}** 💰`, inline: true });
+      .addFields({ name: "Duckcoin Received", value: `**${gold.toLocaleString()}** <:duck_coin:1494344514465431614>`, inline: true });
 
     return interaction.editReply({ embeds: [embed] });
   },

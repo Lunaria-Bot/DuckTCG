@@ -149,7 +149,7 @@ app.get("/", (req, res, next) => {
     <div class="card">
       <h2>Top Players by Combat Power</h2>
       <table>
-        <thead><tr><th>#</th><th>Username</th><th>Combat Power</th><th>Cards</th><th>Gold</th></tr></thead>
+        <thead><tr><th>#</th><th>Username</th><th>Combat Power</th><th>Cards</th><th>Duckcoin</th></tr></thead>
         <tbody>
           ${topPlayers.map((p, i) => `
             <tr>
@@ -662,7 +662,7 @@ app.get("/players", auth, async (req, res) => {
   res.send(renderPage("Players", `
     <div class="card">
       <table>
-        <thead><tr><th>Player</th><th>Gold</th><th>Tickets (R/P)</th><th>CP</th><th>Streak</th><th>Actions</th></tr></thead>
+        <thead><tr><th>Player</th><th>Duckcoin</th><th>Tickets (R/P)</th><th>CP</th><th>Streak</th><th>Actions</th></tr></thead>
         <tbody>${rows || "<tr><td colspan='6' style='color:#666;text-align:center'>No players yet</td></tr>"}</tbody>
       </table>
     </div>
@@ -679,7 +679,7 @@ app.get("/players/:id/give", auth, async (req, res) => {
       <form method="POST" action="/players/${player.userId}/give${t}">
         <div><label>Currency Type</label>
           <select name="type">
-            <option value="gold">Gold</option>
+            <option value="gold">Duckcoin</option>
             <option value="regularTickets">Regular Tickets</option>
             <option value="pickupTickets">Pick Up Tickets</option>
             <option value="premiumCurrency">Premium</option>

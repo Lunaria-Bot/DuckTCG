@@ -5,6 +5,7 @@ const PlayerCard = require("../../models/PlayerCard");
 const Raid = require("../../models/Raid");
 const { calculateRaidDamage } = require("../../services/cardStats");
 const { processBadges } = require("../../services/badges");
+const { incrementProgress } = require("../../services/quests");
 
 const RAID_COOLDOWN_SECONDS = 3600;
 
@@ -134,6 +135,8 @@ async function doAttack(interaction, raid) {
   const User = require("../../models/User");
   const freshUser = await User.findOne({ userId: interaction.user.id });
   if (freshUser) await processBadges(freshUser, interaction, "daily");
+  await incrementProgress(redis, interaction.user.id, "daily", "raid", 1);
+  await incrementProgress(redis, interaction.user.id, "weekly", "raid", 1);
 
   await redis.set(cooldownKey, "1", "EX", RAID_COOLDOWN_SECONDS);
 
@@ -142,7 +145,7 @@ async function doAttack(interaction, raid) {
     .setColor(0xE53935)
     .addFields(
       { name: "Damage Dealt", value: `**${damage.toLocaleString()}**`, inline: true },
-      { name: "Gold Earned", value: `**${goldEarned.toLocaleString()}** 💰`, inline: true },
+      { name: "Duckcoin Earned", value: `**${goldEarned.toLocaleString()}** <:duck_coin:1494344514465431614>`, inline: true },
       { name: "Boss HP Left", value: `${Math.max(0, newHp).toLocaleString()} / ${raid.maxHp.toLocaleString()}`, inline: true },
     );
 

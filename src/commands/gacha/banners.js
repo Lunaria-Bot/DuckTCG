@@ -13,6 +13,8 @@ const PlayerCard = require("../../models/PlayerCard");
 const User = require("../../models/User");
 const { doPulls } = require("../../services/gacha");
 const { processBadges } = require("../../services/badges");
+const { incrementProgress } = require("../../services/quests");
+const { getRedis } = require("../../services/redis");
 const { requireProfile } = require("../../utils/requireProfile");
 
 const RARITY_COLOR = {
@@ -215,6 +217,9 @@ async function handleBannerInteraction(interaction, banners) {
     await user.save();
     const results = await doPulls(interaction.user.id, banner, 1);
     await processBadges(user, interaction, "realtime");
+    const _redis1 = getRedis();
+    await incrementProgress(_redis1, interaction.user.id, "daily", "pull", 1);
+    await incrementProgress(_redis1, interaction.user.id, "weekly", "pull", 1);
     return interaction.update({ embeds: [buildPullResultEmbed(results, banner, user.currency[ticketKey])], components: [bannerMainRow(bannerId, banner.type)] });
   }
 
@@ -230,6 +235,9 @@ async function handleBannerInteraction(interaction, banners) {
     await user.save();
     const results = await doPulls(interaction.user.id, banner, 10);
     await processBadges(user, interaction, "realtime");
+    const _redis10 = getRedis();
+    await incrementProgress(_redis10, interaction.user.id, "daily", "pull", 10);
+    await incrementProgress(_redis10, interaction.user.id, "weekly", "pull", 10);
     return interaction.update({ embeds: [buildPullResultEmbed(results, banner, user.currency[ticketKey])], components: [bannerMainRow(bannerId, banner.type)] });
   }
 }
