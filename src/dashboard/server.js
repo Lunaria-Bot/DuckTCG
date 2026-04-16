@@ -625,7 +625,7 @@ app.get("/players", auth, adminOnly, async (req, res) => {
     <td>${p.currency.regularTickets} / ${p.currency.pickupTickets}</td>
     <td>${p.combatPower.toLocaleString()}</td>
     <td>${p.loginStreak}</td>
-    <td><a href="/players/${p.userId}/give" class="btn btn-sm btn-green">Give</a></td>
+    <td><a href="/players/${p.userId}/give" class="btn btn-sm btn-green">Give Currency</a> <a href="/players/${p.userId}/give-card" class="btn btn-sm">Give Card</a></td>
   </tr>`).join("");
   res.send(renderPage("Players", `
     <div class="card"><table>
@@ -662,6 +662,71 @@ app.post("/players/:id/give", auth, adminOnly, async (req, res) => {
     { new: true }
   );
   await audit(req.user, "update", "player", req.params.id, `Gave ${amount} ${type} to ${player?.username}`, null, null);
+  res.redirect("/players");
+});
+
+app.get("/players/:id/give-card", auth, adminOnly, async (req, res) => {
+  const player = await User.findOne({ userId: req.params.id });
+  if (!player) return res.redirect("/players");
+  const cards = await Card.find({ isAvailable: true }).sort({ anime: 1, rarity: 1, name: 1 });
+  const rarityBadge = { common:"badge-gray", rare:"badge-blue", special:"badge-purple", exceptional:"badge-yellow" };
+  const options = cards.map(c =>
+    `<option value="${c.cardId}">[${c.rarity.toUpperCase()}] ${c.name} — ${c.anime} (${c.role})</option>`
+  ).join("");
+  res.send(renderPage(`Give Card — ${player.username}`, `
+    <div class="card" style="max-width:500px">
+      <form method="POST" action="/players/${player.userId}/give-card">
+        <div><label>Card</label>
+          <select name="cardId" required>
+            <option value="">— Select a card —</option>
+            ${options}
+          </select>
+        </div>
+        <div style="margin-top:4px;font-size:12px;color:#666">
+          The card will be added at level 1 with the next available print number.
+        </div>
+        <div style="display:flex;gap:10px;margin-top:8px">
+          <button type="submit">Give Card</button>
+          <a href="/players" class="btn btn-red">Cancel</a>
+        </div>
+      </form>
+    </div>
+  `, req.user));
+});
+
+app.post("/players/:id/give-card", auth, adminOnly, async (req, res) => {
+  const { cardId } = req.body;
+  const player = await User.findOne({ userId: req.params.id });
+  const card = await Card.findOne({ cardId });
+  if (!player || !card) return res.redirect("/players");
+
+  const { calculateStats } = require("../services/cardStats");
+
+  // Increment print counter
+  const updatedCard = await Card.findOneAndUpdate(
+    { cardId },
+    { $inc: { totalPrints: 1 } },
+    { new: true }
+  );
+
+  const stats = calculateStats(card, 1);
+
+  await PlayerCard.create({
+    userId: player.userId,
+    cardId,
+    printNumber: updatedCard.totalPrints,
+    level: 1,
+    cachedStats: stats,
+  });
+
+  await User.findOneAndUpdate(
+    { userId: player.userId },
+    { $inc: { "stats.totalCardsEverObtained": 1 } }
+  );
+
+  await audit(req.user, "update", "player", player.userId,
+    `Gave card "${card.name}" (Print #${updatedCard.totalPrints}) to ${player.username}`, null, null);
+
   res.redirect("/players");
 });
 

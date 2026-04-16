@@ -88,7 +88,14 @@ module.exports = {
         name: `${target.username}'s Profile`,
         iconURL: target.displayAvatarURL(),
       })
-      .setThumbnail(target.displayAvatarURL())
+      .setThumbnail(target.displayAvatarURL());
+
+    // Bio (if set)
+    if (user.bio) {
+      embed.setDescription(`*${user.bio}*`);
+    }
+
+    embed
 
       // Level + XP bar
       .addFields({

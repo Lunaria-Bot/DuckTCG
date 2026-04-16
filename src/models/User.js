@@ -39,6 +39,7 @@ const UserSchema = new Schema({
   },
 
   favoriteCardId: { type: Schema.Types.ObjectId, ref: "PlayerCard", default: null },
+  bio: { type: String, default: null, maxlength: 150 },
   combatPower: { type: Number, default: 0 },
 
   stats: {
