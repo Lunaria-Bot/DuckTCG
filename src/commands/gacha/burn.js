@@ -62,7 +62,7 @@ module.exports = {
 
     const embed = new EmbedBuilder()
       .setTitle("Card Burned")
-      .setDescription(`**${card.name}** (Print #${pc.printNumber}) has been destroyed.`)
+      .setDescription(`**${card.name}** has been destroyed.`)
       .setColor(0xFF7043)
       .addFields({ name: "Duckcoin Received", value: `**${gold.toLocaleString()}** <:duck_coin:1494344514465431614>`, inline: true });
 

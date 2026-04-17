@@ -24,8 +24,6 @@ const CardSchema = new Schema({
     hp: { type: Number, default: 100 },
   },
 
-  totalPrints: { type: Number, default: 0 },
-
   bannerType: {
     type: String,
     enum: ["regular", "pickup"],

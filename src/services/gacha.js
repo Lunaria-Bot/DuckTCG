@@ -55,16 +55,9 @@ async function doPulls(userId, banner, count = 1) {
     const card = await Card.findOne({ cardId });
     if (!card) continue;
 
-    const updatedCard = await Card.findOneAndUpdate(
-      { cardId },
-      { $inc: { totalPrints: 1 } },
-      { new: true }
-    );
-
     const playerCard = await PlayerCard.create({
       userId,
       cardId,
-      printNumber: updatedCard.totalPrints,
       level: 1,
       cachedStats: calculateStats(card, 1),
     });

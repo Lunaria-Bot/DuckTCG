@@ -4,7 +4,6 @@ const PlayerCardSchema = new Schema({
   userId: { type: String, required: true, index: true },
   cardId: { type: String, required: true, ref: "Card" },
 
-  printNumber: { type: Number, required: true },
   acquiredAt: { type: Date, default: Date.now },
 
   level: { type: Number, default: 1, min: 1, max: 125 },

@@ -29,9 +29,9 @@ async function getCardOptions(userId) {
       const card = cardMap[pc.cardId];
       return {
         pcId: pc._id.toString(), label: `${card.name} — Lv.${pc.level}`,
-        description: `${card.anime} · Print #${pc.printNumber} · ${card.rarity}`,
+        description: `${card.anime} · ${card.rarity}`,
         emoji: RARITY_EMOJI[card.rarity] ?? "⬜",
-        cardName: card.name, printNumber: pc.printNumber,
+        cardName: card.name,
         imageUrl: card.imageUrl, rarity: card.rarity,
       };
     });
@@ -39,7 +39,7 @@ async function getCardOptions(userId) {
 
 function formatOffer(card, gold, premium) {
   const parts = [];
-  if (card) parts.push(`${RARITY_EMOJI[card.rarity] ?? "⬜"} **${card.cardName}** #${card.printNumber}`);
+  if (card) parts.push(`${RARITY_EMOJI[card.rarity] ?? "⬜"} **${card.cardName}**`);
   if (gold)    parts.push(`${DUCK_COIN} **${gold.toLocaleString()}** Duckcoin`);
   if (premium) parts.push(`💎 **${premium.toLocaleString()}** Premium`);
   return parts.length ? parts.join("\n") : "*Nothing offered*";

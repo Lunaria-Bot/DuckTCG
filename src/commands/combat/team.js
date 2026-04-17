@@ -113,7 +113,7 @@ async function showTeam(interaction, user) {
     embed.addFields({
       name: `Slot ${slot.slot} — ${roleEmoji} ${card.name}`,
       value: [
-        `Lv. **${pc.level}** | Print #${pc.printNumber}`,
+        `Lv. **${pc.level}**`,
         `⚔️ ${pc.cachedStats.damage}  💚 ${pc.cachedStats.mana}  🛡️ ${pc.cachedStats.hp}`,
         `CP: **${pc.cachedStats.combatPower}**`,
       ].join("\n"),

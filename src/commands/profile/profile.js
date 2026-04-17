@@ -67,7 +67,7 @@ module.exports = {
       if (pc) {
         const card = await Card.findOne({ cardId: pc.cardId });
         if (card) {
-          favoriteValue = `**${card.name}**\nPrint #${pc.printNumber}`;
+          favoriteValue = `**${card.name}**`;
           if (card.imageUrl) favoriteImageUrl = card.imageUrl;
         }
       }

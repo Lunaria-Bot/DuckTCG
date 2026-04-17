@@ -100,7 +100,7 @@ async function buildViewCardsEmbed(banner, page, userId) {
   const embed = new EmbedBuilder()
     .setTitle(card?.name ?? cardId)
     .setColor(RARITY_COLOR[card?.rarity] ?? 0x9E9E9E)
-    .addFields({ name: banner.name, value: `ID: ${cardId}\nPrint total: ${card?.totalPrints ?? 0}` })
+    .addFields({ name: banner.name, value: `ID: ${cardId}` })
     .setFooter({ text: `${RARITY_EMOJI[card?.rarity] ?? ""} page ${page + 1} of ${allCardIds.length} | You Own: ${owned}` });
   if (card?.imageUrl && isValidUrl(card.imageUrl)) embed.setImage(card.imageUrl);
   return { embed, total: allCardIds.length };
@@ -139,7 +139,7 @@ function buildPullResultEmbed(results, banner, remaining) {
     const { card, playerCard, rarity } = results[0];
     const embed = new EmbedBuilder()
       .setTitle(RARITY_LABEL[rarity])
-      .setDescription(`**${card.name}** — *${card.anime}*\nPrint **#${playerCard.printNumber}**`)
+      .setDescription(`**${card.name}** — *${card.anime}*`)
       .setColor(RARITY_COLOR[rarity])
       .setFooter({ text: `Remaining tickets: ${remaining}` });
     if (card.imageUrl && isValidUrl(card.imageUrl)) embed.setThumbnail(card.imageUrl);
@@ -148,7 +148,7 @@ function buildPullResultEmbed(results, banner, remaining) {
   const rarityOrder = ["exceptional", "special", "rare", "common"];
   const best = rarityOrder.find(r => results.some(res => res.rarity === r));
   const lines = results.map(({ card, playerCard, rarity }) =>
-    `${RARITY_LABEL[rarity]} — **${card.name}** (Print #${playerCard.printNumber})`
+    `${RARITY_LABEL[rarity]} — **${card.name}**`
   );
   return new EmbedBuilder()
     .setTitle(`Multi ×10 — ${banner.name}`)

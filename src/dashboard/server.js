@@ -948,10 +948,10 @@ app.get("/cards", auth, editorOrAdmin, async (req, res) => {
     <td>${c.imageUrl?`<img src="${c.imageUrl}" style="width:36px;height:36px;object-fit:cover;border-radius:4px"/>`:"—"}</td>
     <td><strong>${c.name}</strong><br/><small style="color:#666">${c.cardId}</small></td>
     <td>${c.anime}</td><td><span class="badge ${rarityBadge[c.rarity]}">${c.rarity}</span></td>
-    <td><span class="badge ${roleBadge[c.role]}">${c.role}</span></td><td>${c.totalPrints}</td>
+    <td><span class="badge ${roleBadge[c.role]}">${c.role}</span></td>
     <td><a href="/cards/${c.cardId}/detail" class="btn btn-sm btn-gray">Detail</a> <a href="/cards/${c.cardId}/edit" class="btn btn-sm">Edit</a></td>
   </tr>`).join("");
-  res.send(renderPage("Cards", `<a href="/cards/new" class="btn" style="margin-bottom:20px;display:inline-block">+ New Card</a><div class="card"><table><thead><tr><th>Art</th><th>Card</th><th>Anime</th><th>Rarity</th><th>Role</th><th>Prints</th><th>Actions</th></tr></thead><tbody>${rows||"<tr><td colspan='7' style='color:#666;text-align:center'>No cards yet</td></tr>"}</tbody></table></div>`, req.user));
+  res.send(renderPage("Cards", `<a href="/cards/new" class="btn" style="margin-bottom:20px;display:inline-block">+ New Card</a><div class="card"><table><thead><tr><th>Art</th><th>Card</th><th>Anime</th><th>Rarity</th><th>Role</th><th>Actions</th></tr></thead><tbody>${rows||"<tr><td colspan='7' style='color:#666;text-align:center'>No cards yet</td></tr>"}</tbody></table></div>`, req.user));
 });
 
 app.get("/cards/new", auth, editorOrAdmin, async (req, res) => {
@@ -1014,12 +1014,8 @@ app.get("/cards/:id/detail", auth, editorOrAdmin, async (req, res) => {
   const card = await Card.findOne({ cardId: req.params.id });
   if (!card) return res.redirect("/cards");
 
-  const [totalPrints, topPrints, ownerCount] = await Promise.all([
+  const [totalCopies, ownerCount] = await Promise.all([
     PlayerCard.countDocuments({ cardId: card.cardId, isBurned: false }),
-    PlayerCard.find({ cardId: card.cardId, isBurned: false })
-      .sort({ printNumber: 1 })
-      .limit(10)
-      .lean(),
     PlayerCard.aggregate([
       { $match: { cardId: card.cardId, isBurned: false } },
       { $group: { _id: "$userId" } },
@@ -1027,21 +1023,12 @@ app.get("/cards/:id/detail", auth, editorOrAdmin, async (req, res) => {
     ])
   ]);
 
-  // Enrich top prints with username
-  const userIds = [...new Set(topPrints.map(p => p.userId))];
-  const users = await User.find({ userId: { $in: userIds } }).select("userId username").lean();
-  const userMap = Object.fromEntries(users.map(u => [u.userId, u.username]));
-
   const rarityBadge = { common:"badge-gray",rare:"badge-blue",special:"badge-purple",exceptional:"badge-yellow" };
   const roleBadge = { dps:"badge-red",support:"badge-green",tank:"badge-blue" };
   const totalOwners = ownerCount[0]?.total ?? 0;
+  const totalCopies2 = totalCopies;
 
-  const printRows = topPrints.map(p => `<tr>
-    <td><strong>#${p.printNumber}</strong>${p.printNumber===1?" 👑":""}</td>
-    <td>${userMap[p.userId] || p.userId}</td>
-    <td>Lv.${p.level}${p.isAscended?" ✨":""}</td>
-    <td>${(p.cachedStats?.combatPower ?? 0).toLocaleString()}</td>
-  </tr>`).join("");
+
 
   res.send(renderPage(`Card — ${card.name}`, `
     <div style="margin-bottom:16px"><a href="/cards" class="btn btn-sm btn-gray">← Back to Cards</a></div>
@@ -1056,21 +1043,16 @@ app.get("/cards/:id/detail", auth, editorOrAdmin, async (req, res) => {
             <tr><td style="color:#888">Base DMG</td><td>${card.baseStats?.damage ?? 0}</td></tr>
             <tr><td style="color:#888">Base Mana</td><td>${card.baseStats?.mana ?? 0}</td></tr>
             <tr><td style="color:#888">Base HP</td><td>${card.baseStats?.hp ?? 0}</td></tr>
-            <tr><td style="color:#888">Total Prints</td><td><strong>${card.totalPrints}</strong></td></tr>
+
           </table>
         </div>
       </div>
       <div style="flex:1">
         <div class="grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:16px">
-          <div class="stat"><div class="value">${totalPrints}</div><div class="label">Copies Owned</div></div>
+          <div class="stat"><div class="value">${totalCopies}</div><div class="label">Copies in Circulation</div></div>
           <div class="stat"><div class="value">${totalOwners}</div><div class="label">Unique Owners</div></div>
-          <div class="stat"><div class="value">${card.totalPrints}</div><div class="label">Total Ever Printed</div></div>
         </div>
-        <div class="card">
-          <h2>Lowest Prints (rarest)</h2>
-          <table><thead><tr><th>Print</th><th>Owner</th><th>Level</th><th>CP</th></tr></thead>
-          <tbody>${printRows||"<tr><td colspan='4' style='color:#666'>No copies in circulation</td></tr>"}</tbody></table>
-        </div>
+
       </div>
     </div>
   `, req.user));
@@ -1178,10 +1160,9 @@ app.post("/players/:id/give-card", auth, adminOnly, async (req, res) => {
   const card = await Card.findOne({ cardId });
   if (!player || !card) return res.redirect("/players");
   const { calculateStats } = require("../services/cardStats");
-  const updatedCard = await Card.findOneAndUpdate({ cardId }, { $inc: { totalPrints: 1 } }, { new: true });
-  await PlayerCard.create({ userId: player.userId, cardId, printNumber: updatedCard.totalPrints, level: 1, cachedStats: calculateStats(card, 1) });
+  await PlayerCard.create({ userId: player.userId, cardId, level: 1, cachedStats: calculateStats(card, 1) });
   await User.findOneAndUpdate({ userId: player.userId }, { $inc: { "stats.totalCardsEverObtained": 1 } });
-  await audit(req.user, "update", "player", player.userId, `Gave card "${card.name}" (Print #${updatedCard.totalPrints}) to ${player.username}`, null, null);
+  await audit(req.user, "update", "player", player.userId, `Gave card "${card.name}" to ${player.username}`, null, null);
   res.redirect("/players");
 });
 

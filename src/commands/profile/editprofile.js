@@ -148,7 +148,7 @@ module.exports = {
         const emoji = RARITY_EMOJI[card.rarity] ?? "⬜";
         return new StringSelectMenuOptionBuilder()
           .setLabel(`${card.name} — Lv.${pc.level}`)
-          .setDescription(`${card.anime} · Print #${pc.printNumber} · ${card.rarity}`)
+          .setDescription(`${card.anime} · ${card.rarity}`)
           .setValue(pc._id.toString())
           .setEmoji(emoji.codePointAt ? emoji : { name: emoji });
       });
@@ -201,7 +201,7 @@ module.exports = {
 
         await User.findOneAndUpdate({ userId: interaction.user.id }, { favoriteCardId: pc._id });
         await interaction.editReply({
-          content: `Favorite card set to **${card.name}** (Lv.${pc.level} · Print #${pc.printNumber})!`,
+          content: `Favorite card set to **${card.name}** (Lv.${pc.level})!`,
           components: [],
         });
       });

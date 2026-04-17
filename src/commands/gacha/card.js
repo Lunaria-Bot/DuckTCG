@@ -44,7 +44,7 @@ function buildListEmbed(cards, page, totalPages, filterRarity, filterRole, filte
     ].filter(Boolean).join(" · ") });
 }
 
-function buildCardEmbed(card, totalPrints) {
+function buildCardEmbed(card) {
   const embed = new EmbedBuilder()
     .setTitle(`${RARITY_EMOJI[card.rarity] ?? "⬜"} ${card.name}`)
     .setDescription(`*${card.anime}*`)
@@ -52,7 +52,6 @@ function buildCardEmbed(card, totalPrints) {
     .addFields(
       { name: "Rarity",       value: RARITY_LABEL[card.rarity] ?? card.rarity,            inline: true },
       { name: "Role",         value: `${ROLE_EMOJI[card.role] ?? ""} ${card.role.toUpperCase()}`, inline: true },
-      { name: "Total Prints", value: `**${totalPrints}** in circulation`,                  inline: true },
       { name: "Base Damage",  value: `**${card.baseStats?.damage ?? 0}**`,                inline: true },
       { name: "Base Mana",    value: `**${card.baseStats?.mana ?? 0}**`,                  inline: true },
       { name: "Base HP",      value: `**${card.baseStats?.hp ?? 0}**`,                   inline: true },
@@ -192,8 +191,7 @@ module.exports = {
       if (state.detailCard) {
         const card = allCards.find(c => c.cardId === state.detailCard);
         if (card) {
-          const totalPrints = await PlayerCard.countDocuments({ cardId: card.cardId, isBurned: false });
-          const embed = buildCardEmbed(card, totalPrints);
+          const embed = buildCardEmbed(card);
           const backRow = new ActionRowBuilder().addComponents(
             new ButtonBuilder().setCustomId("card_back_list").setLabel("← Back to List").setStyle(ButtonStyle.Secondary),
           );

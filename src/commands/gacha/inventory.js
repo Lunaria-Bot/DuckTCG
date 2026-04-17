@@ -22,7 +22,6 @@ function sortCards(pairs, sortBy) {
     switch (sortBy) {
       case "rarity": return (RARITY_ORDER[a.card.rarity] ?? 9) - (RARITY_ORDER[b.card.rarity] ?? 9);
       case "level":  return b.pc.level - a.pc.level;
-      case "print":  return a.pc.printNumber - b.pc.printNumber;
       case "anime":  return a.card.anime.localeCompare(b.card.anime);
       case "date":   return new Date(b.pc.createdAt) - new Date(a.pc.createdAt);
       default:       return 0;
@@ -47,7 +46,7 @@ function buildListEmbed(pairs, page, username, sortBy, filterRarity, filterRole)
     const num = page * PAGE_SIZE + i + 1;
     const rar = RARITY_EMOJI[card.rarity] ?? "⬜";
     const rol = ROLE_EMOJI[card.role] ?? "";
-    return `\`${String(num).padStart(3," ")}.\` ${rar}${rol} **${card.name}** — Lv.**${pc.level}** · Print **#${pc.printNumber}**`;
+    return `\`${String(num).padStart(3," ")}.\` ${rar}${rol} **${card.name}** — Lv.**${pc.level}**`;
   });
 
   const activeFilters = [
@@ -55,7 +54,7 @@ function buildListEmbed(pairs, page, username, sortBy, filterRarity, filterRole)
     filterRole   ? filterRole   : null,
   ].filter(Boolean);
 
-  const sortLabel = { rarity:"Rarity", level:"Level", print:"Print", anime:"Anime", date:"Recent" }[sortBy] ?? sortBy;
+  const sortLabel = { rarity:"Rarity", level:"Level", anime:"Anime", date:"Recent" }[sortBy] ?? sortBy;
 
   const footerParts = [
     `Page ${page + 1}/${totalPages} · ${pairs.length} card${pairs.length !== 1 ? "s" : ""}`,
@@ -91,7 +90,6 @@ function buildCardEmbed(pairs, index, username) {
     .addFields(
       { name: "Rarity",       value: RARITY_LABEL[card.rarity] ?? card.rarity,          inline: true },
       { name: "Role",         value: `${ROLE_EMOJI[card.role] ?? ""} ${card.role.toUpperCase()}`, inline: true },
-      { name: "Print",        value: `**#${pc.printNumber}**`,                           inline: true },
       { name: "Level",        value: `**${pc.level}** / ${maxLevel}\n\`[${lvlBar}]\``,  inline: true },
       { name: "Combat Power", value: `**${(pc.cachedStats?.combatPower ?? 0).toLocaleString()}**`, inline: true },
       { name: pc.isAscended ? "✨ Ascended" : "Ascension",
@@ -125,7 +123,7 @@ function buildNavRow(index, total, view, page, totalPages) {
 
 // Row 2 — Filter + Sort buttons (open dropdown)
 function buildControlRow(activeSort, activeRarity, activeRole) {
-  const sortLabel    = { rarity:"Rarity ↕", level:"Level ↕", print:"Print ↕", anime:"Anime ↕", date:"Recent ↕" }[activeSort] ?? "Sort ↕";
+  const sortLabel    = { rarity:"Rarity ↕", level:"Level ↕", anime:"Anime ↕", date:"Recent ↕" }[activeSort] ?? "Sort ↕";
   const rarityLabel  = activeRarity ? `${RARITY_EMOJI[activeRarity]} ${activeRarity}` : "Rarity";
   const roleLabel    = activeRole   ? `${ROLE_EMOJI[activeRole] ?? ""} ${activeRole}`  : "Role";
 
@@ -159,7 +157,6 @@ function buildSortDropdown() {
       .addOptions([
         new StringSelectMenuOptionBuilder().setLabel("Rarity (best first)").setValue("rarity").setEmoji("🌟"),
         new StringSelectMenuOptionBuilder().setLabel("Level (highest first)").setValue("level").setEmoji("⬆️"),
-        new StringSelectMenuOptionBuilder().setLabel("Print (lowest first)").setValue("print").setEmoji("🔢"),
         new StringSelectMenuOptionBuilder().setLabel("Anime (A → Z)").setValue("anime").setEmoji("📚"),
         new StringSelectMenuOptionBuilder().setLabel("Recently obtained").setValue("date").setEmoji("🕐"),
       ])
