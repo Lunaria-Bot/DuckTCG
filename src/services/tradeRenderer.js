@@ -45,7 +45,7 @@ function buildTradeHTML({ title, subtitle, statusText, sections, footer }) {
             ${itemsHTML || '<span class="empty">Nothing offered yet</span>'}
           </div>
         </div>
-        ${s.imageUrl ? `<div class="section-img"><img src="${s.imageUrl}" /></div>` : ""}
+        ${s.avatarUrl ? `<div class="section-img"><img src="${s.avatarUrl}" /></div>` : ""}
       </div>
     `;
   }).join('<div class="divider"></div>');
@@ -134,12 +134,13 @@ function buildTradeHTML({ title, subtitle, statusText, sections, footer }) {
   .item-name { font-weight: 500; }
   .empty { font-size: 12px; color: #6b6f76; font-style: italic; }
   .section-img {
-    width: 80px;
-    height: 80px;
+    width: 64px;
+    height: 64px;
     flex-shrink: 0;
-    border-radius: 6px;
+    border-radius: 50%;
     overflow: hidden;
     background: #1e1f22;
+    border: 2px solid #3f4147;
   }
   .section-img img {
     width: 100%;

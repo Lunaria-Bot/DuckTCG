@@ -74,7 +74,7 @@ async function offerItems(offer) {
 }
 
 // ─── Build image payload ──────────────────────────────────────────────────────
-async function buildTradePayload(session, completed = false) {
+async function buildTradePayload(session, completed = false, client = null) {
   const iOffer = session.offers[session.initiatorId];
   const tOffer = session.offers[session.targetId];
 
@@ -86,12 +86,23 @@ async function buildTradePayload(session, completed = false) {
   const iName = iUser?.username ?? "Player 1";
   const tName = tUser?.username ?? "Player 2";
 
-  const [iItems, tItems, iThumb, tThumb] = await Promise.all([
+  const [iItems, tItems] = await Promise.all([
     offerItems(iOffer),
     offerItems(tOffer),
-    getThumb(iOffer),
-    getThumb(tOffer),
   ]);
+
+  // Fetch Discord avatars
+  let iAvatar = null, tAvatar = null;
+  if (client) {
+    try {
+      const [iu, tu] = await Promise.all([
+        client.users.fetch(session.initiatorId),
+        client.users.fetch(session.targetId),
+      ]);
+      iAvatar = iu.displayAvatarURL({ extension: "png", size: 128 });
+      tAvatar = tu.displayAvatarURL({ extension: "png", size: 128 });
+    } catch {}
+  }
 
   const minutesLeft = Math.max(0, Math.round((session.expiresAt - Date.now()) / 60000));
 
@@ -101,18 +112,8 @@ async function buildTradePayload(session, completed = false) {
       subtitle:   `${iName} ⇌ ${tName}`,
       statusText: completed ? "Status: Completed" : "Awaiting confirmations.",
       sections: [
-        {
-          name:      iName,
-          confirmed: iOffer.confirmed,
-          items:     iItems,
-          imageUrl:  iThumb,
-        },
-        {
-          name:      tName,
-          confirmed: tOffer.confirmed,
-          items:     tItems,
-          imageUrl:  tThumb,
-        },
+        { name: iName, confirmed: iOffer.confirmed, items: iItems, avatarUrl: iAvatar },
+        { name: tName, confirmed: tOffer.confirmed, items: tItems, avatarUrl: tAvatar },
       ],
       footer: completed
         ? "Trade completed."
@@ -123,6 +124,7 @@ async function buildTradePayload(session, completed = false) {
     return { files: [attachment] };
   } catch (err) {
     // Fallback to embed if renderer fails
+  const iThumb = null; const tThumb = null;
     console.error("Trade renderer error:", err.message);
     const minutesLeft = Math.max(0, Math.round((session.expiresAt - Date.now()) / 60000));
     const iOffer = session.offers[session.initiatorId];
@@ -286,7 +288,7 @@ module.exports = {
       await saveSession(redis, session);
 
       // Show the trade embed
-      const viewPayload = await buildTradePayload(session);
+      const viewPayload = await buildTradePayload(session, false, interaction.client);
       const tradeRow    = buildTradeRow(uid, session);
 
       await interaction.editReply({
@@ -435,7 +437,7 @@ module.exports = {
 
     // ── VIEW ──────────────────────────────────────────────────────────────────
     if (sub === "view") {
-      const payload = await buildTradePayload(session);
+      const payload = await buildTradePayload(session, false, interaction.client);
       const row     = buildTradeRow(uid, session);
       const msg     = await interaction.editReply({ ...payload, components: [row] });
 
@@ -485,7 +487,7 @@ module.exports = {
 
       if (!partnerOffer.confirmed) {
         // Show updated image so partner can see the confirmation
-        const updatedPayload = await buildTradePayload(session);
+        const updatedPayload = await buildTradePayload(session, false, interaction.client);
         const row = buildTradeRow(uid, session);
         // Update the live message too
         try {
@@ -550,7 +552,7 @@ module.exports = {
 
         const myName       = myFresh?.username ?? uid;
         const partnerName2 = partnerFresh?.username ?? partnerId;
-        const donePayload = await buildTradePayload(session, true);
+        const donePayload = await buildTradePayload(session, true, interaction.client);
         return interaction.editReply({ ...donePayload, components: [] });
       } catch (err) {
         await deleteSession(redis, session);
