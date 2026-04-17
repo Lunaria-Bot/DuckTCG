@@ -238,9 +238,53 @@ module.exports = {
       await saveSession(redis, session);
 
       const expiresTs = Math.floor(session.expiresAt / 1000);
-      return interaction.editReply({
-        content: `✅ Trade started between **${interaction.user.username}** and <@${targetDiscord.id}>!\n\nBoth players can now use:\n\`/trade add <card name>\` — add a card\n\`/trade add-currency <type> <amount>\` — add Duckcoin or Premium\n\`/trade view\` — see the current trade\n\`/trade confirm\` — confirm your side\n\`/trade cancel\` — cancel the trade\n\nTrade expires <t:${expiresTs}:R>.`,
+
+      // Show the trade embed immediately
+      const viewEmbed = await buildViewEmbed(session);
+      const tradeRow  = buildTradeRow(uid, session);
+
+      await interaction.editReply({
+        content: `✅ Trade started between **${interaction.user.username}** and <@${targetDiscord.id}>!\n\nBoth players can now use:\n\`/trade add <card name>\` — add a card\n\`/trade add-currency <type> <amount>\` — add Duckcoin or Premium\n\`/trade view\` — see the current trade\n\`/trade confirm\` — confirm your side\n\`/trade cancel\` — cancel the trade\n\nTrade expires in 30 minutes.`,
       });
+
+      // Also send the live embed
+      const msg = await interaction.followUp({ embeds: [viewEmbed], components: [tradeRow] });
+
+      // Keep buttons alive for 30 min
+      const collector = msg.createMessageComponentCollector({
+        filter: i => [uid, targetDiscord.id].includes(i.user.id),
+        time: TRADE_TTL * 1000,
+      });
+
+      collector.on("collect", async i => {
+        await i.deferUpdate();
+        if (i.customId === "trade_commands_btn") {
+          await i.followUp({
+            content: [
+              "**Trade Commands:**",
+              "`/trade add <card name>` — add a card by name",
+              "`/trade add-currency <type> <amount>` — add Duckcoin or Premium",
+              "`/trade remove <card>` — remove a card from your offer",
+              "`/trade view` — refresh the trade view",
+              "`/trade confirm` — confirm your side",
+              "`/trade cancel` — cancel the trade",
+            ].join("\n"),
+            ephemeral: true,
+          });
+        } else if (i.customId === "trade_confirm_btn") {
+          await i.followUp({ content: "Use `/trade confirm` to confirm your side.", ephemeral: true });
+        } else if (i.customId === "trade_cancel_btn") {
+          const sess = await getSession(redis, i.user.id);
+          if (sess) await deleteSession(redis, sess);
+          collector.stop();
+          await msg.edit({
+            embeds: [new EmbedBuilder().setTitle("Trade Cancelled").setDescription("The trade has been cancelled.").setColor(0xE53935)],
+            components: [],
+          });
+        }
+      });
+
+      return;
     }
 
     // All other subcommands require an active session
