@@ -124,14 +124,38 @@ async function buildTradePayload(session, completed = false) {
   } catch (err) {
     // Fallback to embed if renderer fails
     console.error("Trade renderer error:", err.message);
+    const minutesLeft = Math.max(0, Math.round((session.expiresAt - Date.now()) / 60000));
+    const iOffer = session.offers[session.initiatorId];
+    const tOffer = session.offers[session.targetId];
+    const [iUser, tUser] = await Promise.all([
+      User.findOne({ userId: session.initiatorId }),
+      User.findOne({ userId: session.targetId }),
+    ]);
+    const iName   = iUser?.username ?? "Player 1";
+    const tName   = tUser?.username ?? "Player 2";
+    const iStatus = iOffer.confirmed ? "✅ Confirmed" : "⏳ Pending";
+    const tStatus = tOffer.confirmed ? "✅ Confirmed" : "⏳ Pending";
+    const iValue  = await offerValue(iOffer);
+    const tValue  = await offerValue(tOffer);
+    const iThumb  = await getThumb(iOffer);
+    const tThumb  = await getThumb(tOffer);
+
     const fallback = new EmbedBuilder()
       .setTitle(completed ? "Trade Completed" : "Active Trade")
-      .setDescription(`**${iName}** ⇌ **${tName}**\n\n${completed ? "Status: **Completed**" : "Awaiting confirmations."}`)
+      .setDescription(
+        `**${iName}** ⇌ **${tName}**\n\n` +
+        (completed ? "Status: **Completed**" : "Awaiting confirmations.")
+      )
       .setColor(completed ? 0x16a34a : 0x5B21B6)
       .addFields(
-        { name: `${iName} ${iOffer.confirmed ? "✅" : "⏳"}`, value: await offerValue(iOffer), inline: true },
-        { name: `${tName} ${tOffer.confirmed ? "✅" : "⏳"}`, value: await offerValue(tOffer), inline: true },
-      );
+        { name: `${iName} ${iStatus}`, value: iValue, inline: false },
+        { name: `${tName} ${tStatus}`, value: tValue, inline: false },
+      )
+      .setFooter({ text: completed ? "Trade completed." : `Trade expires in ${minutesLeft} minute${minutesLeft !== 1 ? "s" : ""} due to inactivity.` });
+
+    if (iThumb) fallback.setThumbnail(iThumb);
+    else if (tThumb) fallback.setThumbnail(tThumb);
+
     return { embeds: [fallback] };
   }
 }

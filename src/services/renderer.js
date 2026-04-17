@@ -26,8 +26,13 @@ async function getBrowser() {
       "/usr/bin/google-chrome",
       "/usr/bin/google-chrome-stable",
     ].filter(Boolean);
-    executablePath = candidates.find(p => fs.existsSync(p)) ?? "chromium-browser";
+    executablePath = candidates.find(p => fs.existsSync(p));
+    if (!executablePath) {
+      throw new Error(`Chromium not found. Tried: ${candidates.join(", ")}`);
+    }
   }
+
+  console.log(`[Renderer] Launching Chromium at: ${executablePath}`);
 
   browser = await puppeteer.launch({
     executablePath,
