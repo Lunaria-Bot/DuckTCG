@@ -42,43 +42,72 @@ async function touchSession(redis, session) {
 }
 
 // ─── Build view embed ──────────────────────────────────────────────────────────
-async function buildViewEmbed(session) {
+async function buildViewEmbed(session, client) {
   const iOffer = session.offers[session.initiatorId];
   const tOffer = session.offers[session.targetId];
 
-  async function offerLines(offer, userId) {
+  const [iUser, tUser] = await Promise.all([
+    User.findOne({ userId: session.initiatorId }),
+    User.findOne({ userId: session.targetId }),
+  ]);
+
+  async function offerValue(offer, userId) {
     const lines = [];
     for (const cardId of offer.cardIds) {
-      const pc   = await PlayerCard.findOne({ userId, cardId, isBurned: false, quantity: { $gt: 0 } });
       const card = await Card.findOne({ cardId });
       if (card) lines.push(`${RARITY_EMOJI[card.rarity] ?? "⬜"} **${card.name}**`);
     }
     if (offer.gold)    lines.push(`${DUCK_COIN} **${offer.gold.toLocaleString()}** Duckcoin`);
     if (offer.premium) lines.push(`💎 **${offer.premium.toLocaleString()}** Premium`);
     return lines.length ? lines.join("\n") : "*Nothing offered yet*";
-}
+  }
 
-  const iUser = await User.findOne({ userId: session.initiatorId });
-  const tUser = await User.findOne({ userId: session.targetId });
+  // Get thumbnail from first card in each offer
+  async function getThumb(offer) {
+    for (const cardId of offer.cardIds) {
+      const card = await Card.findOne({ cardId });
+      if (card?.imageUrl) return card.imageUrl;
+    }
+    return null;
+  }
 
-  const iLines = await offerLines(iOffer, session.initiatorId);
-  const tLines = await offerLines(tOffer, session.targetId);
-
+  const iValue  = await offerValue(iOffer, session.initiatorId);
+  const tValue  = await offerValue(tOffer, session.targetId);
+  const iThumb  = await getThumb(iOffer);
+  const tThumb  = await getThumb(tOffer);
   const iStatus = iOffer.confirmed ? "✅ Confirmed" : "⏳ Pending";
   const tStatus = tOffer.confirmed ? "✅ Confirmed" : "⏳ Pending";
 
+  const iName = iUser?.username ?? "Player 1";
+  const tName = tUser?.username ?? "Player 2";
+
   const expiresTs = Math.floor(session.expiresAt / 1000);
 
+  // Discord embed image trick: use thumbnail for first card,
+  // include second card image in a field if available
   const embed = new EmbedBuilder()
     .setTitle("Active Trade")
-    .setDescription(`**${iUser?.username ?? session.initiatorId}** ⇌ **${tUser?.username ?? session.targetId}**\n\nAwaiting confirmations.`)
+    .setDescription(
+      `**${iName}** ⇌ **${tName}**\n\nAwaiting confirmations.`
+    )
     .addFields(
-      { name: `${iUser?.username ?? "Player 1"} ${iStatus}`, value: iLines, inline: true },
-      { name: `${tUser?.username ?? "Player 2"} ${tStatus}`, value: tLines, inline: true },
+      {
+        name: `${iName} ${iStatus}`,
+        value: iValue,
+        inline: true,
+      },
+      {
+        name: `${tName} ${tStatus}`,
+        value: tValue,
+        inline: true,
+      },
     )
     .setColor(0x5B21B6)
-    .setFooter({ text: `Trade expires` })
-    .setTimestamp(session.expiresAt);
+    .setFooter({ text: `Trade expires <t:${expiresTs}:R> due to inactivity.` });
+
+  // Use first available card image as thumbnail
+  if (iThumb) embed.setThumbnail(iThumb);
+  else if (tThumb) embed.setThumbnail(tThumb);
 
   return embed;
 }
@@ -88,9 +117,13 @@ function buildTradeRow(userId, session) {
   return new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId("trade_confirm_btn")
-      .setLabel(confirmed ? "Confirmed ✅" : "Confirm Trade")
-      .setStyle(confirmed ? ButtonStyle.Success : ButtonStyle.Primary)
+      .setLabel("Confirm Trade")
+      .setStyle(confirmed ? ButtonStyle.Success : ButtonStyle.Success)
       .setDisabled(!!confirmed),
+    new ButtonBuilder()
+      .setCustomId("trade_commands_btn")
+      .setLabel("View Trade Commands")
+      .setStyle(ButtonStyle.Secondary),
     new ButtonBuilder()
       .setCustomId("trade_cancel_btn")
       .setLabel("Cancel Trade")
@@ -245,16 +278,33 @@ module.exports = {
       const collector = msg.createMessageComponentCollector({
         filter: i => i.user.id === uid,
         time: 5 * 60 * 1000,
-        max: 1,
       });
 
       collector.on("collect", async i => {
         await i.deferUpdate();
-        if (i.customId === "trade_confirm_btn") {
-          interaction.followUp({ content: "Use `/trade confirm` to confirm.", ephemeral: true });
+
+        if (i.customId === "trade_commands_btn") {
+          await interaction.followUp({
+            content: [
+              "**Trade Commands:**",
+              "`/trade add <card>` — add a card by name",
+              "`/trade add-currency <type> <amount>` — add Duckcoin or Premium",
+              "`/trade remove <card>` — remove a card from your offer",
+              "`/trade view` — view the current trade",
+              "`/trade confirm` — confirm your side",
+              "`/trade cancel` — cancel the trade",
+            ].join("\n"),
+            ephemeral: true,
+          });
+        } else if (i.customId === "trade_confirm_btn") {
+          await interaction.followUp({ content: "Use `/trade confirm` to confirm your side.", ephemeral: true });
         } else if (i.customId === "trade_cancel_btn") {
           await deleteSession(redis, session);
-          await interaction.editReply({ embeds: [new EmbedBuilder().setTitle("Trade Cancelled").setDescription("The trade has been cancelled.").setColor(0xE53935)], components: [] });
+          collector.stop();
+          await interaction.editReply({
+            embeds: [new EmbedBuilder().setTitle("Trade Cancelled").setDescription("The trade has been cancelled.").setColor(0xE53935)],
+            components: [],
+          });
         }
       });
 
