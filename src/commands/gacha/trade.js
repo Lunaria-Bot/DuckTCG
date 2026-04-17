@@ -1,8 +1,9 @@
 const {
-  SlashCommandBuilder, EmbedBuilder,
+  SlashCommandBuilder, EmbedBuilder, AttachmentBuilder,
   ActionRowBuilder, ButtonBuilder, ButtonStyle,
   ComponentType,
 } = require("discord.js");
+const { renderTrade } = require("../../services/tradeRenderer");
 const { requireProfile } = require("../../utils/requireProfile");
 const PlayerCard = require("../../models/PlayerCard");
 const Card = require("../../models/Card");
@@ -41,8 +42,39 @@ async function touchSession(redis, session) {
   await saveSession(redis, session);
 }
 
-// ─── Build view embed ──────────────────────────────────────────────────────────
-async function buildViewEmbed(session) {
+// ─── Shared helpers ───────────────────────────────────────────────────────────
+async function offerValue(offer) {
+  const lines = [];
+  for (const cardId of offer.cardIds) {
+    const card = await Card.findOne({ cardId });
+    if (card) lines.push(`${RARITY_EMOJI[card.rarity] ?? "⬜"} **${card.name}**`);
+  }
+  if (offer.gold)    lines.push(`${DUCK_COIN} **${offer.gold.toLocaleString()}** Duckcoin`);
+  if (offer.premium) lines.push(`💎 **${offer.premium.toLocaleString()}** Premium`);
+  return lines.length ? lines.join("\n") : "*Nothing offered yet*";
+}
+
+async function getThumb(offer) {
+  for (const cardId of offer.cardIds) {
+    const card = await Card.findOne({ cardId });
+    if (card?.imageUrl) return card.imageUrl;
+  }
+  return null;
+}
+
+async function offerItems(offer) {
+  const items = [];
+  for (const cardId of offer.cardIds) {
+    const card = await Card.findOne({ cardId });
+    if (card) items.push({ label: card.name, rarity: card.rarity });
+  }
+  if (offer.gold)    items.push({ label: `${offer.gold.toLocaleString()} Duckcoin` });
+  if (offer.premium) items.push({ label: `${offer.premium.toLocaleString()} Premium` });
+  return items;
+}
+
+// ─── Build image payload ──────────────────────────────────────────────────────
+async function buildTradePayload(session, completed = false) {
   const iOffer = session.offers[session.initiatorId];
   const tOffer = session.offers[session.targetId];
 
@@ -54,101 +86,54 @@ async function buildViewEmbed(session) {
   const iName = iUser?.username ?? "Player 1";
   const tName = tUser?.username ?? "Player 2";
 
-  async function offerValue(offer) {
-    const lines = [];
-    for (const cardId of offer.cardIds) {
-      const card = await Card.findOne({ cardId });
-      if (card) lines.push(`${RARITY_EMOJI[card.rarity] ?? "⬜"} **${card.name}**`);
-    }
-    if (offer.gold)    lines.push(`${DUCK_COIN} **${offer.gold.toLocaleString()}** Duckcoin`);
-    if (offer.premium) lines.push(`💎 **${offer.premium.toLocaleString()}** Premium`);
-    return lines.length ? lines.join("\n") : "*Nothing offered yet*";
-  }
-
-  async function getThumb(offer) {
-    for (const cardId of offer.cardIds) {
-      const card = await Card.findOne({ cardId });
-      if (card?.imageUrl) return card.imageUrl;
-    }
-    return null;
-  }
-
-  const iValue  = await offerValue(iOffer);
-  const tValue  = await offerValue(tOffer);
-  const iThumb  = await getThumb(iOffer);
-  const tThumb  = await getThumb(tOffer);
-  const iStatus = iOffer.confirmed ? "✅ Confirmed" : "⏳ Pending";
-  const tStatus = tOffer.confirmed ? "✅ Confirmed" : "⏳ Pending";
+  const [iItems, tItems, iThumb, tThumb] = await Promise.all([
+    offerItems(iOffer),
+    offerItems(tOffer),
+    getThumb(iOffer),
+    getThumb(tOffer),
+  ]);
 
   const minutesLeft = Math.max(0, Math.round((session.expiresAt - Date.now()) / 60000));
 
-  const embed = new EmbedBuilder()
-    .setTitle("Active Trade")
-    .setDescription(`**${iName}** ⇌ **${tName}**\n\nAwaiting confirmations.`)
-    .setColor(0x5B21B6)
-    // Initiator section
-    .addFields({
-      name: `${iName} ${iStatus}`,
-      value: iValue + (iThumb ? `\n\u200b` : ""),
-      inline: false,
-    })
-    // Target section
-    .addFields({
-      name: `${tName} ${tStatus}`,
-      value: tValue + (tThumb ? `\n\u200b` : ""),
-      inline: false,
-    })
-    .setFooter({ text: `Trade expires in ${minutesLeft} minute${minutesLeft !== 1 ? "s" : ""} due to inactivity.` });
+  try {
+    const buffer = await renderTrade({
+      title:      completed ? "Trade Completed" : "Active Trade",
+      subtitle:   `${iName} ⇌ ${tName}`,
+      statusText: completed ? "Status: Completed" : "Awaiting confirmations.",
+      sections: [
+        {
+          name:      iName,
+          confirmed: iOffer.confirmed,
+          items:     iItems,
+          imageUrl:  iThumb,
+        },
+        {
+          name:      tName,
+          confirmed: tOffer.confirmed,
+          items:     tItems,
+          imageUrl:  tThumb,
+        },
+      ],
+      footer: completed
+        ? "Trade completed."
+        : `Trade expires in ${minutesLeft} minute${minutesLeft !== 1 ? "s" : ""} due to inactivity.`,
+    });
 
-  // Use the first available card image as thumbnail (top right)
-  if (iThumb) embed.setThumbnail(iThumb);
-  else if (tThumb) embed.setThumbnail(tThumb);
-
-  return embed;
-}
-
-// ─── Build completed embed ────────────────────────────────────────────────────
-async function buildCompletedEmbed(session, myOffer, partnerOffer, myName, partnerName) {
-  async function offerValue(offer) {
-    const lines = [];
-    for (const cardId of offer.cardIds) {
-      const card = await Card.findOne({ cardId });
-      if (card) lines.push(`${RARITY_EMOJI[card.rarity] ?? "⬜"} **${card.name}**`);
-    }
-    if (offer.gold)    lines.push(`${DUCK_COIN} **${offer.gold.toLocaleString()}** Duckcoin`);
-    if (offer.premium) lines.push(`💎 **${offer.premium.toLocaleString()}** Premium`);
-    return lines.length ? lines.join("\n") : "*Nothing*";
+    const attachment = new AttachmentBuilder(buffer, { name: "trade.png" });
+    return { files: [attachment] };
+  } catch (err) {
+    // Fallback to embed if renderer fails
+    console.error("Trade renderer error:", err.message);
+    const fallback = new EmbedBuilder()
+      .setTitle(completed ? "Trade Completed" : "Active Trade")
+      .setDescription(`**${iName}** ⇌ **${tName}**\n\n${completed ? "Status: **Completed**" : "Awaiting confirmations."}`)
+      .setColor(completed ? 0x16a34a : 0x5B21B6)
+      .addFields(
+        { name: `${iName} ${iOffer.confirmed ? "✅" : "⏳"}`, value: await offerValue(iOffer), inline: true },
+        { name: `${tName} ${tOffer.confirmed ? "✅" : "⏳"}`, value: await offerValue(tOffer), inline: true },
+      );
+    return { embeds: [fallback] };
   }
-
-  async function getThumb(offer) {
-    for (const cardId of offer.cardIds) {
-      const card = await Card.findOne({ cardId });
-      if (card?.imageUrl) return card.imageUrl;
-    }
-    return null;
-  }
-
-  const myValue      = await offerValue(myOffer);
-  const partnerValue = await offerValue(partnerOffer);
-  const myThumb      = await getThumb(myOffer);
-  const partnerThumb = await getThumb(partnerOffer);
-
-  const embed = new EmbedBuilder()
-    .setTitle("Trade Completed")
-    .setDescription(
-      `**${myName}** ⇌ **${partnerName}**\n\nStatus: **Completed**`
-    )
-    .addFields(
-      { name: `${myName} ✅ Confirmed`,      value: myValue,      inline: false },
-      { name: `${partnerName} ✅ Confirmed`, value: partnerValue, inline: false },
-    )
-    .setColor(0x16a34a)
-    .setFooter({ text: "Trade completed." });
-
-  if (myThumb) embed.setThumbnail(myThumb);
-  else if (partnerThumb) embed.setThumbnail(partnerThumb);
-
-  return embed;
 }
 
 function buildTradeRow(userId, session) {
@@ -156,8 +141,8 @@ function buildTradeRow(userId, session) {
   return new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId("trade_confirm_btn")
-      .setLabel("Confirm Trade")
-      .setStyle(confirmed ? ButtonStyle.Success : ButtonStyle.Success)
+      .setLabel(confirmed ? "Confirmed ✅" : "Confirm Trade")
+      .setStyle(ButtonStyle.Success)
       .setDisabled(!!confirmed),
     new ButtonBuilder()
       .setCustomId("trade_commands_btn")
@@ -240,15 +225,15 @@ module.exports = {
       const expiresTs = Math.floor(session.expiresAt / 1000);
 
       // Show the trade embed immediately
-      const viewEmbed = await buildViewEmbed(session);
-      const tradeRow  = buildTradeRow(uid, session);
+      const viewPayload = await buildTradePayload(session);
+      const tradeRow    = buildTradeRow(uid, session);
 
       await interaction.editReply({
         content: `✅ Trade started between **${interaction.user.username}** and <@${targetDiscord.id}>!\n\nBoth players can now use:\n\`/trade add <card name>\` — add a card\n\`/trade add-currency <type> <amount>\` — add Duckcoin or Premium\n\`/trade view\` — see the current trade\n\`/trade confirm\` — confirm your side\n\`/trade cancel\` — cancel the trade\n\nTrade expires in 30 minutes.`,
       });
 
-      // Also send the live embed
-      const msg = await interaction.followUp({ embeds: [viewEmbed], components: [tradeRow] });
+      // Also send the live image
+      const msg = await interaction.followUp({ ...viewPayload, components: [tradeRow] });
 
       // Keep buttons alive for 30 min
       const collector = msg.createMessageComponentCollector({
@@ -354,9 +339,9 @@ module.exports = {
 
     // ── VIEW ──────────────────────────────────────────────────────────────────
     if (sub === "view") {
-      const embed = await buildViewEmbed(session);
-      const row   = buildTradeRow(uid, session);
-      const msg   = await interaction.editReply({ embeds: [embed], components: [row] });
+      const payload = await buildTradePayload(session);
+      const row     = buildTradeRow(uid, session);
+      const msg     = await interaction.editReply({ ...payload, components: [row] });
 
       const collector = msg.createMessageComponentCollector({
         filter: i => [session.initiatorId, session.targetId].includes(i.user.id),
@@ -403,7 +388,15 @@ module.exports = {
       const partnerName  = (await User.findOne({ userId: partnerId }))?.username ?? "your partner";
 
       if (!partnerOffer.confirmed) {
-        return interaction.editReply({ content: `✅ You confirmed the trade. Waiting for **${partnerName}** to confirm.` });
+        // Show updated image so partner can see the confirmation
+        const updatedPayload = await buildTradePayload(session);
+        const row = buildTradeRow(uid, session);
+        await interaction.editReply({ ...updatedPayload, components: [row] });
+        await interaction.followUp({
+          content: `✅ You confirmed the trade. Waiting for **${partnerName}** to confirm with \`/trade confirm\`.`,
+          ephemeral: true,
+        });
+        return;
       }
 
       // Both confirmed — execute trade
@@ -453,9 +446,8 @@ module.exports = {
 
         const myName       = myFresh?.username ?? uid;
         const partnerName2 = partnerFresh?.username ?? partnerId;
-        const doneEmbed    = await buildCompletedEmbed(session, myOffer, partnerOffer, myName, partnerName2);
-
-        return interaction.editReply({ embeds: [doneEmbed], components: [] });
+        const donePayload = await buildTradePayload(session, true);
+        return interaction.editReply({ ...donePayload, components: [] });
       } catch (err) {
         await deleteSession(redis, session);
         return interaction.editReply({ content: "Something went wrong during the trade. It has been cancelled." });
