@@ -84,7 +84,9 @@ module.exports = {
 
     // CP label
     const duckBadge = user.badges.find(b => b.badgeId.startsWith("duck_"));
-    const cpLabel = duckBadge ? BADGE_LABEL[duckBadge.badgeId] : "Combat Power";
+    const cpValue = duckBadge
+      ? `${BADGE_LABEL[duckBadge.badgeId]} — **${user.combatPower.toLocaleString()}**`
+      : `**${user.combatPower.toLocaleString()}**`;
 
     const embed = new EmbedBuilder()
       .setColor(0x5B21B6)
@@ -110,7 +112,7 @@ module.exports = {
 
       // 3 stat pills
       .addFields(
-        { name: cpLabel,        value: `**${user.combatPower.toLocaleString()}**`, inline: true },
+        { name: "Combat Power",  value: cpValue, inline: true },
         { name: "🔥 Login Streak", value: `**${user.loginStreak}** day${user.loginStreak !== 1 ? "s" : ""}`, inline: true },
         { name: "Total Pulls",  value: `**${user.stats.totalPullsDone}**`, inline: true },
       )
