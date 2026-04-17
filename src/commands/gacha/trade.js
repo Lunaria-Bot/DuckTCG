@@ -42,7 +42,7 @@ async function touchSession(redis, session) {
 }
 
 // ─── Build view embed ──────────────────────────────────────────────────────────
-async function buildViewEmbed(session, client) {
+async function buildViewEmbed(session) {
   const iOffer = session.offers[session.initiatorId];
   const tOffer = session.offers[session.targetId];
 
@@ -51,7 +51,10 @@ async function buildViewEmbed(session, client) {
     User.findOne({ userId: session.targetId }),
   ]);
 
-  async function offerValue(offer, userId) {
+  const iName = iUser?.username ?? "Player 1";
+  const tName = tUser?.username ?? "Player 2";
+
+  async function offerValue(offer) {
     const lines = [];
     for (const cardId of offer.cardIds) {
       const card = await Card.findOne({ cardId });
@@ -62,7 +65,6 @@ async function buildViewEmbed(session, client) {
     return lines.length ? lines.join("\n") : "*Nothing offered yet*";
   }
 
-  // Get thumbnail from first card in each offer
   async function getThumb(offer) {
     for (const cardId of offer.cardIds) {
       const card = await Card.findOne({ cardId });
@@ -71,43 +73,80 @@ async function buildViewEmbed(session, client) {
     return null;
   }
 
-  const iValue  = await offerValue(iOffer, session.initiatorId);
-  const tValue  = await offerValue(tOffer, session.targetId);
+  const iValue  = await offerValue(iOffer);
+  const tValue  = await offerValue(tOffer);
   const iThumb  = await getThumb(iOffer);
   const tThumb  = await getThumb(tOffer);
   const iStatus = iOffer.confirmed ? "✅ Confirmed" : "⏳ Pending";
   const tStatus = tOffer.confirmed ? "✅ Confirmed" : "⏳ Pending";
 
-  const iName = iUser?.username ?? "Player 1";
-  const tName = tUser?.username ?? "Player 2";
+  const minutesLeft = Math.max(0, Math.round((session.expiresAt - Date.now()) / 60000));
 
-  const expiresTs = Math.floor(session.expiresAt / 1000);
-
-  // Discord embed image trick: use thumbnail for first card,
-  // include second card image in a field if available
   const embed = new EmbedBuilder()
     .setTitle("Active Trade")
-    .setDescription(
-      `**${iName}** ⇌ **${tName}**\n\nAwaiting confirmations.`
-    )
-    .addFields(
-      {
-        name: `${iName} ${iStatus}`,
-        value: iValue,
-        inline: true,
-      },
-      {
-        name: `${tName} ${tStatus}`,
-        value: tValue,
-        inline: true,
-      },
-    )
+    .setDescription(`**${iName}** ⇌ **${tName}**\n\nAwaiting confirmations.`)
     .setColor(0x5B21B6)
-    .setFooter({ text: `Trade expires <t:${expiresTs}:R> due to inactivity.` });
+    // Initiator section
+    .addFields({
+      name: `${iName} ${iStatus}`,
+      value: iValue + (iThumb ? `\n\u200b` : ""),
+      inline: false,
+    })
+    // Target section
+    .addFields({
+      name: `${tName} ${tStatus}`,
+      value: tValue + (tThumb ? `\n\u200b` : ""),
+      inline: false,
+    })
+    .setFooter({ text: `Trade expires in ${minutesLeft} minute${minutesLeft !== 1 ? "s" : ""} due to inactivity.` });
 
-  // Use first available card image as thumbnail
+  // Use the first available card image as thumbnail (top right)
   if (iThumb) embed.setThumbnail(iThumb);
   else if (tThumb) embed.setThumbnail(tThumb);
+
+  return embed;
+}
+
+// ─── Build completed embed ────────────────────────────────────────────────────
+async function buildCompletedEmbed(session, myOffer, partnerOffer, myName, partnerName) {
+  async function offerValue(offer) {
+    const lines = [];
+    for (const cardId of offer.cardIds) {
+      const card = await Card.findOne({ cardId });
+      if (card) lines.push(`${RARITY_EMOJI[card.rarity] ?? "⬜"} **${card.name}**`);
+    }
+    if (offer.gold)    lines.push(`${DUCK_COIN} **${offer.gold.toLocaleString()}** Duckcoin`);
+    if (offer.premium) lines.push(`💎 **${offer.premium.toLocaleString()}** Premium`);
+    return lines.length ? lines.join("\n") : "*Nothing*";
+  }
+
+  async function getThumb(offer) {
+    for (const cardId of offer.cardIds) {
+      const card = await Card.findOne({ cardId });
+      if (card?.imageUrl) return card.imageUrl;
+    }
+    return null;
+  }
+
+  const myValue      = await offerValue(myOffer);
+  const partnerValue = await offerValue(partnerOffer);
+  const myThumb      = await getThumb(myOffer);
+  const partnerThumb = await getThumb(partnerOffer);
+
+  const embed = new EmbedBuilder()
+    .setTitle("Trade Completed")
+    .setDescription(
+      `**${myName}** ⇌ **${partnerName}**\n\nStatus: **Completed**`
+    )
+    .addFields(
+      { name: `${myName} ✅ Confirmed`,      value: myValue,      inline: false },
+      { name: `${partnerName} ✅ Confirmed`, value: partnerValue, inline: false },
+    )
+    .setColor(0x16a34a)
+    .setFooter({ text: "Trade completed." });
+
+  if (myThumb) embed.setThumbnail(myThumb);
+  else if (partnerThumb) embed.setThumbnail(partnerThumb);
 
   return embed;
 }
@@ -276,7 +315,7 @@ module.exports = {
       const msg   = await interaction.editReply({ embeds: [embed], components: [row] });
 
       const collector = msg.createMessageComponentCollector({
-        filter: i => i.user.id === uid,
+        filter: i => [session.initiatorId, session.targetId].includes(i.user.id),
         time: 5 * 60 * 1000,
       });
 
@@ -284,7 +323,7 @@ module.exports = {
         await i.deferUpdate();
 
         if (i.customId === "trade_commands_btn") {
-          await interaction.followUp({
+          await i.followUp({
             content: [
               "**Trade Commands:**",
               "`/trade add <card>` — add a card by name",
@@ -297,7 +336,7 @@ module.exports = {
             ephemeral: true,
           });
         } else if (i.customId === "trade_confirm_btn") {
-          await interaction.followUp({ content: "Use `/trade confirm` to confirm your side.", ephemeral: true });
+          await i.followUp({ content: "Use `/trade confirm` to confirm your side.", ephemeral: true });
         } else if (i.customId === "trade_cancel_btn") {
           await deleteSession(redis, session);
           collector.stop();
@@ -368,30 +407,9 @@ module.exports = {
 
         await deleteSession(redis, session);
 
-        // Build completion embed
-        async function summaryLines(offer, ownerId) {
-          const lines = [];
-          for (const cardId of offer.cardIds) {
-            const card = await Card.findOne({ cardId });
-            if (card) lines.push(`${RARITY_EMOJI[card.rarity] ?? "⬜"} **${card.name}**`);
-          }
-          if (offer.gold)    lines.push(`${DUCK_COIN} **${offer.gold.toLocaleString()}** Duckcoin`);
-          if (offer.premium) lines.push(`💎 **${offer.premium.toLocaleString()}** Premium`);
-          return lines.length ? lines.join("\n") : "*Nothing*";
-        }
-
-        const myName      = myFresh?.username ?? uid;
+        const myName       = myFresh?.username ?? uid;
         const partnerName2 = partnerFresh?.username ?? partnerId;
-
-        const doneEmbed = new EmbedBuilder()
-          .setTitle("Trade Completed ✅")
-          .setDescription(`**${myName}** ⇌ **${partnerName2}**`)
-          .addFields(
-            { name: `${myName} gave`,      value: await summaryLines(myOffer, uid),       inline: true },
-            { name: `${partnerName2} gave`, value: await summaryLines(partnerOffer, partnerId), inline: true },
-          )
-          .setColor(0x16a34a)
-          .setFooter({ text: "Trade completed." });
+        const doneEmbed    = await buildCompletedEmbed(session, myOffer, partnerOffer, myName, partnerName2);
 
         return interaction.editReply({ embeds: [doneEmbed], components: [] });
       } catch (err) {
