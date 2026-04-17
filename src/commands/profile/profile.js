@@ -27,11 +27,13 @@ const DUCK_COIN  = "<:duck_coin:1494344514465431614>";
 const PERMA      = "<:perma_ticket:1494344593863344258>";
 const PICKUP     = "<:pickup_ticket:1494344547046523091>";
 
+const XP_FULL  = "<:xp_full:1494696138396270592>";
+const XP_EMPTY = "<:xp_empty:1494696186525909002>";
+
 function buildExpBar(current, needed) {
   const pct = Math.min(current / needed, 1);
   const filled = Math.round(pct * 15);
-  const empty = 15 - filled;
-  const bar = "▰".repeat(filled) + "▱".repeat(empty);
+  const bar = XP_FULL.repeat(filled) + XP_EMPTY.repeat(15 - filled);
   return `${bar} ${Math.round(pct * 100)}%\n\`${current.toLocaleString()} / ${needed.toLocaleString()} XP\``;
 }
 

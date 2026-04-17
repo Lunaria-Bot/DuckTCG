@@ -20,11 +20,19 @@ loadCommands(path.join(__dirname, "commands"));
 
 const rest = new REST().setToken(process.env.DISCORD_TOKEN);
 
+const GUILD_IDS = [
+  process.env.GUILD_ID,
+  "1494695953125474478",
+].filter(Boolean);
+
 (async () => {
-  console.log(`Deploying ${commands.length} commands...`);
-  await rest.put(
-    Routes.applicationGuildCommands(process.env.CLIENT_ID, process.env.GUILD_ID),
-    { body: commands }
-  );
+  console.log(`Deploying ${commands.length} commands to ${GUILD_IDS.length} server(s)...`);
+  for (const guildId of GUILD_IDS) {
+    await rest.put(
+      Routes.applicationGuildCommands(process.env.CLIENT_ID, guildId),
+      { body: commands }
+    );
+    console.log(`✅ Deployed to guild ${guildId}`);
+  }
   console.log("Done.");
 })();
