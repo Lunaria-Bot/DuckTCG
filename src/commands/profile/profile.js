@@ -48,15 +48,16 @@ module.exports = {
       xpBar,
       `XP: **${user.accountExp.toLocaleString()} / ${expNeeded.toLocaleString()}**`,
       ``,
+      `**Status:** ${user.isPremium ? "💎 Premium" : "Free"}`,
+      ``,
       `**__Start Date__**`,
       formatDate(user.firstJoinDate),
       ...(user.bio ? [``, `**__About__**`, user.bio] : []),
       ``,
       `**__Stats__**`,
-      `📦 Cards Obtained: **${user.stats.totalCardsEverObtained}**`,
+      `📦 Cards Collected: **${user.stats.totalCardsEverObtained}**`,
       `⚔️ Combat Power: **${user.combatPower.toLocaleString()}**`,
       `💀 Raids Attacked: **${user.stats.raidDamageTotal > 0 ? user.stats.raidDamageTotal.toLocaleString() : "0"}**`,
-      `🎰 Total Pulls: **${user.stats.totalPullsDone}**`,
       `🔥 Login Streak: **${user.loginStreak}** day${user.loginStreak !== 1 ? "s" : ""}`,
     ].join("\n");
 

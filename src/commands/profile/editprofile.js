@@ -40,7 +40,7 @@ module.exports = {
     const sub = interaction.options.getSubcommand();
 
     // ── Bio ──────────────────────────────────────────────────────────────────
-    if (sub === "bio") {
+if (sub === "bio") {
       const modal = new ModalBuilder()
         .setCustomId("editprofile_bio")
         .setTitle("Edit Bio");
