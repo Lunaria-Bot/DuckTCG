@@ -55,7 +55,11 @@ async function checkBadges(user, trigger = "all") {
   const earned = [];
 
   // Card count (needs DB query)
-  const cardCount = await PlayerCard.countDocuments({ userId: user.userId, isBurned: false });
+  const cardCountAgg = await PlayerCard.aggregate([
+    { $match: { userId: user.userId, isBurned: false, quantity: { $gt: 0 } } },
+    { $group: { _id: null, total: { $sum: "$quantity" } } }
+  ]);
+  const cardCount = cardCountAgg[0]?.total ?? 0;
 
   // ── Collector (realtime) ──────────────────────────────────────────────
   if (trigger !== "daily") {

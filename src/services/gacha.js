@@ -1,93 +1,143 @@
+const PlayerCard  = require("../models/PlayerCard");
+const Card        = require("../models/Card");
+const User        = require("../models/User");
 const { getRedis } = require("./redis");
-const User = require("../models/User");
-const Card = require("../models/Card");
-const PlayerCard = require("../models/PlayerCard");
 const { calculateStats } = require("./cardStats");
 
-const PITY_HARD = 90;
-const PITY_SOFT_START = 75;
+const RARITY_ORDER = { exceptional: 0, special: 1, rare: 2, common: 3 };
 
-function rollRarity(currentPulls, rates) {
-  if (currentPulls >= PITY_HARD - 1) return "exceptional";
+// ─── Pity helpers ─────────────────────────────────────────────────────────────
+async function getPity(redis, userId, bannerType) {
+  const key = `pity:${userId}:${bannerType}`;
+  const val = await redis.get(key).catch(() => null);
+  return parseInt(val) || 0;
+}
 
-  let exceptionalRate = rates.exceptional;
-  if (currentPulls >= PITY_SOFT_START) {
-    const extra = (currentPulls - PITY_SOFT_START + 1) * 6;
-    exceptionalRate = Math.min(rates.exceptional + extra, 100);
+async function setPity(redis, userId, bannerType, value) {
+  await redis.set(`pity:${userId}:${bannerType}`, value, "EX", 30 * 24 * 3600);
+}
+
+async function getGuarantee(redis, userId, bannerType) {
+  const key = `pity:${userId}:${bannerType}:guarantee`;
+  const val = await redis.get(key).catch(() => null);
+  return val === "1";
+}
+
+async function setGuarantee(redis, userId, bannerType, val) {
+  await redis.set(`pity:${userId}:${bannerType}:guarantee`, val ? "1" : "0", "EX", 30 * 24 * 3600);
+}
+
+// ─── Rarity roll ──────────────────────────────────────────────────────────────
+function rollRarity(banner, pityCount) {
+  const rates = { ...banner.rates };
+
+  // Soft pity boost after pull 75
+  if (pityCount >= (banner.pity?.softPityStart ?? 75)) {
+    const bonus = (pityCount - 74) * 0.06;
+    rates.exceptional = Math.min(rates.exceptional + bonus, 100);
   }
 
   const roll = Math.random() * 100;
-  if (roll < exceptionalRate) return "exceptional";
-  if (roll < exceptionalRate + rates.special) return "special";
-  if (roll < exceptionalRate + rates.special + rates.rare) return "rare";
+  let cumulative = 0;
+  for (const [rarity, rate] of Object.entries(rates).sort(
+    (a, b) => RARITY_ORDER[a[0]] - RARITY_ORDER[b[0]]
+  )) {
+    cumulative += rate;
+    if (roll < cumulative) return rarity;
+  }
   return "common";
 }
 
-function pickCardFromPool(pool, rarity, featuredCards, isGuaranteed) {
-  const candidates = pool[rarity] ?? [];
-  if (candidates.length === 0) return null;
-
-  if (rarity === "exceptional" && featuredCards?.length > 0) {
-    if (isGuaranteed || Math.random() < 0.5) {
-      return featuredCards[Math.floor(Math.random() * featuredCards.length)];
+// ─── Pick card from pool ──────────────────────────────────────────────────────
+function pickCard(pool, rarity) {
+  const rarityPool = pool[rarity];
+  if (!rarityPool?.length) {
+    // fallback down rarity
+    for (const r of ["exceptional","special","rare","common"]) {
+      if (pool[r]?.length) return { cardId: pool[r][Math.floor(Math.random() * pool[r].length)], rarity: r };
     }
+    return null;
   }
-
-  return candidates[Math.floor(Math.random() * candidates.length)];
+  return { cardId: rarityPool[Math.floor(Math.random() * rarityPool.length)], rarity };
 }
 
-async function doPulls(userId, banner, count = 1) {
-  const redis = getRedis();
-  const pityKey = `pity:${userId}:${banner.type}`;
-  const guaranteeKey = `pity:${userId}:${banner.type}:guarantee`;
-
-  let currentPity = parseInt(await redis.get(pityKey)) || 0;
-  let isGuaranteed = (await redis.get(guaranteeKey)) === "1";
-
-  const results = [];
+// ─── Main pull function ───────────────────────────────────────────────────────
+async function doPulls(userId, banner, count) {
+  const redis    = getRedis();
+  const bannerType = banner.type ?? "regular";
+  let pityCount  = await getPity(redis, userId, bannerType);
+  let guarantee  = await getGuarantee(redis, userId, bannerType);
+  const results  = [];
 
   for (let i = 0; i < count; i++) {
-    const rarity = rollRarity(currentPity, banner.rates);
-    const cardId = pickCardFromPool(banner.pool, rarity, banner.featuredCards, isGuaranteed);
+    pityCount++;
+
+    // Hard pity
+    let rarity = pityCount >= (banner.pity?.hardPity ?? 90) ? "exceptional" : rollRarity(banner, pityCount);
+
+    // 50/50 logic for exceptional
+    let cardId;
+    if (rarity === "exceptional") {
+      pityCount = 0;
+      const featured = banner.featuredCards ?? [];
+      if (guarantee || !featured.length) {
+        // Guaranteed featured
+        const pick = featured.length
+          ? featured[Math.floor(Math.random() * featured.length)]
+          : pickCard(banner.pool, "exceptional")?.cardId;
+        cardId = pick;
+        guarantee = false;
+      } else {
+        // 50/50
+        if (Math.random() < 0.5) {
+          cardId = featured[Math.floor(Math.random() * featured.length)];
+          guarantee = false;
+        } else {
+          cardId = pickCard(banner.pool, "exceptional")?.cardId;
+          guarantee = true; // next exceptional is guaranteed featured
+        }
+      }
+    } else {
+      const pick = pickCard(banner.pool, rarity);
+      cardId = pick?.cardId;
+      rarity = pick?.rarity ?? rarity;
+    }
 
     if (!cardId) continue;
 
     const card = await Card.findOne({ cardId });
     if (!card) continue;
 
-    const playerCard = await PlayerCard.create({
-      userId,
-      cardId,
-      level: 1,
-      cachedStats: calculateStats(card, 1),
-    });
+    // Upsert PlayerCard — increment quantity if exists
+    const playerCard = await PlayerCard.findOneAndUpdate(
+      { userId, cardId },
+      {
+        $inc: { quantity: 1 },
+        $setOnInsert: {
+          level: 1,
+          exp: 0,
+          cachedStats: calculateStats(card, 1),
+        },
+      },
+      { upsert: true, new: true }
+    );
 
-    results.push({ playerCard, card, rarity });
-
-    if (rarity === "exceptional") {
-      currentPity = 0;
-      const wasFeatured = banner.featuredCards.includes(cardId);
-      isGuaranteed = !wasFeatured;
-    } else {
-      currentPity++;
-    }
+    results.push({ playerCard, card, rarity, isNew: playerCard.quantity === 1 });
   }
 
-  await redis.set(pityKey, currentPity, "EX", 60 * 60 * 24 * 30);
-  await redis.set(guaranteeKey, isGuaranteed ? "1" : "0", "EX", 60 * 60 * 24 * 30);
+  // Save pity
+  await setPity(redis, userId, bannerType, pityCount);
+  await setGuarantee(redis, userId, bannerType, guarantee);
 
-  await User.findOneAndUpdate(
-    { userId },
-    {
-      $inc: {
-        "stats.totalCardsEverObtained": results.length,
-        "stats.totalPullsDone": count,
-        [`pity.${banner.type}Pulls`]: count,
-      },
-    }
-  );
+  // Update user stats
+  await User.findOneAndUpdate({ userId }, {
+    $inc: {
+      "stats.totalCardsEverObtained": results.length,
+      "stats.totalPullsDone": count,
+    },
+  });
 
   return results;
 }
 
-module.exports = { doPulls, rollRarity };
+module.exports = { doPulls };

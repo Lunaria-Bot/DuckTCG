@@ -46,7 +46,8 @@ function buildListEmbed(pairs, page, username, sortBy, filterRarity, filterRole)
     const num = page * PAGE_SIZE + i + 1;
     const rar = RARITY_EMOJI[card.rarity] ?? "⬜";
     const rol = ROLE_EMOJI[card.role] ?? "";
-    return `\`${String(num).padStart(3," ")}.\` ${rar}${rol} **${card.name}** — Lv.**${pc.level}**`;
+    const qty = pc.quantity > 1 ? ` x**${pc.quantity}**` : "";
+    return `\`${String(num).padStart(3," ")}.\` ${rar}${rol} **${card.name}**${qty} — Lv.**${pc.level}**`;
   });
 
   const activeFilters = [

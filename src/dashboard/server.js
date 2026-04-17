@@ -1160,7 +1160,11 @@ app.post("/players/:id/give-card", auth, adminOnly, async (req, res) => {
   const card = await Card.findOne({ cardId });
   if (!player || !card) return res.redirect("/players");
   const { calculateStats } = require("../services/cardStats");
-  await PlayerCard.create({ userId: player.userId, cardId, level: 1, cachedStats: calculateStats(card, 1) });
+  await PlayerCard.findOneAndUpdate(
+    { userId: player.userId, cardId },
+    { $inc: { quantity: 1 }, $setOnInsert: { level: 1, cachedStats: calculateStats(card, 1) } },
+    { upsert: true, new: true }
+  );
   await User.findOneAndUpdate({ userId: player.userId }, { $inc: { "stats.totalCardsEverObtained": 1 } });
   await audit(req.user, "update", "player", player.userId, `Gave card "${card.name}" to ${player.username}`, null, null);
   res.redirect("/players");

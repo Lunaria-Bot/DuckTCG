@@ -16,7 +16,7 @@ const DUCK_COIN    = "<:duck_coin:1494344514465431614>";
 const TRADE_TIMEOUT = 5 * 60 * 1000;
 
 async function getCardOptions(userId) {
-  const playerCards = await PlayerCard.find({ userId, isBurned: false, isInTeam: false })
+  const playerCards = await PlayerCard.find({ userId, isBurned: false, isInTeam: false, quantity: { $gt: 0 } })
     .sort({ createdAt: -1 }).limit(100);
   const cardIds = [...new Set(playerCards.map(pc => pc.cardId))];
   const cards   = await Card.find({ cardId: { $in: cardIds } });
@@ -32,6 +32,7 @@ async function getCardOptions(userId) {
         description: `${card.anime} · ${card.rarity}`,
         emoji: RARITY_EMOJI[card.rarity] ?? "⬜",
         cardName: card.name,
+        cardId: card.cardId,
         imageUrl: card.imageUrl, rarity: card.rarity,
       };
     });
@@ -301,9 +302,24 @@ module.exports = {
         if (to.gold    > (tFresh?.currency.gold ?? 0))            return interaction.editReply({ embeds: [new EmbedBuilder().setTitle("Trade Failed").setDescription(`**${targetDiscord.username}** doesn't have enough Duckcoin.`).setColor(0xE53935)], components: [] });
         if (to.premium > (tFresh?.currency.premiumCurrency ?? 0)) return interaction.editReply({ embeds: [new EmbedBuilder().setTitle("Trade Failed").setDescription(`**${targetDiscord.username}** doesn't have enough Premium.`).setColor(0xE53935)], components: [] });
 
-        // Swap cards
-        if (io.card) await PlayerCard.findByIdAndUpdate(io.card.pcId, { userId: targetDiscord.id });
-        if (to.card) await PlayerCard.findByIdAndUpdate(to.card.pcId, { userId: interaction.user.id });
+        // Swap cards — use upsert quantity system
+        const CardModel = require("../../models/Card");
+        const { calculateStats } = require("../../services/cardStats");
+
+        async function transferCard(fromUserId, toUserId, pcId, cardId) {
+          await PlayerCard.findByIdAndUpdate(pcId, { $inc: { quantity: -1 } });
+          const cardData = await CardModel.findOne({ cardId });
+          if (cardData) {
+            await PlayerCard.findOneAndUpdate(
+              { userId: toUserId, cardId },
+              { $inc: { quantity: 1 }, $setOnInsert: { level: 1, cachedStats: calculateStats(cardData, 1) } },
+              { upsert: true, new: true }
+            );
+          }
+        }
+
+        if (io.card) await transferCard(interaction.user.id, targetDiscord.id, io.card.pcId, io.card.cardId);
+        if (to.card) await transferCard(targetDiscord.id, interaction.user.id, to.card.pcId, to.card.cardId);
 
         // Transfer currency (initiator → target, target → initiator)
         const iGoldDelta    = (to.gold    - io.gold);
