@@ -82,6 +82,23 @@ function startMessageScheduler() {
   }, 60_000);
 }
 
+// Banner auto-expiration — checks every 5 minutes
+function startBannerExpirationChecker() {
+  const Banner = require("./models/Banner");
+
+  const check = async () => {
+    const now = new Date();
+    const expired = await Banner.find({ isActive: true, endsAt: { $lte: now } });
+    for (const banner of expired) {
+      await banner.updateOne({ isActive: false });
+      logger.info(`Banner "${banner.name}" auto-expired`);
+    }
+  };
+
+  check(); // Run immediately on startup
+  setInterval(check, 5 * 60_000);
+}
+
 // Start
 (async () => {
   await connectMongo();
@@ -89,6 +106,7 @@ function startMessageScheduler() {
   startDashboard(client);
   await client.login(process.env.DISCORD_TOKEN);
   startMessageScheduler();
+  startBannerExpirationChecker();
 })();
 
 module.exports = client;
