@@ -161,7 +161,7 @@ module.exports = {
         new ButtonBuilder().setCustomId(`trade_gold_${userId}`).setLabel(goldLabel).setEmoji("🪙").setStyle(o.gold ? ButtonStyle.Primary : ButtonStyle.Secondary),
         new ButtonBuilder().setCustomId(`trade_premium_${userId}`).setLabel(premiumLabel).setEmoji("💎").setStyle(o.premium ? ButtonStyle.Primary : ButtonStyle.Secondary),
         new ButtonBuilder().setCustomId(`trade_confirm_${userId}`).setLabel(confirmLabel).setStyle(o.confirmed ? ButtonStyle.Success : ButtonStyle.Primary).setDisabled(!canConfirm),
-        new ButtonBuilder().setCustomId("trade_cancel").setLabel("Cancel").setStyle(ButtonStyle.Danger),
+        new ButtonBuilder().setCustomId(`trade_cancel_${userId}`).setLabel("Cancel").setStyle(ButtonStyle.Danger),
       );
     }
 
@@ -194,12 +194,12 @@ module.exports = {
       const myPremiumId = `trade_premium_${uid}`;
       const myConfirmId = `trade_confirm_${uid}`;
 
-      if (![myCardId, myGoldId, myPremiumId, myConfirmId, "trade_cancel"].includes(i.customId)) {
+      if (![myCardId, myGoldId, myPremiumId, myConfirmId, `trade_cancel_${uid}`].includes(i.customId)) {
         await i.reply({ content: "That's not your trade section!", ephemeral: true });
         return;
       }
 
-      if (i.customId === "trade_cancel") {
+      if (i.customId === `trade_cancel_${uid}`) {
         await i.deferUpdate();
         collector.stop("cancelled");
         return;
