@@ -14,7 +14,7 @@ const { calculateStats } = require("../../services/cardStats");
 const RARITY_EMOJI = { exceptional: "🌟", special: "🟪", rare: "🟦", common: "⬜" };
 const RARITY_ORDER = { exceptional: 0, special: 1, rare: 2, common: 3 };
 const DUCK_COIN    = "<:duck_coin:1494344514465431614>";
-const TRADE_TTL    = 30 * 60; // 30 min Redis TTL
+const TRADE_TTL    = 5 * 60; // 5 min Redis TTL
 
 // ─── Redis trade session ───────────────────────────────────────────────────────
 function tradeKey(userId) { return `trade:${userId}`; }
@@ -235,6 +235,45 @@ module.exports = {
       const targetExisting = await getSession(redis, targetDiscord.id);
       if (targetExisting) return interaction.editReply({ content: `**${targetDiscord.username}** already has an active trade.` });
 
+      // ── Ask target to accept ─────────────────────────────────────────────
+      const requestRow = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId("trade_req_accept").setLabel("Accept").setEmoji("✅").setStyle(ButtonStyle.Success),
+        new ButtonBuilder().setCustomId("trade_req_decline").setLabel("Decline").setEmoji("❌").setStyle(ButtonStyle.Danger),
+      );
+
+      await interaction.editReply({
+        content: `<@${targetDiscord.id}> — **${interaction.user.username}** wants to trade with you!`,
+        components: [requestRow],
+      });
+
+      let accepted = false;
+      try {
+        const response = await interaction.fetchReply().then(m =>
+          m.awaitMessageComponent({
+            filter: i => i.user.id === targetDiscord.id && ["trade_req_accept","trade_req_decline"].includes(i.customId),
+            time: 60_000,
+          })
+        );
+
+        if (response.customId === "trade_req_decline") {
+          await response.update({
+            content: `❌ **${targetDiscord.username}** declined the trade request.`,
+            components: [],
+          });
+          return;
+        }
+
+        accepted = true;
+        await response.deferUpdate();
+      } catch {
+        await interaction.editReply({
+          content: `⏰ Trade request expired — **${targetDiscord.username}** didn't respond in time.`,
+          components: [],
+        });
+        return;
+      }
+
+      // ── Both agreed — create session ──────────────────────────────────────
       const session = {
         initiatorId: uid,
         targetId: targetDiscord.id,
@@ -246,18 +285,21 @@ module.exports = {
       };
       await saveSession(redis, session);
 
-      const expiresTs = Math.floor(session.expiresAt / 1000);
-
-      // Show the trade embed immediately
+      // Show the trade embed
       const viewPayload = await buildTradePayload(session);
       const tradeRow    = buildTradeRow(uid, session);
 
       await interaction.editReply({
-        content: `✅ Trade started between **${interaction.user.username}** and <@${targetDiscord.id}>!\n\nBoth players can now use:\n\`/trade add <card name>\` — add a card\n\`/trade add-currency <type> <amount>\` — add Duckcoin or Premium\n\`/trade view\` — see the current trade\n\`/trade confirm\` — confirm your side\n\`/trade cancel\` — cancel the trade\n\nTrade expires in 30 minutes.`,
+        content: `✅ Trade started between **${interaction.user.username}** and **${targetDiscord.username}**!\n\nBoth players can now use:\n\`/trade add <card name>\` — add a card\n\`/trade add-currency <type> <amount>\` — add Duckcoin or Premium\n\`/trade view\` — see the current trade\n\`/trade confirm\` — confirm your side\n\`/trade cancel\` — cancel the trade\n\nTrade expires in 5 minutes.`,
+        components: [],
       });
 
-      // Also send the live image
       const msg = await interaction.followUp({ ...viewPayload, components: [tradeRow] });
+
+      // Store message ref so add/remove can update it
+      session.liveMessageId = msg.id;
+      session.liveChannelId = msg.channelId;
+      await saveSession(redis, session);
 
       // Keep buttons alive for 30 min
       const collector = msg.createMessageComponentCollector({
@@ -324,6 +366,16 @@ module.exports = {
       myOffer.confirmed = false;
       await touchSession(redis, session);
 
+      // Update live trade image
+      try {
+        const freshSession = await getSession(redis, uid);
+        if (freshSession?.liveChannelId && freshSession?.liveMessageId) {
+          const ch  = await interaction.client.channels.fetch(freshSession.liveChannelId);
+          const lm  = await ch.messages.fetch(freshSession.liveMessageId);
+          const updated = await buildTradePayload(freshSession);
+          await lm.edit({ ...updated, components: [buildTradeRow(uid, freshSession)] });
+        }
+      } catch {}
       return interaction.editReply({ content: `Added **${RARITY_EMOJI[card.rarity] ?? "⬜"} ${card.name}** to your trade offer.` });
     }
 
@@ -343,6 +395,16 @@ module.exports = {
       myOffer.confirmed = false;
       await touchSession(redis, session);
 
+      // Update live trade image
+      try {
+        const freshSession = await getSession(redis, uid);
+        if (freshSession?.liveChannelId && freshSession?.liveMessageId) {
+          const ch  = await interaction.client.channels.fetch(freshSession.liveChannelId);
+          const lm  = await ch.messages.fetch(freshSession.liveMessageId);
+          const updated = await buildTradePayload(freshSession);
+          await lm.edit({ ...updated, components: [buildTradeRow(uid, freshSession)] });
+        }
+      } catch {}
       const emoji = type === "gold" ? DUCK_COIN : "💎";
       return interaction.editReply({ content: `Set **${emoji} ${amount.toLocaleString()} ${label}** in your trade offer.` });
     }
@@ -358,6 +420,16 @@ module.exports = {
       myOffer.confirmed = false;
       await touchSession(redis, session);
 
+      // Update live trade image
+      try {
+        const freshSession = await getSession(redis, uid);
+        if (freshSession?.liveChannelId && freshSession?.liveMessageId) {
+          const ch  = await interaction.client.channels.fetch(freshSession.liveChannelId);
+          const lm  = await ch.messages.fetch(freshSession.liveMessageId);
+          const updated = await buildTradePayload(freshSession);
+          await lm.edit({ ...updated, components: [buildTradeRow(uid, freshSession)] });
+        }
+      } catch {}
       return interaction.editReply({ content: `Removed **${card.name}** from your offer.` });
     }
 
@@ -415,6 +487,14 @@ module.exports = {
         // Show updated image so partner can see the confirmation
         const updatedPayload = await buildTradePayload(session);
         const row = buildTradeRow(uid, session);
+        // Update the live message too
+        try {
+          if (session.liveChannelId && session.liveMessageId) {
+            const ch = await interaction.client.channels.fetch(session.liveChannelId);
+            const lm = await ch.messages.fetch(session.liveMessageId);
+            await lm.edit({ ...updatedPayload, components: [row] });
+          }
+        } catch {}
         await interaction.editReply({ ...updatedPayload, components: [row] });
         await interaction.followUp({
           content: `✅ You confirmed the trade. Waiting for **${partnerName}** to confirm with \`/trade confirm\`.`,
