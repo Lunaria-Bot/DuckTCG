@@ -1,348 +1,359 @@
 const {
   SlashCommandBuilder, EmbedBuilder,
   ActionRowBuilder, ButtonBuilder, ButtonStyle,
-  StringSelectMenuBuilder, StringSelectMenuOptionBuilder,
-  ModalBuilder, TextInputBuilder, TextInputStyle,
   ComponentType,
 } = require("discord.js");
 const { requireProfile } = require("../../utils/requireProfile");
 const PlayerCard = require("../../models/PlayerCard");
 const Card = require("../../models/Card");
 const User = require("../../models/User");
+const { getRedis } = require("../../services/redis");
+const { calculateStats } = require("../../services/cardStats");
 
 const RARITY_EMOJI = { exceptional: "🌟", special: "🟪", rare: "🟦", common: "⬜" };
 const RARITY_ORDER = { exceptional: 0, special: 1, rare: 2, common: 3 };
 const DUCK_COIN    = "<:duck_coin:1494344514465431614>";
-const TRADE_TIMEOUT = 5 * 60 * 1000;
+const TRADE_TTL    = 30 * 60; // 30 min Redis TTL
 
-async function getCardOptions(userId) {
-  const playerCards = await PlayerCard.find({ userId, isBurned: false, isInTeam: false, quantity: { $gt: 0 } })
-    .sort({ createdAt: -1 }).limit(100);
-  const cardIds = [...new Set(playerCards.map(pc => pc.cardId))];
-  const cards   = await Card.find({ cardId: { $in: cardIds } });
-  const cardMap = Object.fromEntries(cards.map(c => [c.cardId, c]));
-  return playerCards
-    .filter(pc => cardMap[pc.cardId])
-    .sort((a, b) => (RARITY_ORDER[cardMap[a.cardId]?.rarity] ?? 9) - (RARITY_ORDER[cardMap[b.cardId]?.rarity] ?? 9))
-    .slice(0, 24) // leave 1 slot for "None"
-    .map(pc => {
-      const card = cardMap[pc.cardId];
-      return {
-        pcId: pc._id.toString(), label: `${card.name} — Lv.${pc.level}`,
-        description: `${card.anime} · ${card.rarity}`,
-        emoji: RARITY_EMOJI[card.rarity] ?? "⬜",
-        cardName: card.name,
-        cardId: card.cardId,
-        imageUrl: card.imageUrl, rarity: card.rarity,
-      };
-    });
+// ─── Redis trade session ───────────────────────────────────────────────────────
+function tradeKey(userId) { return `trade:${userId}`; }
+
+async function getSession(redis, userId) {
+  const raw = await redis.get(tradeKey(userId)).catch(() => null);
+  if (!raw) return null;
+  try { return JSON.parse(raw); } catch { return null; }
 }
 
-function formatOffer(card, gold, premium) {
-  const parts = [];
-  if (card) parts.push(`${RARITY_EMOJI[card.rarity] ?? "⬜"} **${card.cardName}**`);
-  if (gold)    parts.push(`${DUCK_COIN} **${gold.toLocaleString()}** Duckcoin`);
-  if (premium) parts.push(`💎 **${premium.toLocaleString()}** Premium`);
-  return parts.length ? parts.join("\n") : "*Nothing offered*";
+async function saveSession(redis, session) {
+  const ttl = Math.floor((session.expiresAt - Date.now()) / 1000);
+  if (ttl <= 0) return;
+  await redis.set(tradeKey(session.initiatorId), JSON.stringify(session), "EX", ttl);
+  await redis.set(tradeKey(session.targetId),    JSON.stringify(session), "EX", ttl);
 }
 
+async function deleteSession(redis, session) {
+  await redis.del(tradeKey(session.initiatorId));
+  await redis.del(tradeKey(session.targetId));
+}
+
+async function touchSession(redis, session) {
+  session.expiresAt = Date.now() + TRADE_TTL * 1000;
+  await saveSession(redis, session);
+}
+
+// ─── Build view embed ──────────────────────────────────────────────────────────
+async function buildViewEmbed(session) {
+  const iOffer = session.offers[session.initiatorId];
+  const tOffer = session.offers[session.targetId];
+
+  async function offerLines(offer, userId) {
+    const lines = [];
+    for (const cardId of offer.cardIds) {
+      const pc   = await PlayerCard.findOne({ userId, cardId, isBurned: false, quantity: { $gt: 0 } });
+      const card = await Card.findOne({ cardId });
+      if (card) lines.push(`${RARITY_EMOJI[card.rarity] ?? "⬜"} **${card.name}**`);
+    }
+    if (offer.gold)    lines.push(`${DUCK_COIN} **${offer.gold.toLocaleString()}** Duckcoin`);
+    if (offer.premium) lines.push(`💎 **${offer.premium.toLocaleString()}** Premium`);
+    return lines.length ? lines.join("\n") : "*Nothing offered yet*";
+}
+
+  const iUser = await User.findOne({ userId: session.initiatorId });
+  const tUser = await User.findOne({ userId: session.targetId });
+
+  const iLines = await offerLines(iOffer, session.initiatorId);
+  const tLines = await offerLines(tOffer, session.targetId);
+
+  const iStatus = iOffer.confirmed ? "✅ Confirmed" : "⏳ Pending";
+  const tStatus = tOffer.confirmed ? "✅ Confirmed" : "⏳ Pending";
+
+  const expiresTs = Math.floor(session.expiresAt / 1000);
+
+  const embed = new EmbedBuilder()
+    .setTitle("Active Trade")
+    .setDescription(`**${iUser?.username ?? session.initiatorId}** ⇌ **${tUser?.username ?? session.targetId}**\n\nAwaiting confirmations.`)
+    .addFields(
+      { name: `${iUser?.username ?? "Player 1"} ${iStatus}`, value: iLines, inline: true },
+      { name: `${tUser?.username ?? "Player 2"} ${tStatus}`, value: tLines, inline: true },
+    )
+    .setColor(0x5B21B6)
+    .setFooter({ text: `Trade expires` })
+    .setTimestamp(session.expiresAt);
+
+  return embed;
+}
+
+function buildTradeRow(userId, session) {
+  const confirmed = session.offers[userId]?.confirmed;
+  return new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId("trade_confirm_btn")
+      .setLabel(confirmed ? "Confirmed ✅" : "Confirm Trade")
+      .setStyle(confirmed ? ButtonStyle.Success : ButtonStyle.Primary)
+      .setDisabled(!!confirmed),
+    new ButtonBuilder()
+      .setCustomId("trade_cancel_btn")
+      .setLabel("Cancel Trade")
+      .setStyle(ButtonStyle.Danger),
+  );
+}
+
+// ─── Command ──────────────────────────────────────────────────────────────────
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("trade")
-    .setDescription("Trade cards and/or currency with another player")
-    .addUserOption(opt =>
-      opt.setName("user").setDescription("The player you want to trade with").setRequired(true)
-    ),
+    .setDescription("Trade cards and currency with another player")
+    .addSubcommand(sub => sub
+      .setName("start")
+      .setDescription("Start a trade with another player")
+      .addUserOption(opt => opt.setName("user").setDescription("Player to trade with").setRequired(true))
+    )
+    .addSubcommand(sub => sub
+      .setName("add")
+      .setDescription("Add a card to your trade offer")
+      .addStringOption(opt => opt.setName("card").setDescription("Card name (partial match)").setRequired(true))
+    )
+    .addSubcommand(sub => sub
+      .setName("add-currency")
+      .setDescription("Add Duckcoin or Premium to your trade offer")
+      .addStringOption(opt => opt.setName("type").setDescription("Currency type").setRequired(true)
+        .addChoices({ name: "Duckcoin", value: "gold" }, { name: "Premium", value: "premium" }))
+      .addIntegerOption(opt => opt.setName("amount").setDescription("Amount to add").setRequired(true).setMinValue(1))
+    )
+    .addSubcommand(sub => sub
+      .setName("remove")
+      .setDescription("Remove a card from your trade offer")
+      .addStringOption(opt => opt.setName("card").setDescription("Card name to remove").setRequired(true))
+    )
+    .addSubcommand(sub => sub.setName("view").setDescription("View the current trade"))
+    .addSubcommand(sub => sub.setName("confirm").setDescription("Confirm the trade"))
+    .addSubcommand(sub => sub.setName("cancel").setDescription("Cancel the trade")),
 
   async execute(interaction) {
-    await interaction.deferReply();
+    await interaction.deferReply({ ephemeral: false });
 
-    const initiator = await requireProfile(interaction);
-    if (!initiator) return;
+    const user = await requireProfile(interaction);
+    if (!user) return;
 
-    const targetDiscord = interaction.options.getUser("user");
-    if (targetDiscord.id === interaction.user.id) return interaction.editReply({ content: "You can't trade with yourself!" });
-    if (targetDiscord.bot) return interaction.editReply({ content: "You can't trade with a bot!" });
+    const redis = getRedis();
+    const sub   = interaction.options.getSubcommand();
+    const uid   = interaction.user.id;
 
-    const targetProfile = await User.findOne({ userId: targetDiscord.id });
-    if (!targetProfile) return interaction.editReply({ content: `**${targetDiscord.username}** doesn't have a profile yet.` });
+    // ── START ────────────────────────────────────────────────────────────────
+    if (sub === "start") {
+      const existing = await getSession(redis, uid);
+      if (existing) return interaction.editReply({ content: "You already have an active trade. Use `/trade cancel` first." });
 
-    // ── Step 1: Trade request ─────────────────────────────────────────────────
-    const requestEmbed = new EmbedBuilder()
-      .setTitle("Trade Request")
-      .setDescription(`Hey <@${targetDiscord.id}>! **${interaction.user.username}** would like to trade with you.\nDo you want to begin trading?`)
-      .setColor(0x5B21B6);
+      const targetDiscord = interaction.options.getUser("user");
+      if (targetDiscord.id === uid) return interaction.editReply({ content: "You can't trade with yourself!" });
+      if (targetDiscord.bot) return interaction.editReply({ content: "You can't trade with a bot!" });
 
-    const requestRow = new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId("trade_accept").setLabel("Accepted").setEmoji("✅").setStyle(ButtonStyle.Success),
-      new ButtonBuilder().setCustomId("trade_reject").setLabel("Reject").setEmoji("❌").setStyle(ButtonStyle.Danger),
-    );
+      const targetProfile = await User.findOne({ userId: targetDiscord.id });
+      if (!targetProfile) return interaction.editReply({ content: `**${targetDiscord.username}** doesn't have a profile yet.` });
 
-    const msg = await interaction.editReply({ embeds: [requestEmbed], components: [requestRow] });
+      const targetExisting = await getSession(redis, targetDiscord.id);
+      if (targetExisting) return interaction.editReply({ content: `**${targetDiscord.username}** already has an active trade.` });
 
-    let accepted = false;
-    try {
-      const response = await msg.awaitMessageComponent({
-        filter: i => i.user.id === targetDiscord.id && ["trade_accept","trade_reject"].includes(i.customId),
-        time: TRADE_TIMEOUT,
+      const session = {
+        initiatorId: uid,
+        targetId: targetDiscord.id,
+        expiresAt: Date.now() + TRADE_TTL * 1000,
+        offers: {
+          [uid]: { cardIds: [], gold: 0, premium: 0, confirmed: false },
+          [targetDiscord.id]: { cardIds: [], gold: 0, premium: 0, confirmed: false },
+        },
+      };
+      await saveSession(redis, session);
+
+      const expiresTs = Math.floor(session.expiresAt / 1000);
+      return interaction.editReply({
+        content: `✅ Trade started between **${interaction.user.username}** and <@${targetDiscord.id}>!\n\nBoth players can now use:\n\`/trade add <card name>\` — add a card\n\`/trade add-currency <type> <amount>\` — add Duckcoin or Premium\n\`/trade view\` — see the current trade\n\`/trade confirm\` — confirm your side\n\`/trade cancel\` — cancel the trade\n\nTrade expires <t:${expiresTs}:R>.`,
       });
-      if (response.customId === "trade_reject") {
-        await response.update({ embeds: [new EmbedBuilder().setTitle("Trade Rejected").setDescription(`**${targetDiscord.username}** declined the trade.`).setColor(0xE53935)], components: [] });
-        return;
-      }
-      accepted = true;
-      await response.deferUpdate();
-    } catch {
-      await interaction.editReply({
-        embeds: [new EmbedBuilder().setTitle("Trade Request").setDescription(`Hey <@${targetDiscord.id}>! **${interaction.user.username}** would like to trade with you.\n\n*Trade request expired due to inactivity.*`).setColor(0x888888)],
-        components: [],
+    }
+
+    // All other subcommands require an active session
+    const session = await getSession(redis, uid);
+    if (!session) return interaction.editReply({ content: "You don't have an active trade. Start one with `/trade start @user`." });
+
+    const isInitiator = session.initiatorId === uid;
+    const partnerId   = isInitiator ? session.targetId : session.initiatorId;
+    const myOffer     = session.offers[uid];
+
+    // ── ADD CARD ─────────────────────────────────────────────────────────────
+    if (sub === "add") {
+      const query = interaction.options.getString("card");
+
+      // Find a card in their inventory matching the name
+      const playerCards = await PlayerCard.find({ userId: uid, isBurned: false, quantity: { $gt: 0 }, isInTeam: false });
+      const cardIds = playerCards.map(pc => pc.cardId);
+      const card = await Card.findOne({
+        cardId: { $in: cardIds },
+        name: { $regex: query, $options: "i" },
       });
+
+      if (!card) return interaction.editReply({ content: `No card matching "**${query}**" found in your inventory.` });
+      if (myOffer.cardIds.includes(card.cardId)) return interaction.editReply({ content: `**${card.name}** is already in your offer.` });
+      if (myOffer.cardIds.length >= 5) return interaction.editReply({ content: "You can add up to 5 cards per trade." });
+
+      myOffer.cardIds.push(card.cardId);
+      myOffer.confirmed = false;
+      await touchSession(redis, session);
+
+      return interaction.editReply({ content: `Added **${RARITY_EMOJI[card.rarity] ?? "⬜"} ${card.name}** to your trade offer.` });
+    }
+
+    // ── ADD CURRENCY ──────────────────────────────────────────────────────────
+    if (sub === "add-currency") {
+      const type   = interaction.options.getString("type");
+      const amount = interaction.options.getInteger("amount");
+
+      const freshUser = await User.findOne({ userId: uid });
+      const balance   = type === "gold" ? (freshUser?.currency.gold ?? 0) : (freshUser?.currency.premiumCurrency ?? 0);
+      const label     = type === "gold" ? "Duckcoin" : "Premium";
+
+      if (amount > balance) return interaction.editReply({ content: `You only have **${balance.toLocaleString()}** ${label}.` });
+
+      if (type === "gold") myOffer.gold = amount;
+      else myOffer.premium = amount;
+      myOffer.confirmed = false;
+      await touchSession(redis, session);
+
+      const emoji = type === "gold" ? DUCK_COIN : "💎";
+      return interaction.editReply({ content: `Set **${emoji} ${amount.toLocaleString()} ${label}** in your trade offer.` });
+    }
+
+    // ── REMOVE CARD ───────────────────────────────────────────────────────────
+    if (sub === "remove") {
+      const query = interaction.options.getString("card");
+      const cards = await Card.find({ cardId: { $in: myOffer.cardIds }, name: { $regex: query, $options: "i" } });
+      if (!cards.length) return interaction.editReply({ content: `No card matching "**${query}**" in your offer.` });
+
+      const card = cards[0];
+      myOffer.cardIds = myOffer.cardIds.filter(id => id !== card.cardId);
+      myOffer.confirmed = false;
+      await touchSession(redis, session);
+
+      return interaction.editReply({ content: `Removed **${card.name}** from your offer.` });
+    }
+
+    // ── VIEW ──────────────────────────────────────────────────────────────────
+    if (sub === "view") {
+      const embed = await buildViewEmbed(session);
+      const row   = buildTradeRow(uid, session);
+      const msg   = await interaction.editReply({ embeds: [embed], components: [row] });
+
+      const collector = msg.createMessageComponentCollector({
+        filter: i => i.user.id === uid,
+        time: 5 * 60 * 1000,
+        max: 1,
+      });
+
+      collector.on("collect", async i => {
+        await i.deferUpdate();
+        if (i.customId === "trade_confirm_btn") {
+          interaction.followUp({ content: "Use `/trade confirm` to confirm.", ephemeral: true });
+        } else if (i.customId === "trade_cancel_btn") {
+          await deleteSession(redis, session);
+          await interaction.editReply({ embeds: [new EmbedBuilder().setTitle("Trade Cancelled").setDescription("The trade has been cancelled.").setColor(0xE53935)], components: [] });
+        }
+      });
+
       return;
     }
 
-    // ── Step 2: Build offers ──────────────────────────────────────────────────
-    const [initiatorOptions, targetOptions] = await Promise.all([
-      getCardOptions(interaction.user.id),
-      getCardOptions(targetDiscord.id),
-    ]);
+    // ── CONFIRM ───────────────────────────────────────────────────────────────
+    if (sub === "confirm") {
+      myOffer.confirmed = true;
+      await saveSession(redis, session);
 
-    // State for each side
-    const offer = {
-      [interaction.user.id]: { card: null, gold: 0, premium: 0, confirmed: false },
-      [targetDiscord.id]:    { card: null, gold: 0, premium: 0, confirmed: false },
-    };
+      const partnerOffer = session.offers[partnerId];
+      const partnerName  = (await User.findOne({ userId: partnerId }))?.username ?? "your partner";
 
-    // ── Helpers ───────────────────────────────────────────────────────────────
-    function buildTradeEmbed() {
-      const io = offer[interaction.user.id];
-      const to = offer[targetDiscord.id];
-      return new EmbedBuilder()
-        .setTitle("Trade in Progress")
-        .setDescription(`**${interaction.user.username}** ⇌ **${targetDiscord.username}**`)
-        .addFields(
-          {
-            name: `${interaction.user.username}${io.confirmed ? " ✅ Confirmed" : ""}`,
-            value: formatOffer(io.card, io.gold, io.premium),
-            inline: true,
-          },
-          {
-            name: `${targetDiscord.username}${to.confirmed ? " ✅ Confirmed" : ""}`,
-            value: formatOffer(to.card, to.gold, to.premium),
-            inline: true,
-          },
-        )
-        .setColor(0x5B21B6)
-        .setFooter({ text: "Select a card and/or add currency, then confirm." });
-    }
-
-    function buildCardSelect(userId) {
-      const opts = userId === interaction.user.id ? initiatorOptions : targetOptions;
-      const options = [
-        new StringSelectMenuOptionBuilder().setLabel("No card").setDescription("Offer currency only").setValue("none").setEmoji("❌"),
-        ...opts.map(o =>
-          new StringSelectMenuOptionBuilder()
-            .setLabel(o.label).setDescription(o.description).setValue(o.pcId).setEmoji(o.emoji)
-        ),
-      ];
-      return new ActionRowBuilder().addComponents(
-        new StringSelectMenuBuilder()
-          .setCustomId(`trade_card_${userId}`)
-          .setPlaceholder("Select a card to offer (optional)")
-          .addOptions(options)
-      );
-    }
-
-    function buildCurrencyRow(userId) {
-      const o = offer[userId];
-      const goldLabel    = o.gold    ? `${o.gold.toLocaleString()} Duckcoin`    : "Add Duckcoin";
-      const premiumLabel = o.premium ? `${o.premium.toLocaleString()} Premium`  : "Add Premium";
-      const confirmLabel = o.confirmed ? "Confirmed ✅" : "Confirm";
-      const canConfirm   = !o.confirmed && (o.card || o.gold > 0 || o.premium > 0);
-      return new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId(`trade_gold_${userId}`).setLabel(goldLabel).setEmoji("🪙").setStyle(o.gold ? ButtonStyle.Primary : ButtonStyle.Secondary),
-        new ButtonBuilder().setCustomId(`trade_premium_${userId}`).setLabel(premiumLabel).setEmoji("💎").setStyle(o.premium ? ButtonStyle.Primary : ButtonStyle.Secondary),
-        new ButtonBuilder().setCustomId(`trade_confirm_${userId}`).setLabel(confirmLabel).setStyle(o.confirmed ? ButtonStyle.Success : ButtonStyle.Primary).setDisabled(!canConfirm),
-        new ButtonBuilder().setCustomId(`trade_cancel_${userId}`).setLabel("Cancel").setStyle(ButtonStyle.Danger),
-      );
-    }
-
-    function buildComponents() {
-      return [
-        buildCardSelect(interaction.user.id),
-        buildCurrencyRow(interaction.user.id),
-        buildCardSelect(targetDiscord.id),
-        buildCurrencyRow(targetDiscord.id),
-      ];
-    }
-
-    await interaction.editReply({ embeds: [buildTradeEmbed()], components: buildComponents() });
-
-    // ── Step 3: Collector ─────────────────────────────────────────────────────
-    const collector = msg.createMessageComponentCollector({
-      filter: i => [interaction.user.id, targetDiscord.id].includes(i.user.id),
-      time: TRADE_TIMEOUT,
-    });
-
-    collector.on("collect", async i => {
-      const uid    = i.user.id;
-      const o      = offer[uid];
-      const isInitiator = uid === interaction.user.id;
-      const opts   = isInitiator ? initiatorOptions : targetOptions;
-
-      // Only allow each player to interact with their own controls
-      const myCardId    = `trade_card_${uid}`;
-      const myGoldId    = `trade_gold_${uid}`;
-      const myPremiumId = `trade_premium_${uid}`;
-      const myConfirmId = `trade_confirm_${uid}`;
-
-      if (![myCardId, myGoldId, myPremiumId, myConfirmId, `trade_cancel_${uid}`].includes(i.customId)) {
-        await i.reply({ content: "That's not your trade section!", ephemeral: true });
-        return;
+      if (!partnerOffer.confirmed) {
+        return interaction.editReply({ content: `✅ You confirmed the trade. Waiting for **${partnerName}** to confirm.` });
       }
 
-      if (i.customId === `trade_cancel_${uid}`) {
-        await i.deferUpdate();
-        collector.stop("cancelled");
-        return;
-      }
-
-      // Card select
-      if (i.customId === myCardId) {
-        await i.deferUpdate();
-        const val = i.values[0];
-        o.card = val === "none" ? null : opts.find(x => x.pcId === val) ?? null;
-        o.confirmed = false;
-      }
-
-      // Gold modal
-      else if (i.customId === myGoldId) {
-        const userProfile = isInitiator ? initiator : targetProfile;
-        const modal = new ModalBuilder()
-          .setCustomId(`trade_gold_modal_${uid}`)
-          .setTitle("Add Duckcoin to Trade")
-          .addComponents(new ActionRowBuilder().addComponents(
-            new TextInputBuilder()
-              .setCustomId("amount")
-              .setLabel(`How much? (you have ${userProfile.currency.gold.toLocaleString()})`)
-              .setStyle(TextInputStyle.Short)
-              .setPlaceholder("0")
-              .setValue(o.gold ? String(o.gold) : "")
-              .setRequired(true)
-          ));
-        await i.showModal(modal);
-        try {
-          const modalI = await i.awaitModalSubmit({ filter: m => m.customId === `trade_gold_modal_${uid}` && m.user.id === uid, time: 60_000 });
-          await modalI.deferUpdate();
-          const val = parseInt(modalI.fields.getTextInputValue("amount").replace(/\D/g,"")) || 0;
-          const userProf = await User.findOne({ userId: uid });
-          o.gold = Math.min(val, userProf?.currency.gold ?? 0);
-          o.confirmed = false;
-        } catch { return; }
-      }
-
-      // Premium modal
-      else if (i.customId === myPremiumId) {
-        const userProfile = isInitiator ? initiator : targetProfile;
-        const modal = new ModalBuilder()
-          .setCustomId(`trade_premium_modal_${uid}`)
-          .setTitle("Add Premium to Trade")
-          .addComponents(new ActionRowBuilder().addComponents(
-            new TextInputBuilder()
-              .setCustomId("amount")
-              .setLabel(`How much? (you have ${userProfile.currency.premiumCurrency})`)
-              .setStyle(TextInputStyle.Short)
-              .setPlaceholder("0")
-              .setValue(o.premium ? String(o.premium) : "")
-              .setRequired(true)
-          ));
-        await i.showModal(modal);
-        try {
-          const modalI = await i.awaitModalSubmit({ filter: m => m.customId === `trade_premium_modal_${uid}` && m.user.id === uid, time: 60_000 });
-          await modalI.deferUpdate();
-          const val = parseInt(modalI.fields.getTextInputValue("amount").replace(/\D/g,"")) || 0;
-          const userProf = await User.findOne({ userId: uid });
-          o.premium = Math.min(val, userProf?.currency.premiumCurrency ?? 0);
-          o.confirmed = false;
-        } catch { return; }
-      }
-
-      // Confirm
-      else if (i.customId === myConfirmId) {
-        await i.deferUpdate();
-        o.confirmed = true;
-      }
-
-      // Check both confirmed
-      const allConfirmed = offer[interaction.user.id].confirmed && offer[targetDiscord.id].confirmed;
-      if (allConfirmed) { collector.stop("completed"); return; }
-
-      await interaction.editReply({ embeds: [buildTradeEmbed()], components: buildComponents() });
-    });
-
-    // ── Step 4: Execute ───────────────────────────────────────────────────────
-    collector.on("end", async (_, reason) => {
-      if (reason === "cancelled") {
-        return interaction.editReply({ embeds: [new EmbedBuilder().setTitle("Trade Cancelled").setDescription("The trade was cancelled.").setColor(0xE53935)], components: [] });
-      }
-      if (reason !== "completed") {
-        return interaction.editReply({ embeds: [new EmbedBuilder().setTitle("Trade Expired").setDescription("The trade expired due to inactivity.").setColor(0x888888)], components: [] });
-      }
-
+      // Both confirmed — execute trade
       try {
-        const io = offer[interaction.user.id];
-        const to = offer[targetDiscord.id];
-
-        // Validate balances one last time
-        const [iFresh, tFresh] = await Promise.all([
-          User.findOne({ userId: interaction.user.id }),
-          User.findOne({ userId: targetDiscord.id }),
+        // Validate balances
+        const [myFresh, partnerFresh] = await Promise.all([
+          User.findOne({ userId: uid }),
+          User.findOne({ userId: partnerId }),
         ]);
-        if (io.gold    > (iFresh?.currency.gold ?? 0))            return interaction.editReply({ embeds: [new EmbedBuilder().setTitle("Trade Failed").setDescription(`**${interaction.user.username}** doesn't have enough Duckcoin.`).setColor(0xE53935)], components: [] });
-        if (io.premium > (iFresh?.currency.premiumCurrency ?? 0)) return interaction.editReply({ embeds: [new EmbedBuilder().setTitle("Trade Failed").setDescription(`**${interaction.user.username}** doesn't have enough Premium.`).setColor(0xE53935)], components: [] });
-        if (to.gold    > (tFresh?.currency.gold ?? 0))            return interaction.editReply({ embeds: [new EmbedBuilder().setTitle("Trade Failed").setDescription(`**${targetDiscord.username}** doesn't have enough Duckcoin.`).setColor(0xE53935)], components: [] });
-        if (to.premium > (tFresh?.currency.premiumCurrency ?? 0)) return interaction.editReply({ embeds: [new EmbedBuilder().setTitle("Trade Failed").setDescription(`**${targetDiscord.username}** doesn't have enough Premium.`).setColor(0xE53935)], components: [] });
 
-        // Swap cards — use upsert quantity system
-        const CardModel = require("../../models/Card");
-        const { calculateStats } = require("../../services/cardStats");
-
-        async function transferCard(fromUserId, toUserId, pcId, cardId) {
-          await PlayerCard.findByIdAndUpdate(pcId, { $inc: { quantity: -1 } });
-          const cardData = await CardModel.findOne({ cardId });
-          if (cardData) {
-            await PlayerCard.findOneAndUpdate(
-              { userId: toUserId, cardId },
-              { $inc: { quantity: 1 }, $setOnInsert: { level: 1, cachedStats: calculateStats(cardData, 1) } },
-              { upsert: true, new: true }
-            );
-          }
+        if (myOffer.gold > (myFresh?.currency.gold ?? 0)) {
+          await deleteSession(redis, session);
+          return interaction.editReply({ content: "Trade failed: you don't have enough Duckcoin anymore." });
+        }
+        if (partnerOffer.gold > (partnerFresh?.currency.gold ?? 0)) {
+          await deleteSession(redis, session);
+          return interaction.editReply({ content: `Trade failed: **${partnerName}** doesn't have enough Duckcoin anymore.` });
         }
 
-        if (io.card) await transferCard(interaction.user.id, targetDiscord.id, io.card.pcId, io.card.cardId);
-        if (to.card) await transferCard(targetDiscord.id, interaction.user.id, to.card.pcId, to.card.cardId);
+        // Transfer cards
+        for (const cardId of myOffer.cardIds) {
+          const card = await Card.findOne({ cardId });
+          await PlayerCard.findOneAndUpdate({ userId: uid, cardId }, { $inc: { quantity: -1 } });
+          await PlayerCard.findOneAndUpdate(
+            { userId: partnerId, cardId },
+            { $inc: { quantity: 1 }, $setOnInsert: { level: 1, cachedStats: calculateStats(card, 1) } },
+            { upsert: true, new: true }
+          );
+        }
+        for (const cardId of partnerOffer.cardIds) {
+          const card = await Card.findOne({ cardId });
+          await PlayerCard.findOneAndUpdate({ userId: partnerId, cardId }, { $inc: { quantity: -1 } });
+          await PlayerCard.findOneAndUpdate(
+            { userId: uid, cardId },
+            { $inc: { quantity: 1 }, $setOnInsert: { level: 1, cachedStats: calculateStats(card, 1) } },
+            { upsert: true, new: true }
+          );
+        }
 
-        // Transfer currency (initiator → target, target → initiator)
-        const iGoldDelta    = (to.gold    - io.gold);
-        const iPremiumDelta = (to.premium - io.premium);
-        await User.findOneAndUpdate({ userId: interaction.user.id }, { $inc: { "currency.gold": iGoldDelta, "currency.premiumCurrency": iPremiumDelta } });
-        await User.findOneAndUpdate({ userId: targetDiscord.id },    { $inc: { "currency.gold": -iGoldDelta, "currency.premiumCurrency": -iPremiumDelta } });
+        // Transfer currency
+        const myGoldDelta    = partnerOffer.gold    - myOffer.gold;
+        const myPremiumDelta = partnerOffer.premium - myOffer.premium;
+        await User.findOneAndUpdate({ userId: uid },       { $inc: { "currency.gold": myGoldDelta, "currency.premiumCurrency": myPremiumDelta } });
+        await User.findOneAndUpdate({ userId: partnerId }, { $inc: { "currency.gold": -myGoldDelta, "currency.premiumCurrency": -myPremiumDelta } });
 
-        const completedEmbed = new EmbedBuilder()
-          .setTitle("Trade Completed")
-          .setDescription(`**${interaction.user.username}** ⇌ **${targetDiscord.username}**\n\nStatus: **Completed**`)
+        await deleteSession(redis, session);
+
+        // Build completion embed
+        async function summaryLines(offer, ownerId) {
+          const lines = [];
+          for (const cardId of offer.cardIds) {
+            const card = await Card.findOne({ cardId });
+            if (card) lines.push(`${RARITY_EMOJI[card.rarity] ?? "⬜"} **${card.name}**`);
+          }
+          if (offer.gold)    lines.push(`${DUCK_COIN} **${offer.gold.toLocaleString()}** Duckcoin`);
+          if (offer.premium) lines.push(`💎 **${offer.premium.toLocaleString()}** Premium`);
+          return lines.length ? lines.join("\n") : "*Nothing*";
+        }
+
+        const myName      = myFresh?.username ?? uid;
+        const partnerName2 = partnerFresh?.username ?? partnerId;
+
+        const doneEmbed = new EmbedBuilder()
+          .setTitle("Trade Completed ✅")
+          .setDescription(`**${myName}** ⇌ **${partnerName2}**`)
           .addFields(
-            { name: `${interaction.user.username} ✅ Confirmed`, value: formatOffer(io.card, io.gold, io.premium), inline: true },
-            { name: `${targetDiscord.username} ✅ Confirmed`,   value: formatOffer(to.card, to.gold, to.premium),  inline: true },
+            { name: `${myName} gave`,      value: await summaryLines(myOffer, uid),       inline: true },
+            { name: `${partnerName2} gave`, value: await summaryLines(partnerOffer, partnerId), inline: true },
           )
           .setColor(0x16a34a)
           .setFooter({ text: "Trade completed." });
 
-        if (io.card?.imageUrl) completedEmbed.setThumbnail(io.card.imageUrl);
-
-        await interaction.editReply({ embeds: [completedEmbed], components: [] });
-      } catch {
-        await interaction.editReply({ embeds: [new EmbedBuilder().setTitle("Trade Error").setDescription("Something went wrong. Please try again.").setColor(0xE53935)], components: [] });
+        return interaction.editReply({ embeds: [doneEmbed], components: [] });
+      } catch (err) {
+        await deleteSession(redis, session);
+        return interaction.editReply({ content: "Something went wrong during the trade. It has been cancelled." });
       }
-    });
+    }
+
+    // ── CANCEL ────────────────────────────────────────────────────────────────
+    if (sub === "cancel") {
+      await deleteSession(redis, session);
+      return interaction.editReply({ content: "Trade cancelled." });
+    }
   },
 };
