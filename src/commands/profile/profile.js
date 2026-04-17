@@ -1,49 +1,22 @@
 const { requireProfile } = require("../../utils/requireProfile");
-const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
+const { SlashCommandBuilder, AttachmentBuilder, EmbedBuilder } = require("discord.js");
 const User = require("../../models/User");
 const PlayerCard = require("../../models/PlayerCard");
 const Card = require("../../models/Card");
+const { renderProfile } = require("../../services/profileRenderer");
 
-const BADGE_LABEL = {
-  pioneer:         "🏅 Pioneer",
-  anniversary_1:   "🎂 1st Anniversary",
-  anniversary_2:   "🎂 2nd Anniversary",
-  christmas:       "🎄 Christmas",
-  halloween:       "🎃 Halloween",
-  collector_1:     "📦 Collector I",
-  collector_2:     "📦 Collector II",
-  collector_3:     "📦 Collector III",
-  gold_small_lord: "<:duck_coin:1494344514465431614> Small Lord",
-  gold_lord:       "<:duck_coin:1494344514465431614> Lord",
-  gold_king:       "👑 King",
-  gold_emperor:    "👑 Emperor",
-  gold_god:        "🌕 God of Wealth",
-  duck_glock:      "🦆 Glock Duck",
-  duck_kalash:     "🦆 Kalash Duck",
-  duck_nuclear:    "🦆 Nuclear Duck",
-};
-
-const DUCK_COIN  = "<:duck_coin:1494344514465431614>";
-const PERMA      = "<:perma_ticket:1494344593863344258>";
-const PICKUP     = "<:pickup_ticket:1494344547046523091>";
-
-const XP_FULL  = "<:xp_full:1494696138396270592>";
-const XP_EMPTY = "<:xp_empty:1494696186525909002>";
-
-function buildExpBar(current, needed) {
-  const pct = Math.min(current / needed, 1);
-  const filled = Math.round(pct * 15);
-  const bar = XP_FULL.repeat(filled) + XP_EMPTY.repeat(15 - filled);
-  return `${bar} ${Math.round(pct * 100)}%\n\`${current.toLocaleString()} / ${needed.toLocaleString()} XP\``;
+function formatDate(d) {
+  const months = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+  const day = d.getDate();
+  const suffix = day === 1 || day === 21 || day === 31 ? "st" : day === 2 || day === 22 ? "nd" : day === 3 || day === 23 ? "rd" : "th";
+  return `${day}${suffix} ${months[d.getMonth()]}, ${d.getFullYear()}`;
 }
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("profile")
     .setDescription("View your profile or another player's profile")
-    .addUserOption(opt =>
-      opt.setName("user").setDescription("Target player (optional)")
-    ),
+    .addUserOption(opt => opt.setName("user").setDescription("Target player (optional)")),
 
   async execute(interaction) {
     await interaction.deferReply();
@@ -62,98 +35,62 @@ module.exports = {
     }
 
     // Favorite card
-    let favoriteValue = "*No favorite card set*";
-    let favoriteImageUrl = null;
+    let favoriteCard = null;
     if (user.favoriteCardId) {
-      const pc = await PlayerCard.findById(user.favoriteCardId);
-      if (pc) {
-        const card = await Card.findOne({ cardId: pc.cardId });
-        if (card) {
-          favoriteValue = `**${card.name}**`;
-          if (card.imageUrl) favoriteImageUrl = card.imageUrl;
-        }
+      const pc   = await PlayerCard.findById(user.favoriteCardId);
+      const card = pc ? await Card.findOne({ cardId: pc.cardId }) : null;
+      if (card) {
+        favoriteCard = {
+          name:     card.name,
+          anime:    card.anime,
+          rarity:   card.rarity,
+          level:    pc.level,
+          cp:       pc.cachedStats?.combatPower ?? 0,
+          imageUrl: card.imageUrl ?? null,
+        };
       }
     }
 
-    // Badges
-    const badgeStr = user.badges.length
-      ? user.badges.map(b => BADGE_LABEL[b.badgeId] ?? b.badgeId).join("  ")
-      : "*No badges yet*";
-
-    // XP
     const expNeeded = Math.round(100 * Math.pow(user.accountLevel, 1.4));
-    const expBar = buildExpBar(user.accountExp, expNeeded);
+    const expPct    = Math.min(user.accountExp / expNeeded, 1);
 
-    // CP label
-    const duckBadge = user.badges.find(b => b.badgeId.startsWith("duck_"));
-    const cpValue = duckBadge
-      ? `${BADGE_LABEL[duckBadge.badgeId]} — **${user.combatPower.toLocaleString()}**`
-      : `**${user.combatPower.toLocaleString()}**`;
+    try {
+      const buffer = await renderProfile({
+        username:   user.username,
+        level:      user.accountLevel,
+        expPct,
+        expCurrent: user.accountExp,
+        expNeeded,
+        startDate:  formatDate(user.firstJoinDate),
+        bio:        user.bio ?? null,
+        avatar:     target.displayAvatarURL({ extension: "png", size: 128 }),
+        stats: {
+          cards:      user.stats.totalCardsEverObtained,
+          cp:         user.combatPower.toLocaleString(),
+          raids:      user.stats.raidDamageTotal > 0 ? "?" : "0",
+          adventures: "0",
+          pulls:      user.stats.totalPullsDone,
+          streak:     user.loginStreak,
+        },
+        favoriteCard,
+      });
 
-    const embed = new EmbedBuilder()
-      .setColor(0x5B21B6)
-      .setAuthor({
-        name: `${target.username}'s Profile`,
-        iconURL: target.displayAvatarURL(),
-      })
-      .setThumbnail(favoriteImageUrl ?? target.displayAvatarURL());
+      const attachment = new AttachmentBuilder(buffer, { name: "profile.png" });
+      return interaction.editReply({ files: [attachment] });
 
-    // Bio (if set)
-    if (user.bio) {
-      embed.setDescription(`*${user.bio}*`);
+    } catch (err) {
+      console.error("Profile renderer error:", err.message);
+      // Fallback to basic embed
+      const embed = new EmbedBuilder()
+        .setTitle(`✨ ${user.username}'s Profile ✨`)
+        .setColor(0x5B21B6)
+        .setThumbnail(target.displayAvatarURL())
+        .addFields(
+          { name: `✦ Level ${user.accountLevel}`, value: `${user.accountExp} / ${expNeeded} XP`, inline: false },
+          { name: "Stats", value: `📦 Cards: **${user.stats.totalCardsEverObtained}**\n⚔️ CP: **${user.combatPower}**\n🎰 Pulls: **${user.stats.totalPullsDone}**\n🔥 Streak: **${user.loginStreak}d**`, inline: true },
+        )
+        .setFooter({ text: `Member since ${user.firstJoinDate.toLocaleDateString("en-US")}` });
+      return interaction.editReply({ embeds: [embed] });
     }
-
-    embed
-
-      // Level + XP bar
-      .addFields({
-        name: `✦ Level ${user.accountLevel}`,
-        value: expBar,
-        inline: false,
-      })
-
-      // 3 stat pills
-      .addFields(
-        { name: "Combat Power",  value: cpValue, inline: true },
-        { name: "🔥 Login Streak", value: `**${user.loginStreak}** day${user.loginStreak !== 1 ? "s" : ""}`, inline: true },
-        { name: "Total Pulls",  value: `**${user.stats.totalPullsDone}**`, inline: true },
-      )
-
-      // Favorite card
-      .addFields({
-        name: "Favorite Card",
-        value: favoriteValue,
-        inline: false,
-      })
-
-      // Statistics + Wallet side by side
-      .addFields(
-        {
-          name: "Statistics",
-          value: [
-            `📦 Cards obtained: **${user.stats.totalCardsEverObtained}**`,
-            `${DUCK_COIN} Duckcoin earned: **${user.stats.totalGoldEverEarned.toLocaleString()}**`,
-            `⚔️ Raid damage: **${user.stats.raidDamageTotal.toLocaleString()}**`,
-          ].join("\n"),
-          inline: true,
-        },
-        {
-          name: "Wallet",
-          value: [
-            `${DUCK_COIN} **${user.currency.gold.toLocaleString()}** Duckcoin`,
-            `💎 **${user.currency.premiumCurrency}** Premium`,
-            `${PICKUP} **${user.currency.pickupTickets}** Pick Up`,
-            `${PERMA} **${user.currency.regularTickets}** Regular`,
-          ].join("\n"),
-          inline: true,
-        },
-      )
-
-      // Badges
-      .addFields({ name: "Badges", value: badgeStr, inline: false })
-
-      .setFooter({ text: `Member since ${user.firstJoinDate.toLocaleDateString("en-US")}` });
-
-    return interaction.editReply({ embeds: [embed] });
   },
 };
