@@ -4,6 +4,8 @@ const {
 } = require("discord.js");
 const { requireProfile }  = require("../../utils/requireProfile");
 const { applyExp }         = require("../../services/levels");
+const { incrementProgress } = require("../../services/quests");
+const { getRedis }         = require("../../services/redis");
 const User                = require("../../models/User");
 const Card                = require("../../models/Card");
 const PlayerCard          = require("../../models/PlayerCard");
@@ -160,7 +162,7 @@ module.exports = {
 
     // Grant XP for rolls + handle level up
     // Quest tracking
-    const redis2 = require("../../services/redis").getRedis();
+    const redis2 = getRedis();
     await incrementProgress(redis2, interaction.user.id, "daily", "roll", amount);
     await incrementProgress(redis2, interaction.user.id, "weekly", "roll", amount);
     if (amount >= 10) {
