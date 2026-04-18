@@ -37,7 +37,7 @@ module.exports = {
           name: "Currency",
           value: [
             `${DUCK_COIN} **${user.currency.gold.toLocaleString()}** Duckcoin`,
-            `💎 **${user.currency.premiumCurrency.toLocaleString()}** Premium`,
+            `<:Jade:1495038405866688703> **${user.currency.premiumCurrency.toLocaleString()}** Jade`,
           ].join("\n"),
           inline: true,
         },
@@ -48,11 +48,6 @@ module.exports = {
             `${PERMA} **${user.currency.regularTickets}** Regular`,
           ].join("\n"),
           inline: true,
-        },
-        {
-          name: "Lifetime",
-          value: `${DUCK_COIN} **${user.stats.totalGoldEverEarned.toLocaleString()}** total earned`,
-          inline: false,
         },
       )
       .setFooter({ text: "Use /daily and /quests to earn more!" });
