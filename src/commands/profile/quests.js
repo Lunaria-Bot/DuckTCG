@@ -15,8 +15,8 @@ const NYAN   = "<:Nyan:1495048966528831508>";
 const JADE   = "<:Jade:1495038405866688703>";
 const PERMA  = "<:perma_ticket:1494344593863344258>";
 const PICKUP = "<:pickup_ticket:1494344547046523091>";
-const XP_BAR_FULL  = "<:xp_full:1494696138396270592>";
-const XP_BAR_EMPTY = "<:xp_empty:1494696186525909002>";
+const XP_FULL  = "<:xp_full:1494696138396270592>";
+const XP_EMPTY = "<:xp_empty:1494696186525909002>";
 
 function fmtReward(r) {
   const parts = [];
@@ -31,35 +31,35 @@ function fmtReward(r) {
 function buildBar(current, target, length = 8) {
   const pct    = Math.min(current / target, 1);
   const filled = Math.round(pct * length);
-  return XP_BAR_FULL.repeat(filled) + XP_BAR_EMPTY.repeat(length - filled);
+  return XP_FULL.repeat(filled) + XP_EMPTY.repeat(length - filled);
 }
 
 function buildQuestLine(q, progress, claimed) {
-  const prog     = progress[q.id] || 0;
-  const done     = prog >= q.target;
-  const icon     = claimed ? "✅" : done ? "🎁" : "▫️";
-  const label    = claimed
-    ? `~~${q.label}~~`
-    : `**${q.label}**`;
-  const bar      = buildBar(prog, q.target);
-  const counter  = `${prog}/${q.target}`;
-  const reward   = fmtReward(q.reward);
+  const prog  = progress[q.id] || 0;
+  const done  = prog >= q.target;
+  const icon  = claimed ? "✅" : done ? "🎁" : "▫️";
+  const bar   = buildBar(prog, q.target);
+  const label = claimed ? `~~${q.label}~~` : `**${q.label}**`;
 
-  return [
-    `${icon} ${label}`,
-    `${bar} \`${counter}\`  ${reward}`,
-  ].join("\n");
+  // Bar + counter in the field NAME (256 char limit, safe)
+  // Reward in the field VALUE (1024 char limit)
+  return {
+    name:   `${icon} ${label}  ${bar} \`${prog}/${q.target}\``,
+    value:  fmtReward(q.reward) || "\u200b",
+    inline: false,
+  };
 }
+
 
 function buildQuestsEmbed(dailyData, weeklyData, username) {
   const dailyReset  = getDailyResetTs();
   const weeklyReset = getWeeklyResetTs();
 
-  const dailyLines = dailyData.quests.map(q =>
+  const dailyFields = dailyData.quests.map(q =>
     buildQuestLine(q, dailyData.progress, dailyData.claimed[q.id])
   );
 
-  const weeklyLines = weeklyData.quests.map(q =>
+  const weeklyFields = weeklyData.quests.map(q =>
     buildQuestLine(q, weeklyData.progress, weeklyData.claimed[q.id])
   );
 
@@ -67,16 +67,10 @@ function buildQuestsEmbed(dailyData, weeklyData, username) {
     .setTitle(`${username}'s Quests`)
     .setColor(0x7C3AED)
     .addFields(
-      {
-        name: `📅 Daily — resets <t:${dailyReset}:R>`,
-        value: dailyLines.join("\n\n") || "*No quests*",
-        inline: false,
-      },
-      {
-        name: `📆 Weekly — resets <t:${weeklyReset}:R>`,
-        value: weeklyLines.join("\n\n") || "*No quests*",
-        inline: false,
-      },
+      { name: `📅 Daily — resets <t:${dailyReset}:R>`, value: "\u200b", inline: false },
+      ...dailyFields,
+      { name: `📆 Weekly — resets <t:${weeklyReset}:R>`, value: "\u200b", inline: false },
+      ...weeklyFields,
     )
     .setFooter({ text: "🎁 ready to claim  ✅ claimed  ▫️ in progress" });
 }
