@@ -17,12 +17,12 @@ const BADGE_META = {
   collector_2:   { label: "Collector II",   emoji: "📦", description: "Own 500 cards",   tier: 2 },
   collector_3:   { label: "Collector III",  emoji: "📦", description: "Own 1000 cards",  tier: 3 },
 
-  // Duckcoin wealth
-  gold_small_lord: { label: "Small Lord",     emoji: "<:duck_coin:1494344514465431614>", description: "Earn 100K Duckcoin total" },
-  gold_lord:       { label: "Lord",           emoji: "<:duck_coin:1494344514465431614>", description: "Earn 500K Duckcoin total" },
-  gold_king:       { label: "King",           emoji: "👑", description: "Earn 1M Duckcoin total" },
-  gold_emperor:    { label: "Emperor",        emoji: "👑", description: "Earn 10M Duckcoin total" },
-  gold_god:        { label: "God of Wealth",  emoji: "🌕", description: "Earn 100M Duckcoin total" },
+  // Nyang wealth
+  gold_small_lord: { label: "Small Lord",     emoji: "<:Nyan:1495048966528831508>", description: "Earn 100K Nyang total" },
+  gold_lord:       { label: "Lord",           emoji: "<:Nyan:1495048966528831508>", description: "Earn 500K Nyang total" },
+  gold_king:       { label: "King",           emoji: "👑", description: "Earn 1M Nyang total" },
+  gold_emperor:    { label: "Emperor",        emoji: "👑", description: "Earn 10M Nyang total" },
+  gold_god:        { label: "God of Wealth",  emoji: "🌕", description: "Earn 100M Nyang total" },
 
   // Duck CP
   duck_glock:   { label: "Glock Duck",   emoji: "🦆", description: "Combat Power below 1,000" },
@@ -89,7 +89,7 @@ async function checkBadges(user, trigger = "all") {
     }
   }
 
-  // ── Duckcoin wealth (daily) ───────────────────────────────────────────────
+  // ── Nyang wealth (daily) ───────────────────────────────────────────────
   if (trigger !== "realtime") {
     const gold = user.stats.totalGoldEverEarned;
     const goldBadges = [

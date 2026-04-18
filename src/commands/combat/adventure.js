@@ -139,7 +139,7 @@ module.exports = {
         .setTitle("Adventure Complete!")
         .setColor(0x66BB6A)
         .addFields(
-          { name: "Duckcoin Earned", value: `**${gold.toLocaleString()}** <:duck_coin:1494344514465431614>`, inline: true },
+          { name: "Nyang Earned", value: `**${gold.toLocaleString()}** <:Nyan:1495048966528831508>`, inline: true },
           { name: "EXP per Card", value: `**+${expPerCard}** ⭐`, inline: true },
         );
 

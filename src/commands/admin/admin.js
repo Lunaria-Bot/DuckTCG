@@ -15,7 +15,7 @@ module.exports = {
         .addStringOption(opt =>
           opt.setName("type").setDescription("Currency type").setRequired(true)
             .addChoices(
-              { name: "Duckcoin", value: "gold" },
+              { name: "Nyang", value: "gold" },
               { name: "Premium", value: "premiumCurrency" },
               { name: "Pick Up Ticket", value: "pickupTickets" },
               { name: "Regular Ticket", value: "regularTickets" },

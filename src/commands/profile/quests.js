@@ -15,7 +15,7 @@ const { applyExp } = require("../../services/levels");
 
 function fmtReward(r) {
   const parts = [];
-  if (r.gold)           parts.push(`<:duck_coin:1494344514465431614> ${r.gold.toLocaleString()} Duckcoin`);
+  if (r.gold)           parts.push(`<:Nyan:1495048966528831508> ${r.gold.toLocaleString()} Nyang`);
   if (r.regularTickets) parts.push(`<:perma_ticket:1494344593863344258> ${r.regularTickets} Regular`);
   if (r.pickupTickets)  parts.push(`<:pickup_ticket:1494344547046523091> ${r.pickupTickets} Pick Up`);
   if (r.accountExp)     parts.push(`⭐ ${r.accountExp} XP`);

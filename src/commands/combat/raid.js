@@ -145,7 +145,7 @@ async function doAttack(interaction, raid) {
     .setColor(0xE53935)
     .addFields(
       { name: "Damage Dealt", value: `**${damage.toLocaleString()}**`, inline: true },
-      { name: "Duckcoin Earned", value: `**${goldEarned.toLocaleString()}** <:duck_coin:1494344514465431614>`, inline: true },
+      { name: "Nyang Earned", value: `**${goldEarned.toLocaleString()}** <:Nyan:1495048966528831508>`, inline: true },
       { name: "Boss HP Left", value: `${Math.max(0, newHp).toLocaleString()} / ${raid.maxHp.toLocaleString()}`, inline: true },
     );
 

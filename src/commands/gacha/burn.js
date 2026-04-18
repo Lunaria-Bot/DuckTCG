@@ -14,12 +14,12 @@ const User = require("../../models/User");
 const BURN_VALUE = { common: 50, rare: 200, special: 800, exceptional: 3000 };
 const RARITY_EMOJI = { exceptional: "🌟", special: "🟪", rare: "🟦", common: "⬜" };
 const RARITY_ORDER = { exceptional: 0, special: 1, rare: 2, common: 3 };
-const DUCK_COIN = "<:duck_coin:1494344514465431614>";
+const NYAN = "<:Nyan:1495048966528831508>";
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("burn")
-    .setDescription("Burn a card to receive Duckcoin"),
+    .setDescription("Burn a card to receive Nyang"),
 
   async execute(interaction) {
     await interaction.deferReply({ ephemeral: true });
@@ -56,7 +56,7 @@ module.exports = {
       const val  = BURN_VALUE[card.rarity] ?? 50;
       const qty  = pc.quantity > 1 ? ` (x${pc.quantity})` : "";
       return new StringSelectMenuOptionBuilder()
-        .setLabel(`${card.name}${qty} — ${val.toLocaleString()} ${DUCK_COIN}`)
+        .setLabel(`${card.name}${qty} — ${val.toLocaleString()} ${NYAN}`)
         .setDescription(`${card.anime} · ${card.rarity} · Lv.${pc.level}`)
         .setValue(pc._id.toString())
         .setEmoji(RARITY_EMOJI[card.rarity] ?? "⬜");
@@ -130,7 +130,7 @@ module.exports = {
           (remaining > 0 ? `\nYou still have **${remaining}x** ${card.name}.` : "")
         )
         .setColor(0xFF7043)
-        .addFields({ name: "Duckcoin Received", value: `**${gold.toLocaleString()}** ${DUCK_COIN}`, inline: true });
+        .addFields({ name: "Nyang Received", value: `**${gold.toLocaleString()}** ${NYAN}`, inline: true });
 
       return interaction.editReply({ embeds: [embed], content: "", components: [] });
     });

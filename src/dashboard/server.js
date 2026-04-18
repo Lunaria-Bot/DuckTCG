@@ -1121,7 +1121,7 @@ app.get("/players", auth, adminOnly, async (req, res) => {
     <div class="card"><table>
       <thead><tr>
         <th>Player</th>
-        <th>${sortLink("gold","Duckcoin")}</th>
+        <th>${sortLink("gold","Nyang")}</th>
         <th>Tickets (R/P)</th>
         <th>${sortLink("cp","CP")}</th>
         <th>${sortLink("streak","Streak")}</th>
@@ -1136,7 +1136,7 @@ app.get("/players", auth, adminOnly, async (req, res) => {
 app.get("/players/:id/give", auth, adminOnly, async (req, res) => {
   const player = await User.findOne({ userId: req.params.id });
   if (!player) return res.redirect("/players");
-  res.send(renderPage(`Give Currency — ${player.username}`, `<div class="card" style="max-width:400px"><form method="POST" action="/players/${player.userId}/give"><div><label>Currency</label><select name="type"><option value="gold">Duckcoin</option><option value="regularTickets">Regular Tickets</option><option value="pickupTickets">Pick Up Tickets</option><option value="premiumCurrency">Premium</option></select></div><div><label>Amount</label><input type="number" name="amount" value="1000" min="1" required/></div><div style="display:flex;gap:10px"><button type="submit">Give</button><a href="/players" class="btn btn-red">Cancel</a></div></form></div>`, req.user));
+  res.send(renderPage(`Give Currency — ${player.username}`, `<div class="card" style="max-width:400px"><form method="POST" action="/players/${player.userId}/give"><div><label>Currency</label><select name="type"><option value="gold">Nyang</option><option value="regularTickets">Regular Tickets</option><option value="pickupTickets">Pick Up Tickets</option><option value="premiumCurrency">Premium</option></select></div><div><label>Amount</label><input type="number" name="amount" value="1000" min="1" required/></div><div style="display:flex;gap:10px"><button type="submit">Give</button><a href="/players" class="btn btn-red">Cancel</a></div></form></div>`, req.user));
 });
 
 app.post("/players/:id/give", auth, adminOnly, async (req, res) => {

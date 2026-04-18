@@ -2,7 +2,7 @@ const { requireProfile } = require("../../utils/requireProfile");
 const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
 const User = require("../../models/User");
 
-const DUCK_COIN = "<:duck_coin:1494344514465431614>";
+const NYAN = "<:Nyan:1495048966528831508>";
 const PERMA     = "<:perma_ticket:1494344593863344258>";
 const PICKUP    = "<:pickup_ticket:1494344547046523091>";
 
@@ -36,7 +36,7 @@ module.exports = {
         {
           name: "Currency",
           value: [
-            `${DUCK_COIN} **${user.currency.gold.toLocaleString()}** Duckcoin`,
+            `${NYAN} **${user.currency.gold.toLocaleString()}** Nyang`,
             `<:Jade:1495038405866688703> **${user.currency.premiumCurrency.toLocaleString()}** Jade`,
           ].join("\n"),
           inline: true,

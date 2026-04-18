@@ -13,7 +13,7 @@ const { calculateStats } = require("../../services/cardStats");
 
 const RARITY_EMOJI = { exceptional: "🌟", special: "🟪", rare: "🟦", common: "⬜" };
 const RARITY_ORDER = { exceptional: 0, special: 1, rare: 2, common: 3 };
-const DUCK_COIN    = "<:duck_coin:1494344514465431614>";
+const NYAN    = "<:Nyan:1495048966528831508>";
 const TRADE_TTL    = 5 * 60; // 5 min Redis TTL
 
 // ─── Redis trade session ───────────────────────────────────────────────────────
@@ -49,7 +49,7 @@ async function offerValue(offer) {
     const card = await Card.findOne({ cardId });
     if (card) lines.push(`${RARITY_EMOJI[card.rarity] ?? "⬜"} **${card.name}**`);
   }
-  if (offer.gold)    lines.push(`${DUCK_COIN} **${offer.gold.toLocaleString()}** Duckcoin`);
+  if (offer.gold)    lines.push(`${NYAN} **${offer.gold.toLocaleString()}** Nyang`);
   if (offer.premium) lines.push(`💎 **${offer.premium.toLocaleString()}** Premium`);
   return lines.length ? lines.join("\n") : "*Nothing offered yet*";
 }
@@ -68,7 +68,7 @@ async function offerItems(offer) {
     const card = await Card.findOne({ cardId });
     if (card) items.push({ label: card.name, rarity: card.rarity });
   }
-  if (offer.gold)    items.push({ label: `${offer.gold.toLocaleString()} Duckcoin` });
+  if (offer.gold)    items.push({ label: `${offer.gold.toLocaleString()} Nyang` });
   if (offer.premium) items.push({ label: `${offer.premium.toLocaleString()} Premium` });
   return items;
 }
@@ -173,9 +173,9 @@ module.exports = {
     )
     .addSubcommand(sub => sub
       .setName("add-currency")
-      .setDescription("Add Duckcoin or Premium to your trade offer")
+      .setDescription("Add Nyang or Premium to your trade offer")
       .addStringOption(opt => opt.setName("type").setDescription("Currency type").setRequired(true)
-        .addChoices({ name: "Duckcoin", value: "gold" }, { name: "Premium", value: "premium" }))
+        .addChoices({ name: "Nyang", value: "gold" }, { name: "Premium", value: "premium" }))
       .addIntegerOption(opt => opt.setName("amount").setDescription("Amount to add").setRequired(true).setMinValue(1))
     )
     .addSubcommand(sub => sub
@@ -267,7 +267,7 @@ module.exports = {
       const tradeRow    = buildTradeRow(uid, session);
 
       await interaction.editReply({
-        content: `✅ Trade started between **${interaction.user.username}** and **${targetDiscord.username}**!\n\nBoth players can now use:\n\`/trade add <card name>\` — add a card\n\`/trade add-currency <type> <amount>\` — add Duckcoin or Premium\n\`/trade view\` — see the current trade\n\`/trade confirm\` — confirm your side\n\`/trade cancel\` — cancel the trade\n\nTrade expires in 5 minutes.`,
+        content: `✅ Trade started between **${interaction.user.username}** and **${targetDiscord.username}**!\n\nBoth players can now use:\n\`/trade add <card name>\` — add a card\n\`/trade add-currency <type> <amount>\` — add Nyang or Premium\n\`/trade view\` — see the current trade\n\`/trade confirm\` — confirm your side\n\`/trade cancel\` — cancel the trade\n\nTrade expires in 5 minutes.`,
         components: [],
       });
 
@@ -291,7 +291,7 @@ module.exports = {
             content: [
               "**Trade Commands:**",
               "`/trade add <card name>` — add a card by name",
-              "`/trade add-currency <type> <amount>` — add Duckcoin or Premium",
+              "`/trade add-currency <type> <amount>` — add Nyang or Premium",
               "`/trade remove <card>` — remove a card from your offer",
               "`/trade view` — refresh the trade view",
               "`/trade confirm` — confirm your side",
@@ -363,7 +363,7 @@ module.exports = {
 
       const freshUser = await User.findOne({ userId: uid });
       const balance   = type === "gold" ? (freshUser?.currency.gold ?? 0) : (freshUser?.currency.premiumCurrency ?? 0);
-      const label     = type === "gold" ? "Duckcoin" : "Premium";
+      const label     = type === "gold" ? "Nyang" : "Premium";
 
       if (amount > balance) return interaction.editReply({ content: `You only have **${balance.toLocaleString()}** ${label}.` });
 
@@ -382,7 +382,7 @@ module.exports = {
           await lm.edit({ ...updated, components: [buildTradeRow(uid, freshSession)] });
         }
       } catch {}
-      const emoji = type === "gold" ? DUCK_COIN : "💎";
+      const emoji = type === "gold" ? NYAN : "💎";
       return interaction.editReply({ content: `Set **${emoji} ${amount.toLocaleString()} ${label}** in your trade offer.` });
     }
 
@@ -429,7 +429,7 @@ module.exports = {
             content: [
               "**Trade Commands:**",
               "`/trade add <card>` — add a card by name",
-              "`/trade add-currency <type> <amount>` — add Duckcoin or Premium",
+              "`/trade add-currency <type> <amount>` — add Nyang or Premium",
               "`/trade remove <card>` — remove a card from your offer",
               "`/trade view` — view the current trade",
               "`/trade confirm` — confirm your side",
@@ -490,11 +490,11 @@ module.exports = {
 
         if (myOffer.gold > (myFresh?.currency.gold ?? 0)) {
           await deleteSession(redis, session);
-          return interaction.editReply({ content: "Trade failed: you don't have enough Duckcoin anymore." });
+          return interaction.editReply({ content: "Trade failed: you don't have enough Nyang anymore." });
         }
         if (partnerOffer.gold > (partnerFresh?.currency.gold ?? 0)) {
           await deleteSession(redis, session);
-          return interaction.editReply({ content: `Trade failed: **${partnerName}** doesn't have enough Duckcoin anymore.` });
+          return interaction.editReply({ content: `Trade failed: **${partnerName}** doesn't have enough Nyang anymore.` });
         }
 
         // Transfer cards

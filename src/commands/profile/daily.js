@@ -31,7 +31,7 @@ function getDayRewards(cycleDay) {
 
 function formatRewards(r) {
   const lines = [];
-  if (r.gold)            lines.push(`<:duck_coin:1494344514465431614> **${r.gold.toLocaleString()} Duckcoin**`);
+  if (r.gold)            lines.push(`<:Nyan:1495048966528831508> **${r.gold.toLocaleString()} Nyang**`);
   if (r.regularTickets)  lines.push(`<:perma_ticket:1494344593863344258> **${r.regularTickets} Regular Ticket${r.regularTickets > 1 ? "s" : ""}**`);
   if (r.pickupTickets)   lines.push(`<:pickup_ticket:1494344547046523091> **${r.pickupTickets} Pick Up Ticket${r.pickupTickets > 1 ? "s" : ""}**`);
   if (r.premiumCurrency) lines.push(`💎 **${r.premiumCurrency} Premium**`);
@@ -59,7 +59,7 @@ function buildWeekPreview(currentStreak) {
     const label = isToday ? `**Day ${currentStreak + i}**` : `Day ${currentStreak + i}`;
     const reward = r.pickupTickets   ? "<:pickup_ticket:1494344547046523091> Pickup Ticket"
                  : r.regularTickets  ? "<:perma_ticket:1494344593863344258> Regular Ticket"
-                 : `<:duck_coin:1494344514465431614> ${r.gold.toLocaleString()} Duckcoin`;
+                 : `<:Nyan:1495048966528831508> ${r.gold.toLocaleString()} Nyang`;
 
     lines.push(`${marker}${label} — ${reward}`);
   }
@@ -160,7 +160,7 @@ module.exports = {
         {
           name: "Wallet",
           value: [
-            `<:duck_coin:1494344514465431614> ${updatedUser.currency.gold.toLocaleString()} Duckcoin`,
+            `<:Nyan:1495048966528831508> ${updatedUser.currency.gold.toLocaleString()} Nyang`,
             `<:perma_ticket:1494344593863344258> ${updatedUser.currency.regularTickets} Regular  <:pickup_ticket:1494344547046523091> ${updatedUser.currency.pickupTickets} Pick Up`,
             `💎 ${updatedUser.currency.premiumCurrency} Premium`,
           ].join("\n"),
