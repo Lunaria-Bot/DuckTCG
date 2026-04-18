@@ -11,104 +11,106 @@ const {
 const User = require("../../models/User");
 const { applyExp } = require("../../services/levels");
 
-// ─── Reward formatter ─────────────────────────────────────────────────────────
+const NYAN   = "<:Nyan:1495048966528831508>";
+const JADE   = "<:Jade:1495038405866688703>";
+const PERMA  = "<:perma_ticket:1494344593863344258>";
+const PICKUP = "<:pickup_ticket:1494344547046523091>";
+const XP_BAR_FULL  = "<:xp_full:1494696138396270592>";
+const XP_BAR_EMPTY = "<:xp_empty:1494696186525909002>";
 
 function fmtReward(r) {
   const parts = [];
-  if (r.gold)           parts.push(`<:Nyan:1495048966528831508> ${r.gold.toLocaleString()} Nyang`);
-  if (r.regularTickets) parts.push(`<:perma_ticket:1494344593863344258> ${r.regularTickets} Regular`);
-  if (r.pickupTickets)  parts.push(`<:pickup_ticket:1494344547046523091> ${r.pickupTickets} Pick Up`);
-  if (r.jade)           parts.push(`<:Jade:1495038405866688703> ${r.jade} Jade`);
-  if (r.accountExp)     parts.push(`⭐ ${r.accountExp} XP`);
-  return parts.join(" · ");
+  if (r.gold)           parts.push(`${NYAN} **${r.gold.toLocaleString()}**`);
+  if (r.jade)           parts.push(`${JADE} **${r.jade}**`);
+  if (r.regularTickets) parts.push(`${PERMA} **${r.regularTickets}**`);
+  if (r.pickupTickets)  parts.push(`${PICKUP} **${r.pickupTickets}**`);
+  if (r.accountExp)     parts.push(`⭐ **${r.accountExp} XP**`);
+  return parts.join("  ");
 }
 
-// ─── Build embed ─────────────────────────────────────────────────────────────
+function buildBar(current, target, length = 8) {
+  const pct    = Math.min(current / target, 1);
+  const filled = Math.round(pct * length);
+  return XP_BAR_FULL.repeat(filled) + XP_BAR_EMPTY.repeat(length - filled);
+}
+
+function buildQuestLine(q, progress, claimed) {
+  const prog     = progress[q.id] || 0;
+  const done     = prog >= q.target;
+  const icon     = claimed ? "✅" : done ? "🎁" : "▫️";
+  const label    = claimed
+    ? `~~${q.label}~~`
+    : `**${q.label}**`;
+  const bar      = buildBar(prog, q.target);
+  const counter  = `${prog}/${q.target}`;
+  const reward   = fmtReward(q.reward);
+
+  return [
+    `${icon} ${label}`,
+    `${bar} \`${counter}\`  ${reward}`,
+  ].join("\n");
+}
 
 function buildQuestsEmbed(dailyData, weeklyData, username) {
-  const embed = new EmbedBuilder()
-    .setTitle(`${username}'s Quests`)
-    .setColor(0x7C3AED);
-
-  // Daily
-  const dailyReset = getDailyResetTs();
-  const dailyLines = dailyData.quests.map(q => {
-    const prog = dailyData.progress[q.id] || 0;
-    const claimed = dailyData.claimed[q.id];
-    const complete = prog >= q.target;
-    const bar = buildMiniBar(prog, q.target);
-    const status = claimed ? "✅" : complete ? "🎁" : "🔲";
-    return `${status} **${q.label}** (${prog}/${q.target})\n${bar} ${fmtReward(q.reward)}`;
-  });
-
-  embed.addFields({
-    name: `📅 Daily Quests — resets <t:${dailyReset}:R>`,
-    value: dailyLines.join("\n\n") || "*No quests*",
-    inline: false,
-  });
-
-  // Weekly
+  const dailyReset  = getDailyResetTs();
   const weeklyReset = getWeeklyResetTs();
-  const weeklyLines = weeklyData.quests.map(q => {
-    const prog = weeklyData.progress[q.id] || 0;
-    const claimed = weeklyData.claimed[q.id];
-    const complete = prog >= q.target;
-    const bar = buildMiniBar(prog, q.target);
-    const status = claimed ? "✅" : complete ? "🎁" : "🔲";
-    return `${status} **${q.label}** (${prog}/${q.target})\n${bar} ${fmtReward(q.reward)}`;
-  });
 
-  embed.addFields({
-    name: `📆 Weekly Quests — resets <t:${weeklyReset}:R>`,
-    value: weeklyLines.join("\n\n") || "*No quests*",
-    inline: false,
-  });
+  const dailyLines = dailyData.quests.map(q =>
+    buildQuestLine(q, dailyData.progress, dailyData.claimed[q.id])
+  );
 
-  embed.setFooter({ text: "🎁 = ready to claim  ✅ = claimed  🔲 = in progress" });
-  return embed;
+  const weeklyLines = weeklyData.quests.map(q =>
+    buildQuestLine(q, weeklyData.progress, weeklyData.claimed[q.id])
+  );
+
+  return new EmbedBuilder()
+    .setTitle(`${username}'s Quests`)
+    .setColor(0x7C3AED)
+    .addFields(
+      {
+        name: `📅 Daily — resets <t:${dailyReset}:R>`,
+        value: dailyLines.join("\n\n") || "*No quests*",
+        inline: false,
+      },
+      {
+        name: `📆 Weekly — resets <t:${weeklyReset}:R>`,
+        value: weeklyLines.join("\n\n") || "*No quests*",
+        inline: false,
+      },
+    )
+    .setFooter({ text: "🎁 ready to claim  ✅ claimed  ▫️ in progress" });
 }
-
-function buildMiniBar(current, target) {
-  const pct = Math.min(current / target, 1);
-  const filled = Math.round(pct * 8);
-  return `\`${"▰".repeat(filled)}${"▱".repeat(8 - filled)}\``;
-}
-
-// ─── Build claim buttons ──────────────────────────────────────────────────────
 
 function buildClaimRows(dailyData, weeklyData) {
   const rows = [];
 
-  // Daily claim buttons
   const dailyButtons = dailyData.quests
     .filter(q => !dailyData.claimed[q.id] && (dailyData.progress[q.id] || 0) >= q.target)
     .map(q =>
       new ButtonBuilder()
         .setCustomId(`claim_daily_${q.id}`)
-        .setLabel(`Claim: ${q.label.slice(0, 30)}`)
+        .setLabel(q.label.slice(0, 30))
+        .setEmoji("🎁")
         .setStyle(ButtonStyle.Success)
     );
 
-  // Weekly claim buttons
   const weeklyButtons = weeklyData.quests
     .filter(q => !weeklyData.claimed[q.id] && (weeklyData.progress[q.id] || 0) >= q.target)
     .map(q =>
       new ButtonBuilder()
         .setCustomId(`claim_weekly_${q.id}`)
-        .setLabel(`Claim: ${q.label.slice(0, 30)}`)
+        .setLabel(q.label.slice(0, 30))
+        .setEmoji("🎁")
         .setStyle(ButtonStyle.Primary)
     );
 
   const all = [...dailyButtons, ...weeklyButtons];
-  // Discord max 5 buttons per row, max 5 rows
   for (let i = 0; i < Math.min(all.length, 10); i += 5) {
     rows.push(new ActionRowBuilder().addComponents(all.slice(i, i + 5)));
   }
 
   return rows;
 }
-
-// ─── Command ─────────────────────────────────────────────────────────────────
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -121,7 +123,7 @@ module.exports = {
     const user = await requireProfile(interaction);
     if (!user) return;
 
-    const redis = getRedis();
+    const redis  = getRedis();
     const userId = interaction.user.id;
 
     const [dailyData, weeklyData] = await Promise.all([
@@ -130,12 +132,9 @@ module.exports = {
     ]);
 
     const embed = buildQuestsEmbed(dailyData, weeklyData, interaction.user.username);
-    const rows = buildClaimRows(dailyData, weeklyData);
+    const rows  = buildClaimRows(dailyData, weeklyData);
 
-    const msg = await interaction.editReply({
-      embeds: [embed],
-      components: rows,
-    });
+    const msg = await interaction.editReply({ embeds: [embed], components: rows });
 
     if (!rows.length) return;
 
@@ -148,64 +147,41 @@ module.exports = {
     collector.on("collect", async i => {
       await i.deferUpdate();
 
-      const parts = i.customId.split("_"); // claim_daily_daily_pull_1
-      const type = parts[1]; // "daily" or "weekly"
+      const parts   = i.customId.split("_");
+      const type    = parts[1];
       const questId = parts.slice(2).join("_");
 
       const reward = await claimQuest(redis, userId, type, questId);
-
-      if (!reward || reward === "already_claimed" || reward === "not_complete") {
-        return;
-      }
+      if (!reward || reward === "already_claimed" || reward === "not_complete") return;
 
       // Apply rewards
-      const expNeeded = Math.round(100 * Math.pow(user.accountLevel, 1.4));
-      const updateData = {
+      const freshUser = await User.findOne({ userId });
+      const lvResult  = applyExp(freshUser.accountLevel, freshUser.accountExp, reward.accountExp || 0);
+
+      await User.findOneAndUpdate({ userId }, {
         $inc: {
-          "currency.gold":            reward.gold || 0,
-          "currency.regularTickets":  reward.regularTickets || 0,
-          "currency.pickupTickets":   reward.pickupTickets || 0,
-          "stats.totalGoldEverEarned": reward.gold || 0,
-          accountExp: reward.accountExp || 0,
+          "currency.gold":               reward.gold || 0,
+          "currency.regularTickets":     reward.regularTickets || 0,
+          "currency.pickupTickets":      reward.pickupTickets || 0,
+          "currency.premiumCurrency":    reward.jade || 0,
+          "stats.totalGoldEverEarned":   reward.gold || 0,
         },
-      };
+        accountLevel: lvResult.newLevel,
+        accountExp:   lvResult.newExp,
+      });
 
-      const updatedUser = await User.findOneAndUpdate(
-        { userId },
-        updateData,
-        { new: true }
-      );
-
-      // Level up check
-      let leveledUp = false;
-      while (updatedUser.accountExp >= Math.round(100 * Math.pow(updatedUser.accountLevel, 1.4))) {
-        updatedUser.accountExp -= Math.round(100 * Math.pow(updatedUser.accountLevel, 1.4));
-        updatedUser.accountLevel++;
-        leveledUp = true;
-      }
-      if (leveledUp) await updatedUser.save();
-
-      // Rebuild embed + buttons with fresh data
       const [newDaily, newWeekly] = await Promise.all([
         getOrCreateQuests(redis, userId, "daily"),
         getOrCreateQuests(redis, userId, "weekly"),
       ]);
 
-      const newEmbed = buildQuestsEmbed(newDaily, newWeekly, interaction.user.username);
-      const newRows = buildClaimRows(newDaily, newWeekly);
+      const rewardMsg = [`✅ Reward claimed! ${fmtReward(reward)}`];
+      if (lvResult.leveledUp) rewardMsg.push(`🎉 Level up! You are now **Level ${lvResult.newLevel}**!`);
 
-      // Send reward notification
-      const rewardMsg = [`Reward claimed! ${fmtReward(reward)}`];
-      if (leveledUp) rewardMsg.push(`🎉 Level up! You are now **Level ${updatedUser.accountLevel}**!`);
-
-      await interaction.followUp({
-        content: rewardMsg.join("\n"),
-        ephemeral: true,
-      });
-
+      await interaction.followUp({ content: rewardMsg.join("\n"), ephemeral: true });
       await interaction.editReply({
-        embeds: [newEmbed],
-        components: newRows,
+        embeds: [buildQuestsEmbed(newDaily, newWeekly, interaction.user.username)],
+        components: buildClaimRows(newDaily, newWeekly),
       });
     });
 
