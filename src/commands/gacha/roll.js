@@ -155,15 +155,13 @@ module.exports = {
       });
     }
 
-    if (amount > currentQi) {
-      return interaction.editReply({
-        content: `⚡ Not enough Qi! You have **${currentQi}** Qi but tried to roll **${amount}** times.\nUse \`/refill\` to restore Qi, or roll fewer cards.`,
-      });
-    }
+    // If requested more than available Qi, roll what we can
+    const actualAmount = Math.min(amount, currentQi);
+    const qiShortfall  = amount > currentQi ? amount - currentQi : 0;
 
     // Perform rolls
     const results = [];
-    for (let i = 0; i < amount; i++) {
+    for (let i = 0; i < actualAmount; i++) {
       const r = await drawCard(interaction.user.id);
       if (r) results.push(r);
     }
@@ -172,7 +170,7 @@ module.exports = {
       return interaction.editReply({ content: "No cards available to roll. Please try again later." });
     }
 
-    const newQi      = currentQi - amount;
+    const newQi      = currentQi - actualAmount;
     const cooldownAt = newQi <= 0 ? new Date(Date.now() + QI_COOLDOWN_MS) : null;
 
     await User.findOneAndUpdate({ userId: interaction.user.id }, {
@@ -180,15 +178,15 @@ module.exports = {
       "mana.dantian":         currentDantian,
       "mana.lastDantianUpdate": new Date(),
       ...(cooldownAt ? { "mana.qiCooldownUntil": cooldownAt } : {}),
-      $inc: { "stats.totalPullsDone": amount },
+      $inc: { "stats.totalPullsDone": actualAmount },
     });
 
     // Grant XP for rolls + handle level up
     // Quest tracking
     const redis2 = getRedis();
-    await incrementProgress(redis2, interaction.user.id, "daily", "roll", amount);
-    await incrementProgress(redis2, interaction.user.id, "weekly", "roll", amount);
-    if (amount >= 10) {
+    await incrementProgress(redis2, interaction.user.id, "daily", "roll", actualAmount);
+    await incrementProgress(redis2, interaction.user.id, "weekly", "roll", actualAmount);
+    if (actualAmount >= 10) {
       await incrementProgress(redis2, interaction.user.id, "daily", "multi_roll", 1);
       await incrementProgress(redis2, interaction.user.id, "weekly", "multi_roll", 1);
     }
@@ -203,18 +201,27 @@ module.exports = {
       }
     }
 
-    const xpGain   = amount * 5;
+    const xpGain   = actualAmount * 5;
     const freshUser = await User.findOne({ userId: interaction.user.id });
     const lvResult  = applyExp(freshUser.accountLevel, freshUser.accountExp, xpGain);
     await User.findOneAndUpdate({ userId: interaction.user.id }, {
       accountLevel: lvResult.newLevel,
       accountExp:   lvResult.newExp,
     });
+
+    const embed = buildRollEmbed(results, user.username, newQi, currentDantian, maxQi, maxDantian);
+
+    // Warn if fewer rolls than requested
+    if (qiShortfall > 0) {
+      embed.setDescription((embed.data.description ? embed.data.description + "\n\n" : "") +
+        `⚡ **Not enough Qi** — only rolled **${actualAmount}** / ${amount} (missing ${qiShortfall} Qi).
+Use \`/refill\` to restore your Qi.`);
+    }
+
     if (lvResult.leveledUp) {
       embed.addFields({ name: "🎉 Level Up!", value: `You reached **Level ${lvResult.newLevel}**!`, inline: false });
     }
 
-    const embed = buildRollEmbed(results, user.username, newQi, currentDantian, maxQi, maxDantian);
 
     if (cooldownAt) {
       embed.addFields({
