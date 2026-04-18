@@ -45,7 +45,7 @@ module.exports = {
     const xpBar     = buildXpBar(user.accountExp, expNeeded);
 
     const desc = [
-      `<:xp_full:1494696138396270592> **Level ${user.accountLevel}**`,
+      `<:e_:1495017015885172926> **Level ${user.accountLevel}**`,
       xpBar,
       `XP: **${user.accountExp.toLocaleString()} / ${expNeeded.toLocaleString()}**`,
       ``,
