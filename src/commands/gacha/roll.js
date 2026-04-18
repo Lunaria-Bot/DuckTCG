@@ -67,29 +67,52 @@ async function drawCard(userId) {
   return { card, pc, rarity: actualRarity };
 }
 
-function buildRollEmbed(results, username, qiLeft, dantianLeft, maxQi, maxDantian) {
-  const lines = results.map(({ card, rarity }) =>
-    `${RARITY_EMOJI[rarity] ?? "⬜"} **${card.name}** — *${card.anime}*`
-  );
+const RARITY_LABEL = { exceptional: "Exceptional", special: "Special", rare: "Rare", common: "Common" };
+const RARITY_COLOR = { exceptional: 0xFFD700, special: 0xAB47BC, rare: 0x42A5F5, common: 0x78909C };
 
-  // Highlight if any special+
+function buildRollEmbed(results, username, qiLeft, dantianLeft, maxQi, maxDantian) {
+  const manaField = {
+    name: "Mana",
+    value: `⚡ Qi: **${qiLeft}** / ${maxQi}  ·  🌀 Dantian: **${Math.floor(dantianLeft)}** / ${maxDantian}`,
+  };
+
+  // ── Single roll — big card display ────────────────────────────────────────
+  if (results.length === 1) {
+    const { card, rarity, pc } = results[0];
+    const color = RARITY_COLOR[rarity] ?? 0x78909C;
+    const owned = pc?.quantity ?? 1;
+
+    const embed = new EmbedBuilder()
+      .setTitle(`${username} rolled a ${RARITY_LABEL[rarity] ?? rarity} card`)
+      .setDescription(`**Name:** ${card.name}\n**Anime:** ${card.anime}\nOwned: **${owned}**`)
+      .setColor(color)
+      .addFields(manaField);
+
+    if (card.imageUrl) embed.setImage(card.imageUrl);
+    return embed;
+  }
+
+  // ── Multi roll — compact list ──────────────────────────────────────────────
   const best = results.reduce((b, r) =>
     (RARITY_ORDER[r.rarity] ?? 9) < (RARITY_ORDER[b.rarity] ?? 9) ? r : b
   , results[0]);
 
-  const color = best.rarity === "exceptional" ? 0xFFD700
-    : best.rarity === "special" ? 0xAB47BC
-    : best.rarity === "rare" ? 0x42A5F5
-    : 0x78909C;
+  const color = RARITY_COLOR[best.rarity] ?? 0x78909C;
 
-  return new EmbedBuilder()
-    .setTitle(`${username}'s Roll`)
+  const lines = results.map(({ card, rarity }) =>
+    `${RARITY_EMOJI[rarity] ?? "⬜"} **${card.name}** — *${card.anime}*`
+  );
+
+  const embed = new EmbedBuilder()
+    .setTitle(`${username}'s Rolls (×${results.length})`)
     .setDescription(lines.join("\n"))
     .setColor(color)
-    .addFields({
-      name: "Mana",
-      value: `⚡ Qi: **${qiLeft}** / ${maxQi}  ·  🌀 Dantian: **${Math.floor(dantianLeft)}** / ${maxDantian}`,
-    });
+    .addFields(manaField);
+
+  // Show best card's image as thumbnail
+  if (best.card?.imageUrl) embed.setThumbnail(best.card.imageUrl);
+
+  return embed;
 }
 
 module.exports = {
