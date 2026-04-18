@@ -107,7 +107,7 @@ module.exports = {
       "mana.lastDantianUpdate": new Date(),
     });
 
-    const canRefill = isQiReady(user) && currentQi < maxQi && currentDantian >= 1;
+    const canRefill = currentQi < maxQi && currentDantian >= 1;
 
     const msg = await interaction.editReply({
       embeds: [buildEmbed(user, currentQi, currentDantian)],
@@ -130,14 +130,6 @@ module.exports = {
       const freshDantian = regenDantian(freshUser);
       const freshQi    = freshUser.mana?.qi ?? maxQi;
       const maxDantian = dantianMax(freshUser.accountLevel);
-
-      if (!isQiReady(freshUser)) {
-        const secs = qiCooldownRemaining(freshUser);
-        return interaction.editReply({
-          embeds: [buildEmbed(freshUser, freshQi, freshDantian)],
-          components: [buildRow(false)],
-        });
-      }
 
       if (freshQi >= maxQi) {
         return interaction.editReply({

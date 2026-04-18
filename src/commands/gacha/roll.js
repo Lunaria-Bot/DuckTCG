@@ -70,12 +70,7 @@ async function drawCard(userId) {
 const RARITY_LABEL = { exceptional: "Exceptional", special: "Special", rare: "Rare", common: "Common" };
 const RARITY_COLOR = { exceptional: 0xFFD700, special: 0xAB47BC, rare: 0x42A5F5, common: 0x78909C };
 
-function buildRollEmbed(results, username, qiLeft, dantianLeft, maxQi, maxDantian) {
-  const manaField = {
-    name: "Mana",
-    value: `⚡ Qi: **${qiLeft}** / ${maxQi}  ·  🌀 Dantian: **${Math.floor(dantianLeft)}** / ${maxDantian}`,
-  };
-
+function buildRollEmbed(results, username) {
   // ── Single roll — big card display ────────────────────────────────────────
   if (results.length === 1) {
     const { card, rarity, pc } = results[0];
@@ -85,8 +80,7 @@ function buildRollEmbed(results, username, qiLeft, dantianLeft, maxQi, maxDantia
     const embed = new EmbedBuilder()
       .setTitle(`${username} rolled a ${RARITY_LABEL[rarity] ?? rarity} card`)
       .setDescription(`**Name:** ${card.name}\n**Anime:** ${card.anime}\nOwned: **${owned}**`)
-      .setColor(color)
-      .addFields(manaField);
+      .setColor(color);
 
     if (card.imageUrl) embed.setImage(card.imageUrl);
     return embed;
@@ -106,10 +100,8 @@ function buildRollEmbed(results, username, qiLeft, dantianLeft, maxQi, maxDantia
   const embed = new EmbedBuilder()
     .setTitle(`${username}'s Rolls (×${results.length})`)
     .setDescription(lines.join("\n"))
-    .setColor(color)
-    .addFields(manaField);
+    .setColor(color);
 
-  // Show best card's image as thumbnail
   if (best.card?.imageUrl) embed.setThumbnail(best.card.imageUrl);
 
   return embed;
@@ -121,9 +113,9 @@ module.exports = {
     .setDescription("Roll for cards using your Qi")
     .addIntegerOption(opt =>
       opt.setName("amount")
-        .setDescription("Number of rolls (1-10, costs that much Qi)")
+        .setDescription("Number of rolls (1-5, costs that much Qi)")
         .setMinValue(1)
-        .setMaxValue(10)
+        .setMaxValue(5)
     ),
 
   async execute(interaction) {
@@ -209,7 +201,7 @@ module.exports = {
       accountExp:   lvResult.newExp,
     });
 
-    const embed = buildRollEmbed(results, user.username, newQi, currentDantian, maxQi, maxDantian);
+    const embed = buildRollEmbed(results, user.username);
 
     // Warn if fewer rolls than requested
     if (qiShortfall > 0) {
