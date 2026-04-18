@@ -28,7 +28,7 @@ function fmtReward(r) {
   return parts.join("  ");
 }
 
-function buildBar(current, target, length = 8) {
+function buildBar(current, target, length = 5) {
   const pct    = Math.min(current / target, 1);
   const filled = Math.round(pct * length);
   return XP_FULL.repeat(filled) + XP_EMPTY.repeat(length - filled);
