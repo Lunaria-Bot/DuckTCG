@@ -18,6 +18,7 @@ function fmtReward(r) {
   if (r.gold)           parts.push(`<:Nyan:1495048966528831508> ${r.gold.toLocaleString()} Nyang`);
   if (r.regularTickets) parts.push(`<:perma_ticket:1494344593863344258> ${r.regularTickets} Regular`);
   if (r.pickupTickets)  parts.push(`<:pickup_ticket:1494344547046523091> ${r.pickupTickets} Pick Up`);
+  if (r.jade)           parts.push(`<:Jade:1495038405866688703> ${r.jade} Jade`);
   if (r.accountExp)     parts.push(`⭐ ${r.accountExp} XP`);
   return parts.join(" · ");
 }

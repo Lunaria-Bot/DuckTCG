@@ -141,6 +141,25 @@ module.exports = {
     });
 
     // Grant XP for rolls + handle level up
+    // Quest tracking
+    const redis2 = require("../../services/redis").getRedis();
+    await incrementProgress(redis2, interaction.user.id, "daily", "roll", amount);
+    await incrementProgress(redis2, interaction.user.id, "weekly", "roll", amount);
+    if (amount >= 10) {
+      await incrementProgress(redis2, interaction.user.id, "daily", "multi_roll", 1);
+      await incrementProgress(redis2, interaction.user.id, "weekly", "multi_roll", 1);
+    }
+    for (const { rarity } of results) {
+      if (rarity === "rare" || rarity === "special" || rarity === "exceptional") {
+        await incrementProgress(redis2, interaction.user.id, "daily", "roll_rare", 1);
+        await incrementProgress(redis2, interaction.user.id, "weekly", "roll_rare", 1);
+      }
+      if (rarity === "special" || rarity === "exceptional") {
+        await incrementProgress(redis2, interaction.user.id, "daily", "roll_special", 1);
+        await incrementProgress(redis2, interaction.user.id, "weekly", "roll_special", 1);
+      }
+    }
+
     const xpGain   = amount * 5;
     const freshUser = await User.findOne({ userId: interaction.user.id });
     const lvResult  = applyExp(freshUser.accountLevel, freshUser.accountExp, xpGain);
