@@ -1,5 +1,6 @@
 const { requireProfile } = require("../../utils/requireProfile");
 const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
+const { xpToNextLevel } = require("../../services/levels");
 const User = require("../../models/User");
 
 const XP_FULL  = "<:xp_full:1494696138396270592>";
@@ -40,7 +41,7 @@ module.exports = {
       user = profileCheck;
     }
 
-    const expNeeded = Math.round(100 * Math.pow(user.accountLevel, 1.4));
+    const expNeeded = xpToNextLevel(user.accountLevel);
     const xpBar     = buildXpBar(user.accountExp, expNeeded);
 
     const desc = [

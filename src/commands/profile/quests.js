@@ -9,6 +9,7 @@ const {
   getDailyResetTs, getWeeklyResetTs,
 } = require("../../services/quests");
 const User = require("../../models/User");
+const { applyExp } = require("../../services/levels");
 
 // ─── Reward formatter ─────────────────────────────────────────────────────────
 

@@ -42,6 +42,17 @@ const UserSchema = new Schema({
   bio: { type: String, default: null, maxlength: 150 },
   guild: { type: String, default: null, maxlength: 50 },
   isPremium: { type: Boolean, default: false },
+  // ── Mana system ──────────────────────────────────────────────────────────
+  mana: {
+    // Inner Qi — used for rolling, cooldown after depleted
+    qi:          { type: Number, default: 10 },   // current inner qi (Lv1=10, Lv25=40)
+    qiCooldownUntil: { type: Date, default: null }, // null = ready
+
+    // Dantian — stored mana, passive regen
+    dantian:          { type: Number, default: 40 },   // current stored (Lv1=40, Lv25=100)
+    lastDantianUpdate: { type: Date, default: Date.now },
+  },
+
   combatPower: { type: Number, default: 0 },
 
   stats: {

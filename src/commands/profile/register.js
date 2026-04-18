@@ -66,6 +66,7 @@ module.exports = {
     await User.create({
       userId: interaction.user.id,
       username,
+      mana: { qi: 10, dantian: 40, qiCooldownUntil: null, lastDantianUpdate: new Date() },
       currency: {
         gold: WELCOME_GOLD,
         premiumCurrency: 0,
