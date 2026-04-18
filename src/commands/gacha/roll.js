@@ -31,10 +31,28 @@ function rollRarity() {
 async function drawCard(userId) {
   const rarity = rollRarity();
 
-  // Pick a random available card of this rarity
-  const cards = await Card.find({ rarity, isAvailable: true });
-  if (!cards.length) return null;
-  const card = cards[Math.floor(Math.random() * cards.length)];
+  // Try rolled rarity first, then fallback down to any available rarity
+  const rarityFallback = ["common", "rare", "special", "exceptional"];
+  let card = null;
+  let actualRarity = rarity;
+
+  // Try the rolled rarity
+  const pool = await Card.find({ rarity, isAvailable: true });
+  if (pool.length) {
+    card = pool[Math.floor(Math.random() * pool.length)];
+  } else {
+    // Fallback: try any rarity that has cards
+    for (const r of rarityFallback) {
+      const fallbackPool = await Card.find({ rarity: r, isAvailable: true });
+      if (fallbackPool.length) {
+        card = fallbackPool[Math.floor(Math.random() * fallbackPool.length)];
+        actualRarity = r;
+        break;
+      }
+    }
+  }
+
+  if (!card) return null;
 
   const pc = await PlayerCard.findOneAndUpdate(
     { userId, cardId: card.cardId },
@@ -44,7 +62,7 @@ async function drawCard(userId) {
 
   await User.findOneAndUpdate({ userId }, { $inc: { "stats.totalCardsEverObtained": 1 } });
 
-  return { card, pc, rarity };
+  return { card, pc, rarity: actualRarity };
 }
 
 function buildRollEmbed(results, username, qiLeft, dantianLeft, maxQi, maxDantian) {

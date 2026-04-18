@@ -949,9 +949,10 @@ app.get("/cards", auth, editorOrAdmin, async (req, res) => {
     <td><strong>${c.name}</strong><br/><small style="color:#666">${c.cardId}</small></td>
     <td>${c.anime}</td><td><span class="badge ${rarityBadge[c.rarity]}">${c.rarity}</span></td>
     <td><span class="badge ${roleBadge[c.role]}">${c.role}</span></td>
+    <td><span class="badge ${c.isAvailable ? 'badge-green' : 'badge-red'}">${c.isAvailable ? 'Available' : 'Unavailable'}</span></td>
     <td><a href="/cards/${c.cardId}/detail" class="btn btn-sm btn-gray">Detail</a> <a href="/cards/${c.cardId}/edit" class="btn btn-sm">Edit</a></td>
   </tr>`).join("");
-  res.send(renderPage("Cards", `<a href="/cards/new" class="btn" style="margin-bottom:20px;display:inline-block">+ New Card</a><div class="card"><table><thead><tr><th>Art</th><th>Card</th><th>Anime</th><th>Rarity</th><th>Role</th><th>Actions</th></tr></thead><tbody>${rows||"<tr><td colspan='7' style='color:#666;text-align:center'>No cards yet</td></tr>"}</tbody></table></div>`, req.user));
+  res.send(renderPage("Cards", `<a href="/cards/new" class="btn" style="margin-bottom:20px;display:inline-block">+ New Card</a><div class="card"><table><thead><tr><th>Art</th><th>Card</th><th>Anime</th><th>Rarity</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead><tbody>${rows||"<tr><td colspan='7' style='color:#666;text-align:center'>No cards yet</td></tr>"}</tbody></table></div>`, req.user));
 });
 
 app.get("/cards/new", auth, editorOrAdmin, async (req, res) => {
@@ -965,6 +966,7 @@ app.get("/cards/new", auth, editorOrAdmin, async (req, res) => {
         <div class="row"><div><label>Rarity</label><select name="rarity"><option value="common">Common</option><option value="rare">Rare</option><option value="special">Special</option><option value="exceptional">Exceptional</option></select></div><div><label>Role</label><select name="role"><option value="dps">DPS</option><option value="support">Support</option><option value="tank">Tank</option></select></div></div>
         <div><label>Add to Banner (optional)</label><select name="addToBanner"><option value="">— Don't add —</option>${bannerOptions}</select></div>
         <div class="row3"><div><label>Base Damage</label><input type="number" name="baseDamage" value="100"/></div><div><label>Base Mana</label><input type="number" name="baseMana" value="100"/></div><div><label>Base HP</label><input type="number" name="baseHp" value="100"/></div></div>
+        <div><label><input type="checkbox" name="isAvailable" value="true" checked style="margin-right:6px"/>Available for rolls</label></div>
         <div style="display:flex;gap:10px"><button type="submit">Create Card</button><a href="/cards" class="btn btn-red">Cancel</a></div>
       </form>
     </div>
@@ -973,10 +975,10 @@ app.get("/cards/new", auth, editorOrAdmin, async (req, res) => {
 
 app.post("/cards/new", auth, editorOrAdmin, async (req, res) => {
   try {
-    const { cardId, name, anime, imageUrl, rarity, role, addToBanner, baseDamage, baseMana, baseHp } = req.body;
+    const { cardId, name, anime, imageUrl, rarity, role, addToBanner, baseDamage, baseMana, baseHp, isAvailable } = req.body;
     let bannerType = "regular";
     if (addToBanner) { const b = await Banner.findOne({ bannerId: addToBanner }); if (b) bannerType = b.type; }
-    const card = await Card.create({ cardId, name, anime, imageUrl: imageUrl||null, rarity, role, bannerType, baseStats: { damage:parseInt(baseDamage), mana:parseInt(baseMana), hp:parseInt(baseHp) } });
+    const card = await Card.create({ cardId, name, anime, imageUrl: imageUrl||null, rarity, role, bannerType, isAvailable: isAvailable === "true", baseStats: { damage:parseInt(baseDamage), mana:parseInt(baseMana), hp:parseInt(baseHp) } });
     if (addToBanner) await Banner.findOneAndUpdate({ bannerId: addToBanner }, { $addToSet: { [`pool.${rarity}`]: cardId } });
     await audit(req.user, "create", "card", cardId, `Created card "${name}" (${rarity} ${role})`, null, card.toObject());
     res.redirect("/cards");
@@ -994,6 +996,7 @@ app.get("/cards/:id/edit", auth, editorOrAdmin, async (req, res) => {
         <div><label>Image URL</label><input name="imageUrl" value="${card.imageUrl||""}"/></div>
         <div class="row"><div><label>Rarity</label><select name="rarity">${["common","rare","special","exceptional"].map(r=>`<option value="${r}" ${card.rarity===r?"selected":""}>${r}</option>`).join("")}</select></div><div><label>Role</label><select name="role">${["dps","support","tank"].map(r=>`<option value="${r}" ${card.role===r?"selected":""}>${r}</option>`).join("")}</select></div></div>
         <div class="row3"><div><label>Base Damage</label><input type="number" name="baseDamage" value="${card.baseStats.damage}"/></div><div><label>Base Mana</label><input type="number" name="baseMana" value="${card.baseStats.mana}"/></div><div><label>Base HP</label><input type="number" name="baseHp" value="${card.baseStats.hp}"/></div></div>
+        <div><label><input type="checkbox" name="isAvailable" value="true" ${card.isAvailable ? "checked" : ""} style="margin-right:6px"/>Available for rolls</label></div>
         <div style="display:flex;gap:10px"><button type="submit">Save</button><a href="/cards" class="btn btn-red">Cancel</a></div>
       </form>
     </div>
@@ -1001,9 +1004,9 @@ app.get("/cards/:id/edit", auth, editorOrAdmin, async (req, res) => {
 });
 
 app.post("/cards/:id/edit", auth, editorOrAdmin, async (req, res) => {
-  const { name, anime, imageUrl, rarity, role, baseDamage, baseMana, baseHp } = req.body;
+  const { name, anime, imageUrl, rarity, role, baseDamage, baseMana, baseHp, isAvailable } = req.body;
   const before = await Card.findOne({ cardId: req.params.id });
-  const after = await Card.findOneAndUpdate({ cardId: req.params.id }, { name, anime, imageUrl: imageUrl||null, rarity, role, baseStats: { damage:parseInt(baseDamage), mana:parseInt(baseMana), hp:parseInt(baseHp) } }, { new: true });
+  const after = await Card.findOneAndUpdate({ cardId: req.params.id }, { name, anime, imageUrl: imageUrl||null, rarity, role, isAvailable: isAvailable === "true", baseStats: { damage:parseInt(baseDamage), mana:parseInt(baseMana), hp:parseInt(baseHp) } }, { new: true });
   await audit(req.user, "update", "card", req.params.id, `Updated card "${name}"`, before?.toObject(), after?.toObject());
   res.redirect("/cards");
 });
@@ -1043,7 +1046,7 @@ app.get("/cards/:id/detail", auth, editorOrAdmin, async (req, res) => {
             <tr><td style="color:#888">Base DMG</td><td>${card.baseStats?.damage ?? 0}</td></tr>
             <tr><td style="color:#888">Base Mana</td><td>${card.baseStats?.mana ?? 0}</td></tr>
             <tr><td style="color:#888">Base HP</td><td>${card.baseStats?.hp ?? 0}</td></tr>
-
+            <tr><td style="color:#888">Available</td><td><span class="badge ${card.isAvailable ? 'badge-green' : 'badge-red'}">${card.isAvailable ? 'Yes' : 'No'}</span></td></tr>
           </table>
         </div>
       </div>
@@ -1092,7 +1095,7 @@ app.get("/players", auth, adminOnly, async (req, res) => {
   const search  = (req.query.q || "").trim();
   const sortBy  = req.query.sort || "createdAt";
   const sortDir = req.query.dir === "asc" ? 1 : -1;
-  const sortMap = { cp: "combatPower", gold: "currency.gold", date: "createdAt", streak: "loginStreak" };
+  const sortMap = { cp: "combatPower", gold: "currency.gold", date: "createdAt", streak: "loginStreak", level: "accountLevel" };
   const sortField = sortMap[sortBy] || "createdAt";
   const query = search ? { username: { $regex: search, $options: "i" } } : {};
   const players = await User.find(query).sort({ [sortField]: sortDir }).limit(100);
@@ -1104,11 +1107,16 @@ app.get("/players", auth, adminOnly, async (req, res) => {
   };
   const rows = players.map(p => `<tr>
     <td><strong>${p.username}</strong><br/><small style="color:#666">${p.userId}</small></td>
-    <td>${p.currency.gold.toLocaleString()}</td><td>${p.currency.regularTickets} / ${p.currency.pickupTickets}</td>
-    <td>${p.combatPower.toLocaleString()}</td><td>${p.loginStreak}</td>
+    <td>${p.currency.gold.toLocaleString()}</td>
+    <td>${p.currency.premiumCurrency.toLocaleString()}</td>
+    <td>${p.currency.regularTickets} / ${p.currency.pickupTickets}</td>
+    <td>Lv.${p.accountLevel}</td>
+    <td>${p.combatPower.toLocaleString()}</td>
+    <td>${p.isPremium ? '💎' : '—'}</td>
     <td>
       <a href="/players/${p.userId}/give" class="btn btn-sm btn-green">Give Currency</a>
       <a href="/players/${p.userId}/give-card" class="btn btn-sm">Give Card</a>
+      <a href="/players/${p.userId}/toggle-premium" class="btn btn-sm ${p.isPremium ? 'btn-red' : 'btn-gray'}">${p.isPremium ? '💎 Remove Premium' : 'Set Premium'}</a>
     </td>
   </tr>`).join("");
   res.send(renderPage("Players", `
@@ -1122,10 +1130,11 @@ app.get("/players", auth, adminOnly, async (req, res) => {
       <thead><tr>
         <th>Player</th>
         <th>${sortLink("gold","Nyang")}</th>
+        <th>Jade</th>
         <th>Tickets (R/P)</th>
+        <th>${sortLink("level","Level")}</th>
         <th>${sortLink("cp","CP")}</th>
-        <th>${sortLink("streak","Streak")}</th>
-        <th>${sortLink("date","Joined")}</th>
+        <th>Premium</th>
         <th>Actions</th>
       </tr></thead>
       <tbody>${rows||"<tr><td colspan='7' style='color:#666;text-align:center'>No players found</td></tr>"}</tbody>
@@ -1136,7 +1145,7 @@ app.get("/players", auth, adminOnly, async (req, res) => {
 app.get("/players/:id/give", auth, adminOnly, async (req, res) => {
   const player = await User.findOne({ userId: req.params.id });
   if (!player) return res.redirect("/players");
-  res.send(renderPage(`Give Currency — ${player.username}`, `<div class="card" style="max-width:400px"><form method="POST" action="/players/${player.userId}/give"><div><label>Currency</label><select name="type"><option value="gold">Nyang</option><option value="regularTickets">Regular Tickets</option><option value="pickupTickets">Pick Up Tickets</option><option value="premiumCurrency">Premium</option></select></div><div><label>Amount</label><input type="number" name="amount" value="1000" min="1" required/></div><div style="display:flex;gap:10px"><button type="submit">Give</button><a href="/players" class="btn btn-red">Cancel</a></div></form></div>`, req.user));
+  res.send(renderPage(`Give Currency — ${player.username}`, `<div class="card" style="max-width:400px"><form method="POST" action="/players/${player.userId}/give"><div><label>Currency</label><select name="type"><option value="gold">Nyang</option><option value="regularTickets">Regular Tickets</option><option value="pickupTickets">Pick Up Tickets</option><option value="premiumCurrency">Jade</option></select></div><div><label>Amount</label><input type="number" name="amount" value="1000" min="1" required/></div><div style="display:flex;gap:10px"><button type="submit">Give</button><a href="/players" class="btn btn-red">Cancel</a></div></form></div>`, req.user));
 });
 
 app.post("/players/:id/give", auth, adminOnly, async (req, res) => {
@@ -1167,6 +1176,16 @@ app.post("/players/:id/give-card", auth, adminOnly, async (req, res) => {
   );
   await User.findOneAndUpdate({ userId: player.userId }, { $inc: { "stats.totalCardsEverObtained": 1 } });
   await audit(req.user, "update", "player", player.userId, `Gave card "${card.name}" to ${player.username}`, null, null);
+  res.redirect("/players");
+});
+
+
+app.get("/players/:id/toggle-premium", auth, adminOnly, async (req, res) => {
+  const player = await User.findOne({ userId: req.params.id });
+  if (!player) return res.redirect("/players");
+  const newVal = !player.isPremium;
+  await User.findOneAndUpdate({ userId: req.params.id }, { isPremium: newVal });
+  await audit(req.user, "update", "player", req.params.id, `${newVal ? "Granted" : "Removed"} Premium for ${player.username}`, null, null);
   res.redirect("/players");
 });
 
