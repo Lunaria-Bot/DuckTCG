@@ -82,15 +82,13 @@ function buildCardEmbed(pairs, index, username, totalCopiesMap) {
   const ownedCopies = pc.quantity ?? 1;
   const totalCopies = totalCopiesMap?.[card.cardId] ?? "?";
 
-  // In Discord embeds, fields always render ABOVE the image.
-  // To show owned/in-game below the image, we append them to the description.
-  const ownedLine = `\n\n**Owned:** ${ownedCopies} cop${ownedCopies > 1 ? "ies" : "y"}  ·  **In Game:** ${totalCopies} total`;
+  const ownedLine = `Owned: ${ownedCopies} cop${ownedCopies > 1 ? "ies" : "y"}  ·  In Game: ${totalCopies} total`;
 
   const embed = new EmbedBuilder()
     .setTitle(`${RARITY_EMOJI[card.rarity] ?? "⬜"} ${RARITY_LABEL[card.rarity] ?? card.rarity} — ${card.name}`)
-    .setDescription(`*${card.anime}*\n${ROLE_EMOJI[card.role] ?? ""} **${card.role.toUpperCase()}**  ·  CP **${(pc.cachedStats?.combatPower ?? 0).toLocaleString()}**${ownedLine}`)
+    .setDescription(`*${card.anime}*\n${ROLE_EMOJI[card.role] ?? ""} **${card.role.toUpperCase()}**  ·  CP **${(pc.cachedStats?.combatPower ?? 0).toLocaleString()}**`)
     .setColor(RARITY_COLOR[card.rarity] ?? 0x5B21B6)
-    .setFooter({ text: `${username}'s Inventory · ${index + 1} / ${pairs.length}` });
+    .setFooter({ text: `${ownedLine}` });
 
   if (card.imageUrl) embed.setImage(card.imageUrl);
 
@@ -102,8 +100,8 @@ function buildNavRow(cur, total, view) {
   return new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId("inv_first").setEmoji("⏮").setStyle(ButtonStyle.Secondary).setDisabled(cur === 0),
     new ButtonBuilder().setCustomId("inv_prev").setEmoji("◀").setStyle(ButtonStyle.Primary).setDisabled(cur === 0),
+    new ButtonBuilder().setCustomId("inv_page").setLabel(`${cur + 1} / ${total}`).setStyle(ButtonStyle.Secondary).setDisabled(true),
     new ButtonBuilder().setCustomId("inv_next").setEmoji("▶").setStyle(ButtonStyle.Primary).setDisabled(cur >= total - 1),
-    new ButtonBuilder().setCustomId("inv_last").setEmoji("⏭").setStyle(ButtonStyle.Secondary).setDisabled(cur >= total - 1),
     new ButtonBuilder().setCustomId("inv_toggle").setLabel(view === "card" ? "📋 List" : "🖼️ Card").setStyle(ButtonStyle.Success),
   );
 }
