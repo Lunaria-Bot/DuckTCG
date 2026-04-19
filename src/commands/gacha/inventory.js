@@ -184,6 +184,8 @@ module.exports = {
 
     const allPairs = playerCards.filter(pc => cardMap[pc.cardId]).map(pc => ({ pc, card: cardMap[pc.cardId] }));
 
+    const totalCopiesMap = {};
+
     const state = {
       view: "list", page: 0, cardIndex: 0,
       sortBy: "rarity", filterRarity: "", filterRole: "",
