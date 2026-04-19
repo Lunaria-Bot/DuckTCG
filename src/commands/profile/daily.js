@@ -5,65 +5,53 @@ const { processBadges } = require("../../services/badges");
 const { incrementProgress } = require("../../services/quests");
 const { getRedis } = require("../../services/redis");
 
-// ─── Reward table (28-day cycle) ─────────────────────────────────────────────
-// Each entry = rewards for that day in the cycle (1-indexed)
-// After day 28 the cycle resets but streak keeps climbing
+const NYAN   = "<:Nyan:1495048966528831508>";
+const JADE   = "<:Jade:1495038405866688703>";
+const PERMA  = "<:perma_ticket:1494344593863344258>";
+const PICKUP = "<:pickup_ticket:1494344547046523091>";
 
+// ─── Reward table (28-day cycle) ──────────────────────────────────────────────
 function getDayRewards(cycleDay) {
-  // Base gold scales with cycle day
-  const baseGold = 300 + cycleDay * 50;
-
-  const rewards = { gold: baseGold, regularTickets: 0, pickupTickets: 0, premiumCurrency: 0 };
-
-  // Milestone days
+  const rewards = {
+    gold: 300 + cycleDay * 50,
+    regularTickets: 0,
+    pickupTickets: 0,
+    premiumCurrency: 0,
+  };
   if (cycleDay === 7)  { rewards.regularTickets = 1; rewards.gold = 2000; }
   if (cycleDay === 14) { rewards.pickupTickets = 1;  rewards.gold = 4000; }
   if (cycleDay === 21) { rewards.pickupTickets = 1;  rewards.gold = 6000; rewards.regularTickets = 1; }
   if (cycleDay === 28) { rewards.pickupTickets = 2;  rewards.gold = 10000; rewards.premiumCurrency = 50; }
-
-  // Every 7th day that isn't a major milestone gets a regular ticket
-  if (cycleDay % 7 === 0 && ![7,14,21,28].includes(cycleDay)) {
-    rewards.regularTickets = 1;
-  }
-
+  if (cycleDay % 7 === 0 && ![7,14,21,28].includes(cycleDay)) rewards.regularTickets = 1;
   return rewards;
 }
 
-function formatRewards(r) {
-  const lines = [];
-  if (r.gold)            lines.push(`<:Nyan:1495048966528831508> **${r.gold.toLocaleString()} Nyang**`);
-  if (r.regularTickets)  lines.push(`<:perma_ticket:1494344593863344258> **${r.regularTickets} Regular Ticket${r.regularTickets > 1 ? "s" : ""}**`);
-  if (r.pickupTickets)   lines.push(`<:pickup_ticket:1494344547046523091> **${r.pickupTickets} Pick Up Ticket${r.pickupTickets > 1 ? "s" : ""}**`);
-  if (r.premiumCurrency) lines.push(`💎 **${r.premiumCurrency} Premium**`);
-  return lines.join("\n");
+function isMilestone(day) { return day % 7 === 0; }
+
+function rewardLine(r, short = false) {
+  const parts = [];
+  if (r.gold)            parts.push(`${NYAN} **${r.gold.toLocaleString()}**`);
+  if (r.regularTickets)  parts.push(`${PERMA} **${r.regularTickets}**`);
+  if (r.pickupTickets)   parts.push(`${PICKUP} **${r.pickupTickets}**`);
+  if (r.premiumCurrency) parts.push(`${JADE} **${r.premiumCurrency}**`);
+  return parts.join("  ");
 }
 
-function isMilestone(day) {
-  return day % 7 === 0;
-}
-
-// Build the 7-day preview grid around current day
-function buildWeekPreview(currentStreak) {
+// ─── 7-day upcoming preview ────────────────────────────────────────────────────
+function buildUpcoming(currentStreak) {
   const cycleDay = ((currentStreak - 1) % 28) + 1;
   const lines = [];
-
-  // Show current day + next 6
-  for (let i = 0; i < 7; i++) {
-    const day = cycleDay + i;
-    const actualCycle = ((day - 1) % 28) + 1;
-    const r = getDayRewards(actualCycle);
-    const isToday = i === 0;
-    const isMile = isMilestone(actualCycle);
-
-    const marker = isToday ? "▶ " : (isMile ? "⭐ " : "   ");
-    const label = isToday ? `**Day ${currentStreak + i}**` : `Day ${currentStreak + i}`;
-    const reward = r.pickupTickets   ? "<:pickup_ticket:1494344547046523091> Pickup Ticket"
-                 : r.regularTickets  ? "<:perma_ticket:1494344593863344258> Regular Ticket"
-                 : `<:Nyan:1495048966528831508> ${r.gold.toLocaleString()} Nyang`;
-
-    lines.push(`${marker}${label} — ${reward}`);
+  for (let i = 1; i <= 6; i++) {
+    const futureStreak = currentStreak + i;
+    const futureCycle  = ((futureStreak - 1) % 28) + 1;
+    const r = getDayRewards(futureCycle);
+    const mile = isMilestone(futureCycle);
+    const prefix = mile ? "⭐ " : "·  ";
+    const reward = r.pickupTickets  ? `${PICKUP} Pick Up`
+                 : r.regularTickets ? `${PERMA} Regular Ticket`
+                 : `${NYAN} ${r.gold.toLocaleString()}`;
+    lines.push(`${prefix}Day **${futureStreak}** — ${reward}`);
   }
-
   return lines.join("\n");
 }
 
@@ -78,96 +66,93 @@ module.exports = {
     const user = await requireProfile(interaction);
     if (!user) return;
 
-    const now = new Date();
-    const lastLogin = user.lastLoginDate ? new Date(user.lastLoginDate) : null;
+    const now         = new Date();
+    const todayUTC    = now.toISOString().slice(0, 10);
+    const lastLogin   = user.lastLoginDate ? new Date(user.lastLoginDate) : null;
+    const lastUTC     = lastLogin ? lastLogin.toISOString().slice(0, 10) : null;
 
-    // Check if already claimed today (UTC day)
-    const todayUTC = now.toISOString().slice(0, 10);
-    const lastUTC  = lastLogin ? lastLogin.toISOString().slice(0, 10) : null;
-
+    // ── Already claimed ──────────────────────────────────────────────────────
     if (lastUTC === todayUTC) {
-      // Already claimed — show next reset time
       const nextReset = new Date(now);
       nextReset.setUTCHours(24, 0, 0, 0);
-      const embed = new EmbedBuilder()
-        .setTitle("Daily Reward")
-        .setDescription(`You already claimed your daily reward today!\nCome back <t:${Math.floor(nextReset.getTime() / 1000)}:R>.`)
-        .setColor(0x9E9E9E)
-        .addFields({ name: "Upcoming Rewards", value: buildWeekPreview(user.loginStreak) });
-      return interaction.editReply({ embeds: [embed] });
+      const cycleDay = ((user.loginStreak - 1) % 28) + 1;
+      const nextR = getDayRewards(((user.loginStreak) % 28) + 1);
+
+      return interaction.editReply({
+        embeds: [new EmbedBuilder()
+          .setTitle("Already claimed today")
+          .setDescription(`Come back <t:${Math.floor(nextReset.getTime() / 1000)}:R>`)
+          .setColor(0x4a4a6a)
+          .addFields(
+            { name: "Current streak", value: `🔥 **${user.loginStreak}** day${user.loginStreak !== 1 ? "s" : ""}`, inline: true },
+            { name: "Cycle",          value: `Day **${cycleDay}** / 28`, inline: true },
+            { name: "Next reward",    value: rewardLine(nextR), inline: false },
+          )
+          .setThumbnail(interaction.user.displayAvatarURL())
+        ],
+      });
     }
 
-    // Check streak continuity — did they claim yesterday?
+    // ── Streak check ─────────────────────────────────────────────────────────
     const yesterdayUTC = new Date(now);
     yesterdayUTC.setUTCDate(yesterdayUTC.getUTCDate() - 1);
     const yesterdayStr = yesterdayUTC.toISOString().slice(0, 10);
 
-    let newStreak = 1;
-    if (lastUTC === yesterdayStr) {
-      newStreak = (user.loginStreak ?? 0) + 1;
-    }
-    // else: missed a day → reset to 1
-
-    const cycleDay = ((newStreak - 1) % 28) + 1;
-    const rewards = getDayRewards(cycleDay);
+    const streakReset = !!(lastUTC && lastUTC !== yesterdayStr);
+    const newStreak   = lastUTC === yesterdayStr ? (user.loginStreak ?? 0) + 1 : 1;
+    const cycleDay    = ((newStreak - 1) % 28) + 1;
+    const rewards     = getDayRewards(cycleDay);
+    const milestone   = isMilestone(cycleDay);
 
     // Apply rewards
-    await User.findOneAndUpdate(
-      { userId: interaction.user.id },
-      {
-        $inc: {
-          "currency.gold":            rewards.gold,
-          "currency.regularTickets":  rewards.regularTickets,
-          "currency.pickupTickets":   rewards.pickupTickets,
-          "currency.premiumCurrency": rewards.premiumCurrency,
-          "stats.totalGoldEverEarned": rewards.gold,
-        },
-        $set: {
-          loginStreak:   newStreak,
-          lastLoginDate: now,
-        },
-      }
-    );
+    await User.findOneAndUpdate({ userId: interaction.user.id }, {
+      $inc: {
+        "currency.gold":             rewards.gold,
+        "currency.regularTickets":   rewards.regularTickets,
+        "currency.pickupTickets":    rewards.pickupTickets,
+        "currency.premiumCurrency":  rewards.premiumCurrency,
+        "stats.totalGoldEverEarned": rewards.gold,
+      },
+      $set: { loginStreak: newStreak, lastLoginDate: now },
+    });
 
-    // Reload for accurate wallet display
     const updatedUser = await User.findOne({ userId: interaction.user.id });
-
-    // Check all badges on daily (gold + collector + duck CP)
     await processBadges(updatedUser, interaction, "all");
     const _redis = getRedis();
     await incrementProgress(_redis, interaction.user.id, "daily", "daily", 1);
+    await incrementProgress(_redis, interaction.user.id, "weekly", "daily", 1);
 
-    const streakReset = newStreak === 1 && lastUTC && lastUTC !== yesterdayStr;
-    const milestone = isMilestone(cycleDay);
+    // ── Embed ─────────────────────────────────────────────────────────────────
+    const color = milestone     ? 0xFFD700
+                : streakReset   ? 0xEF4444
+                : newStreak >= 14 ? 0x8b5cf6
+                : 0x6d28d9;
+
+    const titlePrefix = milestone   ? "🌟 Milestone — "
+                      : streakReset ? "Daily Reward"
+                      : "Daily Reward";
 
     const embed = new EmbedBuilder()
-      .setTitle(milestone ? "Daily Reward — Milestone!" : "Daily Reward")
-      .setColor(milestone ? 0xFFD700 : 0x7E57C2)
+      .setTitle(titlePrefix)
+      .setColor(color)
       .setThumbnail(interaction.user.displayAvatarURL())
+      .setDescription(streakReset
+        ? `⚠️ Your streak was reset. Starting over from Day 1.`
+        : `🔥 **${newStreak}-day streak!**  *(Cycle day ${cycleDay}/28)*`
+      )
       .addFields(
         {
-          name: streakReset
-            ? "Streak Reset"
-            : `Day ${newStreak} ${cycleDay !== newStreak ? `(Cycle day ${cycleDay}/28)` : ""}`,
-          value: formatRewards(rewards),
+          name: `Today's Reward — Day ${newStreak}`,
+          value: rewardLine(rewards),
           inline: false,
         },
         {
-          name: "Upcoming Rewards",
-          value: buildWeekPreview(newStreak),
+          name: "Coming Up",
+          value: buildUpcoming(newStreak),
           inline: false,
         },
-        {
-          name: "Wallet",
-          value: [
-            `<:Nyan:1495048966528831508> ${updatedUser.currency.gold.toLocaleString()} Nyang`,
-            `<:perma_ticket:1494344593863344258> ${updatedUser.currency.regularTickets} Regular  <:pickup_ticket:1494344547046523091> ${updatedUser.currency.pickupTickets} Pick Up`,
-            `💎 ${updatedUser.currency.premiumCurrency} Premium`,
-          ].join("\n"),
-          inline: false,
-        },
-      )
-      .setFooter({ text: `Login streak: ${newStreak} day${newStreak > 1 ? "s" : ""}${streakReset ? " (streak was reset)" : ""}` });
+
+      );
 
     return interaction.editReply({ embeds: [embed] });
   },
