@@ -1,6 +1,6 @@
 const {
   SlashCommandBuilder, EmbedBuilder,
-  ActionRowBuilder, ButtonBuilder, ButtonStyle,
+  ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType,
 } = require("discord.js");
 const { requireProfile }  = require("../../utils/requireProfile");
 const { applyExp }         = require("../../services/levels");
@@ -143,7 +143,7 @@ module.exports = {
     // Check Qi available
     if (currentQi <= 0) {
       return interaction.editReply({
-        content: `⚡ Your Qi is empty! Use \`/refill\` to restore it from your Dantian.\nDantian: **${Math.floor(currentDantian)}** / ${maxDantian}`,
+        content: `<:Qi:1495523502961459200> Your Qi is empty! Use \`/refill\` to restore it from your Dantian.\nDantian: **${Math.floor(currentDantian)}** / ${maxDantian}`,
       });
     }
 
@@ -207,7 +207,7 @@ module.exports = {
     // Warn if fewer rolls than requested
     if (qiShortfall > 0) {
       embed.setDescription((embed.data.description ? embed.data.description + "\n\n" : "") +
-        `⚡ **Not enough Qi** — only rolled **${actualAmount}** / ${amount} (missing ${qiShortfall} Qi).
+        `<:Qi:1495523502961459200> **Not enough Qi** — only rolled **${actualAmount}** / ${amount} (missing ${qiShortfall} Qi).
 Use \`/refill\` to restore your Qi.`);
     }
 
@@ -223,6 +223,120 @@ Use \`/refill\` to restore your Qi.`);
       });
     }
 
-    return interaction.editReply({ embeds: [embed] });
+    // Build roll-again buttons — disabled if not enough Qi
+    const freshQi = regenQi(await User.findOne({ userId: interaction.user.id }));
+    const rollRow = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId("roll_again_1")
+        .setLabel("Roll ×1")
+        .setEmoji("<:Qi:1495523502961459200>")
+        .setStyle(ButtonStyle.Secondary)
+        .setDisabled(freshQi < 1),
+      new ButtonBuilder()
+        .setCustomId("roll_again_5")
+        .setLabel("Roll ×5")
+        .setEmoji("<:Qi:1495523502961459200>")
+        .setStyle(ButtonStyle.Primary)
+        .setDisabled(freshQi < 5),
+    );
+
+    const msg = await interaction.editReply({ embeds: [embed], components: [rollRow] });
+
+    const collector = msg.createMessageComponentCollector({
+      componentType: ComponentType.Button,
+      filter: i => i.user.id === interaction.user.id && (i.customId === "roll_again_1" || i.customId === "roll_again_5"),
+      time: 2 * 60 * 1000,
+      max: 10,
+    });
+
+    collector.on("collect", async btnInt => {
+      await btnInt.deferUpdate();
+      const rollAmt = btnInt.customId === "roll_again_1" ? 1 : 5;
+
+      const freshUser2 = await User.findOne({ userId: interaction.user.id });
+      const freshQi2   = regenQi(freshUser2);
+      const freshDantian2 = regenDantian(freshUser2);
+      const maxQi2     = qiMax(freshUser2.accountLevel);
+      const maxDantian2 = dantianMax(freshUser2.accountLevel);
+
+      if (freshQi2 <= 0) {
+        const secs = qiCooldownRemaining(freshUser2);
+        await interaction.editReply({ components: [] });
+        return btnInt.followUp({ content: `⏳ Your Qi is empty. Ready in **${formatCooldown(secs)}**.`, ephemeral: true });
+      }
+
+      const actualAmt2  = Math.min(rollAmt, freshQi2);
+      const shortfall2  = rollAmt > freshQi2 ? rollAmt - freshQi2 : 0;
+
+      const results2 = [];
+      for (let i = 0; i < actualAmt2; i++) {
+        const r = await drawCard(interaction.user.id);
+        if (r) results2.push(r);
+      }
+      if (!results2.length) return;
+
+      const newQi2     = freshQi2 - actualAmt2;
+      const cooldownAt2 = newQi2 <= 0 ? new Date(Date.now() + QI_COOLDOWN_MS) : null;
+
+      await User.findOneAndUpdate({ userId: interaction.user.id }, {
+        "mana.qi":              newQi2,
+        "mana.lastQiUpdate":    newQi2 > 0 ? new Date() : freshUser2.mana?.lastQiUpdate,
+        "mana.dantian":         freshDantian2,
+        "mana.lastDantianUpdate": new Date(),
+        "mana.qiCooldownUntil": null,
+        $inc: { "stats.totalPullsDone": actualAmt2 },
+      });
+
+      // Quest tracking
+      const redis3 = getRedis();
+      await incrementProgress(redis3, interaction.user.id, "daily", "roll", actualAmt2);
+      await incrementProgress(redis3, interaction.user.id, "weekly", "roll", actualAmt2);
+      if (actualAmt2 >= 10) {
+        await incrementProgress(redis3, interaction.user.id, "daily", "multi_roll", 1);
+        await incrementProgress(redis3, interaction.user.id, "weekly", "multi_roll", 1);
+      }
+      for (const { rarity } of results2) {
+        if (rarity === "rare" || rarity === "special" || rarity === "exceptional") {
+          await incrementProgress(redis3, interaction.user.id, "daily", "roll_rare", 1);
+          await incrementProgress(redis3, interaction.user.id, "weekly", "roll_rare", 1);
+        }
+        if (rarity === "special" || rarity === "exceptional") {
+          await incrementProgress(redis3, interaction.user.id, "daily", "roll_special", 1);
+          await incrementProgress(redis3, interaction.user.id, "weekly", "roll_special", 1);
+        }
+      }
+
+      const xpGain2   = actualAmt2 * 5;
+      const freshUser3 = await User.findOne({ userId: interaction.user.id });
+      const lvResult2  = applyExp(freshUser3.accountLevel, freshUser3.accountExp, xpGain2);
+      await User.findOneAndUpdate({ userId: interaction.user.id }, {
+        accountLevel: lvResult2.newLevel,
+        accountExp:   lvResult2.newExp,
+      });
+
+      const embed2 = buildRollEmbed(results2, interaction.user.username);
+      if (shortfall2 > 0) {
+        embed2.setDescription((embed2.data.description ? embed2.data.description + "\n\n" : "") +
+          `<:Qi:1495523502961459200> **Not enough Qi** — only rolled **${actualAmt2}** / ${rollAmt} (missing ${shortfall2} Qi).\nUse \`/refill\` to restore your Qi.`);
+      }
+      if (lvResult2.leveledUp) {
+        embed2.addFields({ name: "🎉 Level Up!", value: `You reached **Level ${lvResult2.newLevel}**!`, inline: false });
+      }
+      if (cooldownAt2) {
+        embed2.addFields({ name: "⏳ Qi Depleted", value: `Your Qi is exhausted.\nUse \`/refill\` once ready.` });
+      }
+
+      const newQiAfter = regenQi(await User.findOne({ userId: interaction.user.id }));
+      const rollRow2 = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId("roll_again_1").setLabel("Roll ×1").setEmoji("<:Qi:1495523502961459200>").setStyle(ButtonStyle.Secondary).setDisabled(newQiAfter < 1),
+        new ButtonBuilder().setCustomId("roll_again_5").setLabel("Roll ×5").setEmoji("<:Qi:1495523502961459200>").setStyle(ButtonStyle.Primary).setDisabled(newQiAfter < 5),
+      );
+
+      await interaction.editReply({ embeds: [embed2], components: [rollRow2] });
+    });
+
+    collector.on("end", () => {
+      interaction.editReply({ components: [] }).catch(() => {});
+    });
   },
 };

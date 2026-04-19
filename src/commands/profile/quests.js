@@ -169,6 +169,9 @@ module.exports = {
         getOrCreateQuests(redis, userId, "weekly"),
       ]);
 
+      // DM notification if quest was completed (not just claimed)
+      // (we notify when quest becomes claimable, not on claim)
+
       const rewardMsg = [`✅ Reward claimed! ${fmtReward(reward)}`];
       if (lvResult.leveledUp) rewardMsg.push(`🎉 Level up! You are now **Level ${lvResult.newLevel}**!`);
 

@@ -38,7 +38,7 @@ function buildEmbed(user, qi, dantian) {
   } else if (qi >= maxQi) {
     qiStatus = `✅ Full — ready to roll!`;
   } else {
-    qiStatus = `⚡ ${qi} / ${maxQi}`;
+    qiStatus = `<:Qi:1495523502961459200> ${qi} / ${maxQi}`;
   }
 
   const dantianPct    = Math.round((dantian / maxDantian) * 100);
@@ -56,7 +56,7 @@ function buildEmbed(user, qi, dantian) {
     )
     .addFields(
       {
-        name: "⚡ Qi",
+        name: "<:Qi:1495523502961459200> Qi",
         value: [
           buildBar(qi, maxQi),
           `**${qi} / ${maxQi}** *(${qiPct}%)*`,
@@ -80,7 +80,7 @@ function buildRow(canRefill) {
     new ButtonBuilder()
       .setCustomId("dantian_refill")
       .setLabel("Refill Qi")
-      .setEmoji("⚡")
+      .setEmoji("<:Qi:1495523502961459200>")
       .setStyle(ButtonStyle.Primary)
       .setDisabled(!canRefill),
   );

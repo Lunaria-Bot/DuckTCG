@@ -99,6 +99,64 @@ function startBannerExpirationChecker() {
   setInterval(check, 5 * 60_000);
 }
 
+
+// Mana notification checker — runs every 5 minutes
+function startManaNotificationChecker() {
+  const { qiMax, dantianMax, regenQi, regenDantian } = require("./services/mana");
+  const User = require("./models/User");
+
+  const notified = new Set(); // "userId_qi" / "userId_dantian" to avoid spam
+
+  setInterval(async () => {
+    try {
+      const users = await User.find({
+        $or: [
+          { "notifications.qiFull": true },
+          { "notifications.dantianFull": true },
+        ],
+      });
+
+      for (const user of users) {
+        try {
+          const currentQi      = regenQi(user);
+          const maxQi          = qiMax(user.accountLevel);
+          const currentDantian = regenDantian(user);
+          const maxDantian     = dantianMax(user.accountLevel);
+
+          const qiKey      = `${user.userId}_qi`;
+          const dantianKey = `${user.userId}_dantian`;
+
+          // Qi full notification
+          if (user.notifications?.qiFull && currentQi >= maxQi && !notified.has(qiKey)) {
+            notified.add(qiKey);
+            try {
+              const discordUser = await client.users.fetch(user.userId);
+              await discordUser.send(`<:Qi:1495523502961459200> **Your Qi is full!** (${maxQi}/${maxQi})
+You can now use \`/roll\` to roll cards.`);
+            } catch {}
+          } else if (currentQi < maxQi) {
+            notified.delete(qiKey);
+          }
+
+          // Dantian full notification
+          if (user.notifications?.dantianFull && currentDantian >= maxDantian && !notified.has(dantianKey)) {
+            notified.add(dantianKey);
+            try {
+              const discordUser = await client.users.fetch(user.userId);
+              await discordUser.send(`🌀 **Your Dantian is full!** (${maxDantian}/${maxDantian})
+Use \`/refill\` to transfer energy to your Qi.`);
+            } catch {}
+          } else if (currentDantian < maxDantian) {
+            notified.delete(dantianKey);
+          }
+        } catch {}
+      }
+    } catch (err) {
+      logger.error("Mana notification error:", err);
+    }
+  }, 5 * 60_000); // every 5 minutes
+}
+
 // Start
 (async () => {
   await connectMongo();
@@ -107,6 +165,7 @@ function startBannerExpirationChecker() {
   await client.login(process.env.DISCORD_TOKEN);
   startMessageScheduler();
   startBannerExpirationChecker();
+  startManaNotificationChecker();
 })();
 
 module.exports = client;

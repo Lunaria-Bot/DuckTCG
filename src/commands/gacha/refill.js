@@ -24,7 +24,7 @@ module.exports = {
 
     if (currentQi >= maxQi) {
       return interaction.editReply({
-        content: `⚡ Your Qi is already full! (**${currentQi}** / ${maxQi})`,
+        content: `<:Qi:1495523502961459200> Your Qi is already full! (**${currentQi}** / ${maxQi})`,
       });
     }
 
@@ -49,11 +49,11 @@ module.exports = {
     });
 
     const embed = new EmbedBuilder()
-      .setTitle("⚡ Qi Refilled")
+      .setTitle("<:Qi:1495523502961459200> Qi Refilled")
       .setDescription(`Transferred **${transfer}** energy from your Dantian into your Qi.`)
       .setColor(0x5B21B6)
       .addFields(
-        { name: "⚡ Qi",      value: `**${newQi}** / ${maxQi}`,                        inline: true },
+        { name: "<:Qi:1495523502961459200> Qi",      value: `**${newQi}** / ${maxQi}`,                        inline: true },
         { name: "🌀 Dantian", value: `**${Math.floor(newDantian)}** / ${maxDantian}`,   inline: true },
       )
       .setFooter({ text: "Use /roll to spend your Qi!" });

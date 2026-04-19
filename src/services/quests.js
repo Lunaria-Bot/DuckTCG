@@ -70,16 +70,36 @@ async function getOrCreateQuests(redis, userId, type) {
   return data;
 }
 
-async function incrementProgress(redis, userId, type, questType, amount = 1) {
+async function incrementProgress(redis, userId, type, questType, amount = 1, discordClient = null) {
   const key = `quests:${type}:${userId}`;
   const raw = await redis.get(key).catch(() => null);
   if (!raw) return;
 
   const data = JSON.parse(raw);
+  const justCompleted = [];
   for (const q of data.quests) {
     if (q.type === questType && !data.claimed[q.id]) {
-      data.progress[q.id] = Math.min((data.progress[q.id] || 0) + amount, q.target);
+      const before = data.progress[q.id] || 0;
+      data.progress[q.id] = Math.min(before + amount, q.target);
+      if (before < q.target && data.progress[q.id] >= q.target) {
+        justCompleted.push(q);
+      }
     }
+  }
+
+  // Send DM if quest just became claimable and user has notifications enabled
+  if (justCompleted.length && discordClient) {
+    try {
+      const User = require("../models/User");
+      const user = await User.findOne({ userId });
+      if (user?.notifications?.questDone) {
+        const discordUser = await discordClient.users.fetch(userId).catch(() => null);
+        if (discordUser) {
+          const names = justCompleted.map(q => `**${q.label}**`).join(", ");
+          await discordUser.send(`📋 **Quest${justCompleted.length > 1 ? "s" : ""} ready to claim!**\n${names}\nUse \`/quests\` to claim your reward.`).catch(() => {});
+        }
+      }
+    } catch {}
   }
 
   const resetTs = type === "daily" ? getDailyResetTs() : getWeeklyResetTs();

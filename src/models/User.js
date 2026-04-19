@@ -42,6 +42,13 @@ const UserSchema = new Schema({
   bio: { type: String, default: null, maxlength: 150 },
   guild: { type: String, default: null, maxlength: 50 },
   isPremium: { type: Boolean, default: false },
+
+  // ── Notification settings ─────────────────────────────────────────────────
+  notifications: {
+    qiFull:      { type: Boolean, default: false }, // DM when Qi is full
+    dantianFull: { type: Boolean, default: false }, // DM when Dantian is full
+    questDone:   { type: Boolean, default: false }, // DM when a quest is completable
+  },
   // ── Mana system ──────────────────────────────────────────────────────────
   mana: {
     // Inner Qi — used for rolling, cooldown after depleted
