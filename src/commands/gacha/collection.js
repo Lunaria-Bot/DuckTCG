@@ -143,23 +143,31 @@ module.exports = {
     const ownedSet = new Set(ownedPCs.map(pc => pc.cardId));
     const totalOwned = allCards.filter(c => ownedSet.has(c.cardId)).length;
     const totalCards = allCards.length;
-    const totalPages = Math.ceil(totalCards / PAGE_SIZE);
 
+    // Build pages: by anime = one page per anime, by rarity = PAGE_SIZE per page
+    let pages; // array of { cards, label }
+    if (sortMode === "anime") {
+      const animeMap = new Map();
+      for (const card of allCards) {
+        if (!animeMap.has(card.anime)) animeMap.set(card.anime, []);
+        animeMap.get(card.anime).push(card);
+      }
+      pages = [...animeMap.entries()].map(([anime, cards]) => ({ cards, label: anime }));
+    } else {
+      pages = [];
+      for (let i = 0; i < allCards.length; i += PAGE_SIZE) {
+        const slice = allCards.slice(i, i + PAGE_SIZE);
+        const rarities = [...new Set(slice.map(c => c.rarity))];
+        pages.push({ cards: slice, label: rarities.map(r => r.charAt(0).toUpperCase() + r.slice(1)).join(", ") });
+      }
+    }
+
+    const totalPages = pages.length;
     let page = 0;
 
     async function renderPage(pg) {
-      const slice = allCards.slice(pg * PAGE_SIZE, (pg + 1) * PAGE_SIZE);
+      const { cards: slice, label: groupLabel } = pages[pg];
       const ownedInSlice = slice.filter(c => ownedSet.has(c.cardId)).length;
-
-      // Group label for header
-      let groupLabel = "";
-      if (sortMode === "anime") {
-        const animes = [...new Set(slice.map(c => c.anime))];
-        groupLabel = animes.join(", ");
-      } else {
-        const rarities = [...new Set(slice.map(c => c.rarity))];
-        groupLabel = rarities.map(r => r.charAt(0).toUpperCase() + r.slice(1)).join(", ");
-      }
 
       const filterLabel = [
         animeFilter ? `anime: ${animeFilter}` : null,
