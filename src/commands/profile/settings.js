@@ -16,7 +16,7 @@ const SETTINGS = [
     key:   "notifications.dantianFull",
     label: "Dantian Full Notification",
     desc:  "Receive a DM when your Dantian is fully recharged",
-    emoji: "🌀",
+    emoji: "<:Dantian:1495528597610303608>",
   },
   {
     key:   "notifications.questDone",

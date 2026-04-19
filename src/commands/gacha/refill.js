@@ -30,7 +30,7 @@ module.exports = {
 
     if (currentDantian < 1) {
       return interaction.editReply({
-        content: `🌀 Your Dantian is empty! It regenerates passively over 8 hours.`,
+        content: `<:Dantian:1495528597610303608> Your Dantian is empty! It regenerates passively over 8 hours.`,
       });
     }
 
@@ -54,7 +54,7 @@ module.exports = {
       .setColor(0x5B21B6)
       .addFields(
         { name: "<:Qi:1495523502961459200> Qi",      value: `**${newQi}** / ${maxQi}`,                        inline: true },
-        { name: "🌀 Dantian", value: `**${Math.floor(newDantian)}** / ${maxDantian}`,   inline: true },
+        { name: "<:Dantian:1495528597610303608> Dantian", value: `**${Math.floor(newDantian)}** / ${maxDantian}`,   inline: true },
       )
       .setFooter({ text: "Use /roll to spend your Qi!" });
 

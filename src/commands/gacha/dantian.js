@@ -64,7 +64,7 @@ function buildEmbed(user, qi, dantian) {
         ].join("\n"),
       },
       {
-        name: "🌀 Dantian",
+        name: "<:Dantian:1495528597610303608> Dantian",
         value: [
           buildBar(dantian, maxDantian),
           `**${Math.floor(dantian)} / ${maxDantian}** *(${dantianPct}%)*`,

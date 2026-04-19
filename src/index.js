@@ -143,7 +143,7 @@ You can now use \`/roll\` to roll cards.`);
             notified.add(dantianKey);
             try {
               const discordUser = await client.users.fetch(user.userId);
-              await discordUser.send(`🌀 **Your Dantian is full!** (${maxDantian}/${maxDantian})
+              await discordUser.send(`<:Dantian:1495528597610303608> **Your Dantian is full!** (${maxDantian}/${maxDantian})
 Use \`/refill\` to transfer energy to your Qi.`);
             } catch {}
           } else if (currentDantian < maxDantian) {
