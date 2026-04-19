@@ -13,6 +13,7 @@ const PlayerCard      = require("../models/PlayerCard");
 const AuditLog        = require("../models/AuditLog");
 const ScheduledEvent  = require("../models/ScheduledEvent");
 const ScheduledMessage = require("../models/ScheduledMessage");
+const Series           = require("../models/Series");
 const logger          = require("../utils/logger");
 
 const app    = express();
@@ -80,6 +81,7 @@ function renderPage(title, content, user = null, activePage = "") {
     { href: "/",         icon: "⬡",  label: "Dashboard",  always: true },
     { href: "/banners",  icon: "◈",  label: "Banners",    show: isEditor },
     { href: "/cards",    icon: "⬭",  label: "Cards",      show: isEditor },
+    { href: "/series",   icon: "◇",  label: "Series",     show: isEditor },
     { href: "/raids",    icon: "⚔",  label: "Raids",      show: isAdmin },
     { href: "/players",  icon: "◉",  label: "Players",    show: isAdmin },
     { href: "/media",    icon: "▨",  label: "Media",      show: isEditor },
@@ -900,7 +902,7 @@ app.get("/banners/:id/pool", auth, editorOrAdmin, async (req, res) => {
           return `<tr>
             <td>${c.imageUrl?`<img src="${c.imageUrl}" class="img-thumb"/>`:"—"}</td>
             <td><strong>${c.name}</strong></td>
-            <td class="text-muted">${c.anime}</td>
+            <td class="text-muted">${c.anime}${c.seriesId ? `<div class="text-dim text-sm">${c.seriesId}</div>` : ""}</td>
             <td><span class="badge ${rarityBadge[c.rarity]}">${c.rarity}</span></td>
             <td class="text-sm">${c.role}</td>
             <td style="display:flex;gap:5px;flex-wrap:wrap">
@@ -991,6 +993,153 @@ app.get("/banners/:id/stats", auth, editorOrAdmin, async (req, res) => {
   `, req.user, "/banners"));
 });
 
+
+// ─── SERIES ───────────────────────────────────────────────────────────────────
+app.get("/series", auth, editorOrAdmin, async (req, res) => {
+  const seriesList = await Series.find().sort({ name: 1 });
+  const cardCounts = await Promise.all(seriesList.map(s => Card.countDocuments({ seriesId: s.seriesId })));
+  res.send(renderPage("Series", `
+    <div class="page-actions">
+      <a href="/series/new" class="btn">+ New Series</a>
+    </div>
+    <div class="card">
+      <div class="table-wrap"><table>
+        <thead><tr><th>Art</th><th>Series</th><th>Cards</th><th>Status</th><th>Actions</th></tr></thead>
+        <tbody>${seriesList.map((s, i) => `<tr>
+          <td>${s.imageUrl ? `<img src="${s.imageUrl}" class="img-thumb"/>` : "—"}</td>
+          <td>
+            <div style="font-weight:600">${s.name}</div>
+            <div class="mono-sm">${s.seriesId}</div>
+            ${s.description ? `<div class="text-sm text-muted" style="margin-top:2px">${s.description}</div>` : ""}
+          </td>
+          <td class="text-sm">${cardCounts[i]} cards</td>
+          <td><span class="${s.isActive ? "tag-available" : "tag-unavailable"}">${s.isActive ? "● Active" : "○ Inactive"}</span></td>
+          <td style="display:flex;gap:5px">
+            <a href="/series/${s.seriesId}/edit" class="btn btn-gray btn-sm">Edit</a>
+            <a href="/series/${s.seriesId}/cards" class="btn btn-ghost btn-sm">Cards</a>
+            <a href="/series/${s.seriesId}/toggle" class="btn ${s.isActive ? "btn-red" : "btn-green"} btn-sm">${s.isActive ? "Disable" : "Enable"}</a>
+          </td>
+        </tr>`).join("") || `<tr><td colspan="5" class="empty-state">No series yet</td></tr>`}
+        </tbody>
+      </table></div>
+    </div>
+  `, req.user, "/series"));
+});
+
+app.get("/series/new", auth, editorOrAdmin, (req, res) => {
+  res.send(renderPage("New Series", `
+    <a href="/series" class="back-link">← Back to Series</a>
+    <div class="form-box">
+      <form method="POST" action="/series/new" style="display:flex;flex-direction:column;gap:0">
+        <div class="form-row">
+          <div class="form-group"><label>Series ID</label><input name="seriesId" placeholder="one_piece" required/></div>
+          <div class="form-group"><label>Name</label><input name="name" placeholder="One Piece" required/></div>
+        </div>
+        <div class="form-group"><label>Description (optional)</label><input name="description" placeholder="Manga by Eiichiro Oda..."/></div>
+        <div class="form-group"><label>Cover Image URL (optional)</label><input name="imageUrl" placeholder="https://..."/></div>
+        <div class="form-group"><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" name="isActive" value="true" checked style="width:auto"/> Active</label></div>
+        <div class="form-actions"><button type="submit" class="btn">Create Series</button><a href="/series" class="btn btn-ghost">Cancel</a></div>
+      </form>
+    </div>
+  `, req.user, "/series"));
+});
+
+app.post("/series/new", auth, editorOrAdmin, async (req, res) => {
+  try {
+    const { seriesId, name, description, imageUrl, isActive } = req.body;
+    const series = await Series.create({ seriesId, name, description: description||"", imageUrl: imageUrl||null, isActive: isActive==="true" });
+    await audit(req.user, "create", "series", seriesId, `Created series "${name}"`, null, series.toObject());
+    res.redirect("/series");
+  } catch (err) { res.send(renderPage("Error", `<div class="alert alert-red">${err.message}</div><a href="/series/new" class="btn">Back</a>`, req.user, "/series")); }
+});
+
+app.get("/series/:id/edit", auth, editorOrAdmin, async (req, res) => {
+  const series = await Series.findOne({ seriesId: req.params.id });
+  if (!series) return res.redirect("/series");
+  res.send(renderPage(`Edit — ${series.name}`, `
+    <a href="/series" class="back-link">← Back to Series</a>
+    <div style="display:flex;gap:20px;align-items:flex-start">
+      ${series.imageUrl ? `<img src="${series.imageUrl}" style="width:120px;border-radius:var(--radius);object-fit:cover;flex-shrink:0"/>` : ""}
+      <div class="form-box" style="flex:1;margin-bottom:0">
+        <form method="POST" action="/series/${series.seriesId}/edit" style="display:flex;flex-direction:column;gap:0">
+          <div class="form-group"><label>Name</label><input name="name" value="${series.name}" required/></div>
+          <div class="form-group"><label>Description</label><input name="description" value="${series.description||""}"/></div>
+          <div class="form-group"><label>Cover Image URL</label><input name="imageUrl" value="${series.imageUrl||""}"/></div>
+          <div class="form-group"><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" name="isActive" value="true" ${series.isActive?"checked":""} style="width:auto"/> Active</label></div>
+          <div class="form-actions"><button type="submit" class="btn">Save</button><a href="/series" class="btn btn-ghost">Cancel</a></div>
+        </form>
+      </div>
+    </div>
+  `, req.user, "/series"));
+});
+
+app.post("/series/:id/edit", auth, editorOrAdmin, async (req, res) => {
+  const { name, description, imageUrl, isActive } = req.body;
+  const before = await Series.findOne({ seriesId: req.params.id });
+  const after = await Series.findOneAndUpdate({ seriesId: req.params.id }, { name, description: description||"", imageUrl: imageUrl||null, isActive: isActive==="true" }, { new: true });
+  await audit(req.user, "update", "series", req.params.id, `Updated series "${name}"`, before?.toObject(), after?.toObject());
+  res.redirect("/series");
+});
+
+app.get("/series/:id/toggle", auth, editorOrAdmin, async (req, res) => {
+  const series = await Series.findOne({ seriesId: req.params.id });
+  if (series) { await series.updateOne({ isActive: !series.isActive }); await audit(req.user, "update", "series", req.params.id, `${series.isActive?"Disabled":"Enabled"} series "${series.name}"`, null, null); }
+  res.redirect("/series");
+});
+
+app.get("/series/:id/cards", auth, editorOrAdmin, async (req, res) => {
+  const series = await Series.findOne({ seriesId: req.params.id });
+  if (!series) return res.redirect("/series");
+  const cards = await Card.find({ seriesId: series.seriesId }).sort({ rarity: 1, name: 1 });
+  const allCards = await Card.find({ seriesId: { $in: [null, ""] } }).sort({ anime: 1, name: 1 });
+  const rarityBadge = { common:"badge-gray",rare:"badge-blue",special:"badge-purple",exceptional:"badge-yellow" };
+  res.send(renderPage(`Cards — ${series.name}`, `
+    <a href="/series" class="back-link">← Back to Series</a>
+    <div class="two-col" style="align-items:flex-start">
+      <div class="card" style="margin-bottom:0">
+        <div class="card-header"><h2>Cards in this series <span class="badge badge-purple">${cards.length}</span></h2></div>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Art</th><th>Card</th><th>Rarity</th><th></th></tr></thead>
+          <tbody>${cards.map(c => `<tr>
+            <td>${c.imageUrl ? `<img src="${c.imageUrl}" class="img-thumb"/>` : "—"}</td>
+            <td><strong>${c.name}</strong><div class="text-dim text-sm">${c.anime}</div></td>
+            <td><span class="badge ${rarityBadge[c.rarity]}">${c.rarity}</span></td>
+            <td><a href="/series/${series.seriesId}/remove-card?cardId=${c.cardId}" class="btn btn-red btn-sm" onclick="return confirm('Remove from series?')">Remove</a></td>
+          </tr>`).join("") || `<tr><td colspan="4" class="empty-state">No cards in this series</td></tr>`}
+          </tbody>
+        </table></div>
+      </div>
+      <div class="card" style="margin-bottom:0">
+        <div class="card-header"><h2>Add Cards</h2></div>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Art</th><th>Card</th><th>Rarity</th><th></th></tr></thead>
+          <tbody>${allCards.map(c => `<tr>
+            <td>${c.imageUrl ? `<img src="${c.imageUrl}" class="img-thumb"/>` : "—"}</td>
+            <td><strong>${c.name}</strong><div class="text-dim text-sm">${c.anime}</div></td>
+            <td><span class="badge ${rarityBadge[c.rarity]}">${c.rarity}</span></td>
+            <td><a href="/series/${series.seriesId}/add-card?cardId=${c.cardId}" class="btn btn-green btn-sm">Add</a></td>
+          </tr>`).join("") || `<tr><td colspan="4" class="empty-state">All cards assigned</td></tr>`}
+          </tbody>
+        </table></div>
+      </div>
+    </div>
+  `, req.user, "/series"));
+});
+
+app.get("/series/:id/add-card", auth, editorOrAdmin, async (req, res) => {
+  const { cardId } = req.query;
+  await Card.findOneAndUpdate({ cardId }, { seriesId: req.params.id });
+  await audit(req.user, "update", "series", req.params.id, `Added card "${cardId}" to series`, null, null);
+  res.redirect(`/series/${req.params.id}/cards`);
+});
+
+app.get("/series/:id/remove-card", auth, editorOrAdmin, async (req, res) => {
+  const { cardId } = req.query;
+  await Card.findOneAndUpdate({ cardId }, { seriesId: null });
+  await audit(req.user, "update", "series", req.params.id, `Removed card "${cardId}" from series`, null, null);
+  res.redirect(`/series/${req.params.id}/cards`);
+});
+
 // ─── CARDS ────────────────────────────────────────────────────────────────────
 app.get("/cards", auth, editorOrAdmin, async (req, res) => {
   const search = (req.query.q||"").trim();
@@ -1020,7 +1169,7 @@ app.get("/cards", auth, editorOrAdmin, async (req, res) => {
         <tbody>${cards.map(c=>`<tr>
           <td>${c.imageUrl?`<img src="${c.imageUrl}" class="img-thumb"/>`:"—"}</td>
           <td><div style="font-weight:600">${c.name}</div><div class="mono-sm">${c.cardId}</div></td>
-          <td class="text-muted">${c.anime}</td>
+          <td class="text-muted">${c.anime}${c.seriesId ? `<div class="text-dim text-sm">${c.seriesId}</div>` : ""}</td>
           <td><span class="badge ${rarityBadge[c.rarity]}">${c.rarity}</span></td>
           <td><span class="badge ${roleBadge[c.role]||"badge-gray"}">${c.role}</span></td>
           <td><span class="${c.isAvailable?"tag-available":"tag-unavailable"}">${c.isAvailable?"● Available":"○ Unavailable"}</span></td>
@@ -1037,6 +1186,8 @@ app.get("/cards", auth, editorOrAdmin, async (req, res) => {
 
 app.get("/cards/new", auth, editorOrAdmin, async (req, res) => {
   const banners = await Banner.find().sort({ type: 1, name: 1 });
+  const seriesList = await Series.find({ isActive: true }).sort({ name: 1 });
+  const seriesOptions = seriesList.map(s => `<option value="${s.seriesId}">${s.name}</option>`).join("");
   const bannerOptions = banners.map(b=>`<option value="${b.bannerId}">[${b.type==="pickup"?"Pick Up":"Regular"}] ${b.name}${b.isActive?"":" (inactive)"}</option>`).join("");
   res.send(renderPage("New Card", `
     <a href="/cards" class="back-link">← Back to Cards</a>
@@ -1046,6 +1197,7 @@ app.get("/cards/new", auth, editorOrAdmin, async (req, res) => {
         <div class="form-row"><div class="form-group"><label>Anime</label><input name="anime" placeholder="Naruto" required/></div><div class="form-group"><label>Image URL</label><input name="imageUrl" placeholder="https://..."/></div></div>
         <div class="form-row"><div class="form-group"><label>Rarity</label><select name="rarity"><option value="common">Common</option><option value="rare">Rare</option><option value="special">Special</option><option value="exceptional">Exceptional</option></select></div><div class="form-group"><label>Role</label><select name="role"><option value="dps">DPS</option><option value="support">Support</option><option value="tank">Tank</option></select></div></div>
         <div class="form-group"><label>Add to Banner (optional)</label><select name="addToBanner"><option value="">— Don't add —</option>${bannerOptions}</select></div>
+        <div class="form-group"><label>Series (optional)</label><select name="seriesId"><option value="">— No series —</option>${seriesOptions}</select></div>
         <div class="form-row3"><div class="form-group"><label>Base Damage</label><input type="number" name="baseDamage" value="100"/></div><div class="form-group"><label>Base Mana</label><input type="number" name="baseMana" value="100"/></div><div class="form-group"><label>Base HP</label><input type="number" name="baseHp" value="100"/></div></div>
         <div class="form-group"><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" name="isAvailable" value="true" checked style="width:auto"/> Available for rolls</label></div>
         <div class="form-actions"><button type="submit" class="btn">Create Card</button><a href="/cards" class="btn btn-ghost">Cancel</a></div>
@@ -1056,10 +1208,10 @@ app.get("/cards/new", auth, editorOrAdmin, async (req, res) => {
 
 app.post("/cards/new", auth, editorOrAdmin, async (req, res) => {
   try {
-    const { cardId, name, anime, imageUrl, rarity, role, addToBanner, baseDamage, baseMana, baseHp, isAvailable } = req.body;
+    const { cardId, name, anime, imageUrl, rarity, role, addToBanner, seriesId, baseDamage, baseMana, baseHp, isAvailable } = req.body;
     let bannerType = "regular";
     if (addToBanner) { const b = await Banner.findOne({ bannerId: addToBanner }); if (b) bannerType = b.type; }
-    const card = await Card.create({ cardId, name, anime, imageUrl: imageUrl||null, rarity, role, bannerType, isAvailable: isAvailable==="true", baseStats: { damage:parseInt(baseDamage), mana:parseInt(baseMana), hp:parseInt(baseHp) } });
+    const card = await Card.create({ cardId, name, anime, imageUrl: imageUrl||null, rarity, role, bannerType, seriesId: seriesId||null, isAvailable: isAvailable==="true", baseStats: { damage:parseInt(baseDamage), mana:parseInt(baseMana), hp:parseInt(baseHp) } });
     if (addToBanner) await Banner.findOneAndUpdate({ bannerId: addToBanner }, { $addToSet: { [`pool.${rarity}`]: cardId } });
     await audit(req.user, "create", "card", cardId, `Created card "${name}" (${rarity} ${role})`, null, card.toObject());
     res.redirect("/cards");
@@ -1069,6 +1221,8 @@ app.post("/cards/new", auth, editorOrAdmin, async (req, res) => {
 app.get("/cards/:id/edit", auth, editorOrAdmin, async (req, res) => {
   const card = await Card.findOne({ cardId: req.params.id });
   if (!card) return res.redirect("/cards");
+  const seriesListEdit = await Series.find({ isActive: true }).sort({ name: 1 });
+  const seriesOpts = `<option value="">— No series —</option>${seriesListEdit.map(s => `<option value="${s.seriesId}"${card.seriesId===s.seriesId?" selected":""}>${s.name}</option>`).join("")}`;
   res.send(renderPage(`Edit — ${card.name}`, `
     <a href="/cards" class="back-link">← Back to Cards</a>
     <div style="display:flex;gap:20px;align-items:flex-start">
@@ -1078,6 +1232,7 @@ app.get("/cards/:id/edit", auth, editorOrAdmin, async (req, res) => {
           <div class="form-row"><div class="form-group"><label>Name</label><input name="name" value="${card.name}" required/></div><div class="form-group"><label>Anime</label><input name="anime" value="${card.anime}" required/></div></div>
           <div class="form-group"><label>Image URL</label><input name="imageUrl" value="${card.imageUrl||""}"/></div>
           <div class="form-row"><div class="form-group"><label>Rarity</label><select name="rarity">${["common","rare","special","exceptional"].map(r=>`<option value="${r}"${card.rarity===r?" selected":""}>${r}</option>`).join("")}</select></div><div class="form-group"><label>Role</label><select name="role">${["dps","support","tank"].map(r=>`<option value="${r}"${card.role===r?" selected":""}>${r}</option>`).join("")}</select></div></div>
+          <div class="form-group"><label>Series</label><select name="seriesId">${seriesOpts}</select></div>
           <div class="form-row3"><div class="form-group"><label>Base Damage</label><input type="number" name="baseDamage" value="${card.baseStats?.damage??100}"/></div><div class="form-group"><label>Base Mana</label><input type="number" name="baseMana" value="${card.baseStats?.mana??100}"/></div><div class="form-group"><label>Base HP</label><input type="number" name="baseHp" value="${card.baseStats?.hp??100}"/></div></div>
           <div class="form-group"><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" name="isAvailable" value="true" ${card.isAvailable?"checked":""} style="width:auto"/> Available for rolls</label></div>
           <div class="form-actions"><button type="submit" class="btn">Save</button><a href="/cards" class="btn btn-ghost">Cancel</a></div>
@@ -1088,9 +1243,9 @@ app.get("/cards/:id/edit", auth, editorOrAdmin, async (req, res) => {
 });
 
 app.post("/cards/:id/edit", auth, editorOrAdmin, async (req, res) => {
-  const { name, anime, imageUrl, rarity, role, baseDamage, baseMana, baseHp, isAvailable } = req.body;
+  const { name, anime, imageUrl, rarity, role, seriesId, baseDamage, baseMana, baseHp, isAvailable } = req.body;
   const before = await Card.findOne({ cardId: req.params.id });
-  const after = await Card.findOneAndUpdate({ cardId: req.params.id }, { name, anime, imageUrl: imageUrl||null, rarity, role, isAvailable: isAvailable==="true", baseStats: { damage:parseInt(baseDamage), mana:parseInt(baseMana), hp:parseInt(baseHp) } }, { new: true });
+  const after = await Card.findOneAndUpdate({ cardId: req.params.id }, { name, anime, imageUrl: imageUrl||null, rarity, role, seriesId: seriesId||null, isAvailable: isAvailable==="true", baseStats: { damage:parseInt(baseDamage), mana:parseInt(baseMana), hp:parseInt(baseHp) } }, { new: true });
   await audit(req.user, "update", "card", req.params.id, `Updated card "${name}"`, before?.toObject(), after?.toObject());
   res.redirect("/cards");
 });
