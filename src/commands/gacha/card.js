@@ -4,8 +4,8 @@ const {
   StringSelectMenuBuilder, StringSelectMenuOptionBuilder,
   ComponentType,
 } = require("discord.js");
-const Card = require("../../models/Card");
-const PlayerCard = require("../../models/PlayerCard");
+const Card   = require("../../models/Card");
+const Series = require("../../models/Series");
 
 const RARITY_ORDER = { exceptional: 0, special: 1, rare: 2, common: 3 };
 const RARITY_EMOJI = { exceptional: "🌟", special: "🟪", rare: "🟦", common: "⬜" };
@@ -15,9 +15,8 @@ const ROLE_EMOJI   = { dps: "⚔️", support: "💚", tank: "🛡️" };
 
 const PAGE_SIZE = 10;
 
-function buildListEmbed(cards, page, totalPages, filterRarity, filterRole, filterAnime) {
+function buildListEmbed(cards, page, totalPages, filters) {
   const slice = cards.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
-
   const lines = slice.map((c, i) => {
     const num = page * PAGE_SIZE + i + 1;
     const rar = RARITY_EMOJI[c.rarity] ?? "⬜";
@@ -25,11 +24,7 @@ function buildListEmbed(cards, page, totalPages, filterRarity, filterRole, filte
     return `\`${String(num).padStart(3," ")}.\` ${rar}${rol} **${c.name}** — *${c.anime}*`;
   });
 
-  const filters = [
-    filterRarity ? `Rarity: ${filterRarity}` : null,
-    filterRole   ? `Role: ${filterRole}`     : null,
-    filterAnime  ? `Anime: ${filterAnime}`   : null,
-  ].filter(Boolean);
+  const activeFilters = Object.entries(filters).filter(([,v]) => v).map(([k,v]) => `${k}: ${v}`);
 
   return new EmbedBuilder()
     .setTitle("🃏 Card List")
@@ -40,21 +35,21 @@ function buildListEmbed(cards, page, totalPages, filterRarity, filterRole, filte
     .setColor(0x5B21B6)
     .setFooter({ text: [
       `Page ${page + 1} / ${totalPages} · ${cards.length} card${cards.length !== 1 ? "s" : ""}`,
-      filters.length ? `Filter: ${filters.join(", ")}` : null,
+      activeFilters.length ? `Filter: ${activeFilters.join(", ")}` : null,
     ].filter(Boolean).join(" · ") });
 }
 
-function buildCardEmbed(card) {
+function buildCardEmbed(card, seriesName) {
   const embed = new EmbedBuilder()
     .setTitle(`${RARITY_EMOJI[card.rarity] ?? "⬜"} ${card.name}`)
-    .setDescription(`*${card.anime}*`)
+    .setDescription(seriesName ? `*${card.anime}* · 📚 ${seriesName}` : `*${card.anime}*`)
     .setColor(RARITY_COLOR[card.rarity] ?? 0x5B21B6)
     .addFields(
-      { name: "Rarity",       value: RARITY_LABEL[card.rarity] ?? card.rarity,            inline: true },
-      { name: "Role",         value: `${ROLE_EMOJI[card.role] ?? ""} ${card.role.toUpperCase()}`, inline: true },
-      { name: "Base Damage",  value: `**${card.baseStats?.damage ?? 0}**`,                inline: true },
-      { name: "Base Mana",    value: `**${card.baseStats?.mana ?? 0}**`,                  inline: true },
-      { name: "Base HP",      value: `**${card.baseStats?.hp ?? 0}**`,                   inline: true },
+      { name: "Rarity",      value: RARITY_LABEL[card.rarity] ?? card.rarity,              inline: true },
+      { name: "Role",        value: `${ROLE_EMOJI[card.role] ?? ""} ${card.role.toUpperCase()}`, inline: true },
+      { name: "Base Damage", value: `**${card.baseStats?.damage ?? 0}**`,                  inline: true },
+      { name: "Base Mana",   value: `**${card.baseStats?.mana ?? 0}**`,                    inline: true },
+      { name: "Base HP",     value: `**${card.baseStats?.hp ?? 0}**`,                      inline: true },
     );
   if (card.imageUrl) embed.setImage(card.imageUrl);
   return embed;
@@ -69,25 +64,30 @@ function buildNavRow(page, totalPages) {
   );
 }
 
-function buildFilterRow(filterRarity, filterRole, filterAnime) {
+function buildFilterRow(f) {
+  const anyActive = f.rarity || f.role || f.anime || f.series;
   return new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId("card_open_rarity")
-      .setLabel(filterRarity ? `${RARITY_EMOJI[filterRarity]} ${filterRarity}` : "Rarity")
-      .setStyle(filterRarity ? ButtonStyle.Primary : ButtonStyle.Secondary),
+      .setLabel(f.rarity ? `${RARITY_EMOJI[f.rarity]} ${f.rarity}` : "Rarity")
+      .setStyle(f.rarity ? ButtonStyle.Primary : ButtonStyle.Secondary),
     new ButtonBuilder()
       .setCustomId("card_open_role")
-      .setLabel(filterRole ? `${ROLE_EMOJI[filterRole] ?? ""} ${filterRole}` : "Role")
-      .setStyle(filterRole ? ButtonStyle.Primary : ButtonStyle.Secondary),
+      .setLabel(f.role ? `${ROLE_EMOJI[f.role] ?? ""} ${f.role}` : "Role")
+      .setStyle(f.role ? ButtonStyle.Primary : ButtonStyle.Secondary),
+    new ButtonBuilder()
+      .setCustomId("card_open_series")
+      .setLabel(f.seriesName ? f.seriesName.slice(0, 20) : "Series")
+      .setStyle(f.series ? ButtonStyle.Primary : ButtonStyle.Secondary),
     new ButtonBuilder()
       .setCustomId("card_open_anime")
-      .setLabel(filterAnime ? filterAnime.slice(0, 20) : "Anime")
-      .setStyle(filterAnime ? ButtonStyle.Primary : ButtonStyle.Secondary),
+      .setLabel(f.anime ? f.anime.slice(0, 20) : "Anime")
+      .setStyle(f.anime ? ButtonStyle.Primary : ButtonStyle.Secondary),
     new ButtonBuilder()
       .setCustomId("card_reset")
       .setLabel("✕ Reset")
       .setStyle(ButtonStyle.Danger)
-      .setDisabled(!filterRarity && !filterRole && !filterAnime),
+      .setDisabled(!anyActive),
   );
 }
 
@@ -95,13 +95,13 @@ function buildRarityDropdown() {
   return new ActionRowBuilder().addComponents(
     new StringSelectMenuBuilder()
       .setCustomId("card_filter_rarity")
-      .setPlaceholder("Select rarity of cards")
+      .setPlaceholder("Select rarity")
       .addOptions([
-        new StringSelectMenuOptionBuilder().setLabel("All rarities").setDescription("Show all cards").setValue("all").setEmoji("✨"),
-        new StringSelectMenuOptionBuilder().setLabel("Exceptional").setDescription("Shows only Exceptional cards").setValue("exceptional").setEmoji("🌟"),
-        new StringSelectMenuOptionBuilder().setLabel("Special").setDescription("Shows only Special cards").setValue("special").setEmoji("🟪"),
-        new StringSelectMenuOptionBuilder().setLabel("Rare").setDescription("Shows only Rare cards").setValue("rare").setEmoji("🟦"),
-        new StringSelectMenuOptionBuilder().setLabel("Common").setDescription("Shows only Common cards").setValue("common").setEmoji("⬜"),
+        new StringSelectMenuOptionBuilder().setLabel("All rarities").setValue("all").setEmoji("✨"),
+        new StringSelectMenuOptionBuilder().setLabel("Exceptional").setValue("exceptional").setEmoji("🌟"),
+        new StringSelectMenuOptionBuilder().setLabel("Special").setValue("special").setEmoji("🟪"),
+        new StringSelectMenuOptionBuilder().setLabel("Rare").setValue("rare").setEmoji("🟦"),
+        new StringSelectMenuOptionBuilder().setLabel("Common").setValue("common").setEmoji("⬜"),
       ])
   );
 }
@@ -110,41 +110,54 @@ function buildRoleDropdown() {
   return new ActionRowBuilder().addComponents(
     new StringSelectMenuBuilder()
       .setCustomId("card_filter_role")
-      .setPlaceholder("Select type of cards")
+      .setPlaceholder("Select role")
       .addOptions([
-        new StringSelectMenuOptionBuilder().setLabel("All roles").setDescription("Show all types").setValue("all"),
-        new StringSelectMenuOptionBuilder().setLabel("DPS").setDescription("Shows only Attack type cards").setValue("dps").setEmoji("⚔️"),
-        new StringSelectMenuOptionBuilder().setLabel("Support").setDescription("Shows only Support type cards").setValue("support").setEmoji("💚"),
-        new StringSelectMenuOptionBuilder().setLabel("Tank").setDescription("Shows only Tank type cards").setValue("tank").setEmoji("🛡️"),
+        new StringSelectMenuOptionBuilder().setLabel("All roles").setValue("all"),
+        new StringSelectMenuOptionBuilder().setLabel("DPS").setValue("dps").setEmoji("⚔️"),
+        new StringSelectMenuOptionBuilder().setLabel("Support").setValue("support").setEmoji("💚"),
+        new StringSelectMenuOptionBuilder().setLabel("Tank").setValue("tank").setEmoji("🛡️"),
       ])
   );
 }
 
+function buildSeriesDropdown(seriesList) {
+  const options = [
+    new StringSelectMenuOptionBuilder().setLabel("All series").setDescription("Show all cards").setValue("all").setEmoji("✨"),
+    new StringSelectMenuOptionBuilder().setLabel("No series").setDescription("Cards without a series").setValue("none"),
+  ];
+  for (const s of seriesList.slice(0, 23)) {
+    options.push(new StringSelectMenuOptionBuilder()
+      .setLabel(s.name.slice(0, 100))
+      .setDescription(`Filter by ${s.name}`)
+      .setValue(`series_${s.seriesId}`)
+    );
+  }
+  return new ActionRowBuilder().addComponents(
+    new StringSelectMenuBuilder()
+      .setCustomId("card_filter_series")
+      .setPlaceholder("Filter by series")
+      .addOptions(options)
+  );
+}
+
 function buildAnimeDropdown(animes, page = 0) {
-  const PAGE = 24; // leave 1 slot for "Next"
+  const PAGE = 23;
   const slice = animes.slice(page * PAGE, (page + 1) * PAGE);
   const hasMore = animes.length > (page + 1) * PAGE;
-
   const options = [];
-  if (page > 0) {
-    options.push(new StringSelectMenuOptionBuilder().setLabel("← Previous").setDescription("Go back").setValue(`anime_prev_${page}`).setEmoji("⬅️"));
-  }
-  if (hasMore) {
-    options.push(new StringSelectMenuOptionBuilder().setLabel("Next →").setDescription("Check more options").setValue(`anime_next_${page}`).setEmoji("➡️"));
-  }
-  options.push(new StringSelectMenuOptionBuilder().setLabel("All anime").setDescription("Show all anime").setValue("all").setEmoji("✨"));
+  if (page > 0) options.push(new StringSelectMenuOptionBuilder().setLabel("← Previous").setValue(`anime_prev_${page}`).setEmoji("⬅️"));
+  if (hasMore) options.push(new StringSelectMenuOptionBuilder().setLabel("Next →").setValue(`anime_next_${page}`).setEmoji("➡️"));
+  options.push(new StringSelectMenuOptionBuilder().setLabel("All anime").setValue("all").setEmoji("✨"));
   for (const anime of slice) {
     options.push(new StringSelectMenuOptionBuilder()
       .setLabel(anime.slice(0, 100))
-      .setDescription(`Show cards only from ${anime}`)
       .setValue(`anime_${anime}`)
     );
   }
-
   return new ActionRowBuilder().addComponents(
     new StringSelectMenuBuilder()
       .setCustomId("card_filter_anime")
-      .setPlaceholder("Filter collection by")
+      .setPlaceholder("Filter by anime")
       .addOptions(options.slice(0, 25))
   );
 }
@@ -157,20 +170,26 @@ module.exports = {
   async execute(interaction) {
     await interaction.deferReply();
 
-    const allCards = await Card.find({ isAvailable: true }).sort({ anime: 1, rarity: 1, name: 1 });
+    const [allCards, seriesList] = await Promise.all([
+      Card.find({ isAvailable: true }).sort({ anime: 1, rarity: 1, name: 1 }),
+      Series.find({ isActive: true }).sort({ name: 1 }),
+    ]);
     if (!allCards.length) return interaction.editReply({ content: "No cards available yet." });
 
+    // Map seriesId → name for quick lookup
+    const seriesMap = new Map(seriesList.map(s => [s.seriesId, s.name]));
     const uniqueAnimes = [...new Set(allCards.map(c => c.anime))].sort();
 
-    // State
     const state = {
       page: 0,
       filterRarity: "",
       filterRole: "",
       filterAnime: "",
+      filterSeries: "",     // seriesId or "none"
+      filterSeriesName: "", // display name
       animePage: 0,
-      openDropdown: null, // "rarity" | "role" | "anime" | null
-      detailCard: null,   // cardId for detail view
+      openDropdown: null,
+      detailCard: null,
     };
 
     function getFiltered() {
@@ -178,6 +197,8 @@ module.exports = {
         if (state.filterRarity && c.rarity !== state.filterRarity) return false;
         if (state.filterRole   && c.role   !== state.filterRole)   return false;
         if (state.filterAnime  && c.anime  !== state.filterAnime)  return false;
+        if (state.filterSeries === "none" && c.seriesId) return false;
+        if (state.filterSeries && state.filterSeries !== "none" && c.seriesId !== state.filterSeries) return false;
         return true;
       });
     }
@@ -187,25 +208,33 @@ module.exports = {
       const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
       state.page = Math.min(state.page, totalPages - 1);
 
-      // Detail view
       if (state.detailCard) {
         const card = allCards.find(c => c.cardId === state.detailCard);
         if (card) {
-          const embed = buildCardEmbed(card);
+          const seriesName = card.seriesId ? seriesMap.get(card.seriesId) : null;
           const backRow = new ActionRowBuilder().addComponents(
             new ButtonBuilder().setCustomId("card_back_list").setLabel("← Back to List").setStyle(ButtonStyle.Secondary),
           );
-          return { embeds: [embed], components: [backRow] };
+          return { embeds: [buildCardEmbed(card, seriesName)], components: [backRow] };
         }
       }
 
-      const components = [buildNavRow(state.page, totalPages), buildFilterRow(state.filterRarity, state.filterRole, state.filterAnime)];
+      const filters = {
+        ...(state.filterRarity ? { Rarity: state.filterRarity } : {}),
+        ...(state.filterRole   ? { Role: state.filterRole }     : {}),
+        ...(state.filterSeries ? { Series: state.filterSeriesName || state.filterSeries } : {}),
+        ...(state.filterAnime  ? { Anime: state.filterAnime }   : {}),
+      };
+
+      const filterRow = buildFilterRow({ rarity: state.filterRarity, role: state.filterRole, anime: state.filterAnime, series: state.filterSeries, seriesName: state.filterSeriesName });
+      const components = [buildNavRow(state.page, totalPages), filterRow];
       if (state.openDropdown === "rarity") components.push(buildRarityDropdown());
       if (state.openDropdown === "role")   components.push(buildRoleDropdown());
+      if (state.openDropdown === "series") components.push(buildSeriesDropdown(seriesList));
       if (state.openDropdown === "anime")  components.push(buildAnimeDropdown(uniqueAnimes, state.animePage));
 
       return {
-        embeds: [buildListEmbed(filtered, state.page, totalPages, state.filterRarity, state.filterRole, state.filterAnime)],
+        embeds: [buildListEmbed(filtered, state.page, totalPages, filters)],
         components,
       };
     }
@@ -221,28 +250,34 @@ module.exports = {
       await i.deferUpdate();
       const id = i.customId;
 
-      // Detail back
-      if (id === "card_back_list") { state.detailCard = null; }
-
-      // Navigation
-      else if (id === "card_first") state.page = 0;
-      else if (id === "card_prev")  state.page = Math.max(0, state.page - 1);
-      else if (id === "card_next")  { const t = Math.max(1, Math.ceil(getFiltered().length / PAGE_SIZE)); state.page = Math.min(t - 1, state.page + 1); }
-      else if (id === "card_last")  { const t = Math.max(1, Math.ceil(getFiltered().length / PAGE_SIZE)); state.page = t - 1; }
-
-      // Filter toggle buttons
+      if      (id === "card_back_list")   { state.detailCard = null; }
+      else if (id === "card_first")       { state.page = 0; }
+      else if (id === "card_prev")        { state.page = Math.max(0, state.page - 1); }
+      else if (id === "card_next")        { const t = Math.max(1, Math.ceil(getFiltered().length / PAGE_SIZE)); state.page = Math.min(t - 1, state.page + 1); }
+      else if (id === "card_last")        { const t = Math.max(1, Math.ceil(getFiltered().length / PAGE_SIZE)); state.page = t - 1; }
       else if (id === "card_open_rarity") { state.openDropdown = state.openDropdown === "rarity" ? null : "rarity"; }
       else if (id === "card_open_role")   { state.openDropdown = state.openDropdown === "role"   ? null : "role"; }
+      else if (id === "card_open_series") { state.openDropdown = state.openDropdown === "series" ? null : "series"; }
       else if (id === "card_open_anime")  { state.openDropdown = state.openDropdown === "anime"  ? null : "anime"; state.animePage = 0; }
-      else if (id === "card_reset")       { state.filterRarity = ""; state.filterRole = ""; state.filterAnime = ""; state.page = 0; state.openDropdown = null; }
+      else if (id === "card_reset")       { state.filterRarity = ""; state.filterRole = ""; state.filterAnime = ""; state.filterSeries = ""; state.filterSeriesName = ""; state.page = 0; state.openDropdown = null; }
 
-      // Dropdowns
       else if (id === "card_filter_rarity") {
         state.filterRarity = i.values[0] === "all" ? "" : i.values[0];
         state.page = 0; state.openDropdown = null;
       }
       else if (id === "card_filter_role") {
         state.filterRole = i.values[0] === "all" ? "" : i.values[0];
+        state.page = 0; state.openDropdown = null;
+      }
+      else if (id === "card_filter_series") {
+        const val = i.values[0];
+        if (val === "all") { state.filterSeries = ""; state.filterSeriesName = ""; }
+        else if (val === "none") { state.filterSeries = "none"; state.filterSeriesName = "No series"; }
+        else {
+          const sid = val.replace(/^series_/, "");
+          state.filterSeries = sid;
+          state.filterSeriesName = seriesMap.get(sid) ?? sid;
+        }
         state.page = 0; state.openDropdown = null;
       }
       else if (id === "card_filter_anime") {

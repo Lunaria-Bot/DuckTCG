@@ -5,6 +5,7 @@ const {
 } = require("discord.js");
 const { requireProfile }  = require("../../utils/requireProfile");
 const Card       = require("../../models/Card");
+const Series     = require("../../models/Series");
 const PlayerCard = require("../../models/PlayerCard");
 const { renderHTML } = require("../../services/renderer");
 
@@ -101,6 +102,7 @@ module.exports = {
         )
     )
     .addStringOption(opt => opt.setName("anime").setDescription("Filter by anime name (partial match)"))
+    .addStringOption(opt => opt.setName("series").setDescription("Filter by series ID (e.g. one_piece)"))
     .addStringOption(opt =>
       opt.setName("rarity")
         .setDescription("Filter by rarity")
@@ -118,14 +120,16 @@ module.exports = {
     const user = await requireProfile(interaction);
     if (!user) return;
 
-    const sortMode    = interaction.options.getString("sort")   ?? "anime";
-    const animeFilter = interaction.options.getString("anime");
+    const sortMode     = interaction.options.getString("sort")   ?? "anime";
+    const animeFilter  = interaction.options.getString("anime");
     const rarityFilter = interaction.options.getString("rarity");
+    const seriesFilter = interaction.options.getString("series");
 
     // Fetch all cards + owned cards
     const cardQuery = {};
-    if (animeFilter) cardQuery.anime = { $regex: animeFilter, $options: "i" };
-    if (rarityFilter) cardQuery.rarity = rarityFilter;
+    if (animeFilter)  cardQuery.anime    = { $regex: animeFilter, $options: "i" };
+    if (rarityFilter) cardQuery.rarity   = rarityFilter;
+    if (seriesFilter) cardQuery.seriesId = seriesFilter;
 
     const [allCards, ownedPCs] = await Promise.all([
       Card.find(cardQuery).sort(
@@ -170,8 +174,9 @@ module.exports = {
       const ownedInSlice = slice.filter(c => ownedSet.has(c.cardId)).length;
 
       const filterLabel = [
-        animeFilter ? `anime: ${animeFilter}` : null,
-        rarityFilter ? rarityFilter : null,
+        animeFilter  ? `anime: ${animeFilter}`   : null,
+        rarityFilter ? rarityFilter               : null,
+        seriesFilter ? `series: ${seriesFilter}`  : null,
       ].filter(Boolean).join(" · ") || "All Cards";
 
       const html = buildCollectionHTML(
@@ -201,7 +206,7 @@ module.exports = {
       .setDescription(`${bar}  **${totalOwned} / ${totalCards}** *(${pct}%)*`)
       .setColor(0x7C3AED)
       .setImage("attachment://collection.png")
-      .setFooter({ text: `Page ${page + 1} / ${totalPages} · Sort: ${sortMode}${animeFilter ? ` · ${animeFilter}` : ""}${rarityFilter ? ` · ${rarityFilter}` : ""}` });
+      .setFooter({ text: `Page ${page + 1} / ${totalPages} · Sort: ${sortMode}${animeFilter ? ` · ${animeFilter}` : ""}${rarityFilter ? ` · ${rarityFilter}` : ""}${seriesFilter ? ` · series:${seriesFilter}` : ""}` });
 
     function buildButtons(pg) {
       return new ActionRowBuilder().addComponents(
@@ -236,7 +241,7 @@ module.exports = {
       const newBuf = await renderPage(page);
       embed
         .setImage("attachment://collection.png")
-        .setFooter({ text: `Page ${page + 1} / ${totalPages} · Sort: ${sortMode}${animeFilter ? ` · ${animeFilter}` : ""}${rarityFilter ? ` · ${rarityFilter}` : ""}` });
+        .setFooter({ text: `Page ${page + 1} / ${totalPages} · Sort: ${sortMode}${animeFilter ? ` · ${animeFilter}` : ""}${rarityFilter ? ` · ${rarityFilter}` : ""}${seriesFilter ? ` · series:${seriesFilter}` : ""}` });
 
       await interaction.editReply({
         embeds: [embed],
