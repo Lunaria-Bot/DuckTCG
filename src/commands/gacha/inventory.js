@@ -82,19 +82,17 @@ function buildCardEmbed(pairs, index, username, totalCopiesMap) {
   const ownedCopies = pc.quantity ?? 1;
   const totalCopies = totalCopiesMap?.[card.cardId] ?? "?";
 
+  // In Discord embeds, fields always render ABOVE the image.
+  // To show owned/in-game below the image, we append them to the description.
+  const ownedLine = `\n\n**Owned:** ${ownedCopies} cop${ownedCopies > 1 ? "ies" : "y"}  ·  **In Game:** ${totalCopies} total`;
+
   const embed = new EmbedBuilder()
     .setTitle(`${RARITY_EMOJI[card.rarity] ?? "⬜"} ${RARITY_LABEL[card.rarity] ?? card.rarity} — ${card.name}`)
-    .setDescription(`${ROLE_EMOJI[card.role] ?? ""} **${card.role.toUpperCase()}**  ·  CP **${(pc.cachedStats?.combatPower ?? 0).toLocaleString()}**
-*${card.anime}*`)
+    .setDescription(`*${card.anime}*\n${ROLE_EMOJI[card.role] ?? ""} **${card.role.toUpperCase()}**  ·  CP **${(pc.cachedStats?.combatPower ?? 0).toLocaleString()}**${ownedLine}`)
     .setColor(RARITY_COLOR[card.rarity] ?? 0x5B21B6)
     .setFooter({ text: `${username}'s Inventory · ${index + 1} / ${pairs.length}` });
 
   if (card.imageUrl) embed.setImage(card.imageUrl);
-
-  embed.addFields(
-    { name: "Owned",   value: `**${ownedCopies}** cop${ownedCopies > 1 ? "ies" : "y"}`, inline: true },
-    { name: "In Game", value: `**${totalCopies}** total`, inline: true },
-  );
 
   return embed;
 }
