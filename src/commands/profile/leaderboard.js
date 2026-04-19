@@ -9,9 +9,9 @@ const User = require("../../models/User");
 const NYAN = "<:Nyan:1495048966528831508>";
 
 const CATEGORIES = {
-  cp:    { label: "Combat Power", emoji: "⚔️",  field: "combatPower",                  format: v => v.toLocaleString(),  unit: "CP"      },
-  gold:  { label: "Nyang",     emoji: "🪙",   field: "currency.gold",                format: v => v.toLocaleString(),  unit: "🪙"     },
-  level: { label: "Level",        emoji: "✦",   field: "accountLevel",                  format: v => `${v}`,              unit: "Lv."     },
+  cp:    { label: "Combat Power", emoji: "⚔",  field: "combatPower",                  format: v => v.toLocaleString(),  unit: "CP"      },
+  gold:  { label: "Nyang",     emoji: "💎",   field: "currency.gold",                format: v => v.toLocaleString(),  unit: "💎"     },
+  level: { label: "Level",        emoji: "⭐",   field: "accountLevel",                  format: v => `${v}`,              unit: "Lv."     },
   cards: { label: "Cards",        emoji: "📦",  field: "stats.totalCardsEverObtained",  format: v => v.toLocaleString(),  unit: "cards"   },
 };
 
