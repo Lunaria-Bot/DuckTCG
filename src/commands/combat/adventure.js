@@ -145,6 +145,9 @@ module.exports = {
 
       if (levelUps.length) {
         embed.addFields({ name: "Level Up!", value: levelUps.join("\n"), inline: false });
+        const _redisLvl = require("../../services/redis").getRedis();
+        await incrementProgress(_redisLvl, interaction.user.id, "daily",  "card_levelup", levelUps.length);
+        await incrementProgress(_redisLvl, interaction.user.id, "weekly", "card_levelup", levelUps.length);
       }
 
       return interaction.editReply({ embeds: [embed] });

@@ -7,6 +7,7 @@ const {
   EmbedBuilder,
 } = require("discord.js");
 const User = require("../../models/User");
+const { qiMax, dantianMax } = require("../../services/mana");
 
 const WELCOME_GOLD = 1000;
 const WELCOME_TICKETS = 10;
@@ -66,7 +67,7 @@ module.exports = {
     await User.create({
       userId: interaction.user.id,
       username,
-      mana: { qi: 10, dantian: 40, qiCooldownUntil: null, lastDantianUpdate: new Date() },
+      mana: { qi: qiMax(1), dantian: dantianMax(1), qiCooldownUntil: null, lastDantianUpdate: new Date() },
       currency: {
         gold: WELCOME_GOLD,
         premiumCurrency: 0,

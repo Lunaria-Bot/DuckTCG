@@ -1194,7 +1194,7 @@ app.get("/cards/new", auth, editorOrAdmin, async (req, res) => {
     <div class="form-box">
       <form method="POST" action="/cards/new" style="display:flex;flex-direction:column;gap:0">
         <div class="form-row"><div class="form-group"><label>Card ID</label><input name="cardId" placeholder="naruto_001" required/></div><div class="form-group"><label>Name</label><input name="name" placeholder="Naruto Uzumaki" required/></div></div>
-        <div class="form-row"><div class="form-group"><label>Anime</label><input name="anime" placeholder="Naruto" required/></div><div class="form-group"><label>Image URL</label><input name="imageUrl" placeholder="https://..."/></div></div>
+        <div class="form-group"><label>Image URL</label><input name="imageUrl" placeholder="https://..."/></div>
         <div class="form-row"><div class="form-group"><label>Rarity</label><select name="rarity"><option value="common">Common</option><option value="rare">Rare</option><option value="special">Special</option><option value="exceptional">Exceptional</option></select></div><div class="form-group"><label>Role</label><select name="role"><option value="dps">DPS</option><option value="support">Support</option><option value="tank">Tank</option></select></div></div>
         <div class="form-group"><label>Add to Banner (optional)</label><select name="addToBanner"><option value="">— Don't add —</option>${bannerOptions}</select></div>
         <div class="form-group"><label>Series (optional)</label><select name="seriesId"><option value="">— No series —</option>${seriesOptions}</select></div>
@@ -1208,9 +1208,12 @@ app.get("/cards/new", auth, editorOrAdmin, async (req, res) => {
 
 app.post("/cards/new", auth, editorOrAdmin, async (req, res) => {
   try {
-    const { cardId, name, anime, imageUrl, rarity, role, addToBanner, seriesId, baseDamage, baseMana, baseHp, isAvailable } = req.body;
+    const { cardId, name, imageUrl, rarity, role, addToBanner, seriesId, baseDamage, baseMana, baseHp, isAvailable } = req.body;
     let bannerType = "regular";
     if (addToBanner) { const b = await Banner.findOne({ bannerId: addToBanner }); if (b) bannerType = b.type; }
+    // Derive anime from series name if available, else use card name
+    let anime = name;
+    if (seriesId) { const s = await Series.findOne({ seriesId }); if (s) anime = s.name; }
     const card = await Card.create({ cardId, name, anime, imageUrl: imageUrl||null, rarity, role, bannerType, seriesId: seriesId||null, isAvailable: isAvailable==="true", baseStats: { damage:parseInt(baseDamage), mana:parseInt(baseMana), hp:parseInt(baseHp) } });
     if (addToBanner) await Banner.findOneAndUpdate({ bannerId: addToBanner }, { $addToSet: { [`pool.${rarity}`]: cardId } });
     await audit(req.user, "create", "card", cardId, `Created card "${name}" (${rarity} ${role})`, null, card.toObject());
@@ -1229,7 +1232,7 @@ app.get("/cards/:id/edit", auth, editorOrAdmin, async (req, res) => {
       ${card.imageUrl?`<img src="${card.imageUrl}" style="width:140px;border-radius:var(--radius);object-fit:cover;flex-shrink:0"/>`:""}
       <div class="form-box" style="flex:1;margin-bottom:0">
         <form method="POST" action="/cards/${card.cardId}/edit" style="display:flex;flex-direction:column;gap:0">
-          <div class="form-row"><div class="form-group"><label>Name</label><input name="name" value="${card.name}" required/></div><div class="form-group"><label>Anime</label><input name="anime" value="${card.anime}" required/></div></div>
+          <div class="form-group"><label>Name</label><input name="name" value="${card.name}" required/></div>
           <div class="form-group"><label>Image URL</label><input name="imageUrl" value="${card.imageUrl||""}"/></div>
           <div class="form-row"><div class="form-group"><label>Rarity</label><select name="rarity">${["common","rare","special","exceptional"].map(r=>`<option value="${r}"${card.rarity===r?" selected":""}>${r}</option>`).join("")}</select></div><div class="form-group"><label>Role</label><select name="role">${["dps","support","tank"].map(r=>`<option value="${r}"${card.role===r?" selected":""}>${r}</option>`).join("")}</select></div></div>
           <div class="form-group"><label>Series</label><select name="seriesId">${seriesOpts}</select></div>
@@ -1243,7 +1246,9 @@ app.get("/cards/:id/edit", auth, editorOrAdmin, async (req, res) => {
 });
 
 app.post("/cards/:id/edit", auth, editorOrAdmin, async (req, res) => {
-  const { name, anime, imageUrl, rarity, role, seriesId, baseDamage, baseMana, baseHp, isAvailable } = req.body;
+  const { name, imageUrl, rarity, role, seriesId, baseDamage, baseMana, baseHp, isAvailable } = req.body;
+  let anime = name;
+  if (seriesId) { const s = await Series.findOne({ seriesId }); if (s) anime = s.name; }
   const before = await Card.findOne({ cardId: req.params.id });
   const after = await Card.findOneAndUpdate({ cardId: req.params.id }, { name, anime, imageUrl: imageUrl||null, rarity, role, seriesId: seriesId||null, isAvailable: isAvailable==="true", baseStats: { damage:parseInt(baseDamage), mana:parseInt(baseMana), hp:parseInt(baseHp) } }, { new: true });
   await audit(req.user, "update", "card", req.params.id, `Updated card "${name}"`, before?.toObject(), after?.toObject());

@@ -75,29 +75,27 @@ function buildListEmbed(pairs, page, username, sortBy, filterRarity, filterRole)
 }
 
 // ─── Card detail embed ────────────────────────────────────────────────────────
-function buildCardEmbed(pairs, index, username) {
+function buildCardEmbed(pairs, index, username, totalCopiesMap) {
   if (!pairs.length) return new EmbedBuilder().setTitle(`${username}'s Inventory`).setDescription("*No cards match your filters.*").setColor(0x5B21B6);
 
   const { pc, card } = pairs[index];
-  const maxLevel  = pc.isAscended ? 125 : 100;
-  const lvlFilled = Math.round((pc.level / maxLevel) * 10);
-  const lvlBar    = "█".repeat(lvlFilled) + "░".repeat(10 - lvlFilled);
+  const ownedCopies = pc.quantity ?? 1;
+  const totalCopies = totalCopiesMap?.[card.cardId] ?? "?";
 
   const embed = new EmbedBuilder()
-    .setTitle(`${RARITY_EMOJI[card.rarity] ?? "⬜"} ${card.name}${(pc.quantity ?? 1) > 1 ? ` ×${pc.quantity}` : ""}`)
-    .setDescription(`*${card.anime}*`)
+    .setTitle(`${RARITY_EMOJI[card.rarity] ?? "⬜"} ${RARITY_LABEL[card.rarity] ?? card.rarity} — ${card.name}`)
+    .setDescription(`${ROLE_EMOJI[card.role] ?? ""} **${card.role.toUpperCase()}**  ·  CP **${(pc.cachedStats?.combatPower ?? 0).toLocaleString()}**
+*${card.anime}*`)
     .setColor(RARITY_COLOR[card.rarity] ?? 0x5B21B6)
-    .addFields(
-      { name: "Rarity",       value: RARITY_LABEL[card.rarity] ?? card.rarity,                            inline: true },
-      { name: "Role",         value: `${ROLE_EMOJI[card.role] ?? ""} ${card.role.toUpperCase()}`,         inline: true },
-      { name: "Copies",       value: `**${pc.quantity ?? 1}**`,                                           inline: true },
-      { name: "Level",        value: `**${pc.level}** / ${maxLevel}\n\`[${lvlBar}]\``,                    inline: true },
-      { name: "Combat Power", value: `**${(pc.cachedStats?.combatPower ?? 0).toLocaleString()}**`,        inline: true },
-      { name: "Ascension",    value: pc.isAscended ? "✨ Yes" : pc.level >= 100 ? "Available!" : `At Lv.100`, inline: true },
-    )
     .setFooter({ text: `${username}'s Inventory · ${index + 1} / ${pairs.length}` });
 
   if (card.imageUrl) embed.setImage(card.imageUrl);
+
+  embed.addFields(
+    { name: "Owned",   value: `**${ownedCopies}** cop${ownedCopies > 1 ? "ies" : "y"}`, inline: true },
+    { name: "In Game", value: `**${totalCopies}** total`, inline: true },
+  );
+
   return embed;
 }
 
@@ -208,7 +206,7 @@ module.exports = {
       const total = state.view === "card" ? pairs.length : tlp;
 
       const embed = state.view === "card"
-        ? buildCardEmbed(pairs, state.cardIndex, targetUser.username)
+        ? buildCardEmbed(pairs, state.cardIndex, targetUser.username, totalCopiesMap)
         : buildListEmbed(pairs, state.page, targetUser.username, state.sortBy, state.filterRarity, state.filterRole);
 
       const components = [
@@ -240,8 +238,19 @@ module.exports = {
       else if (id === "inv_next")   { state.view === "card" ? state.cardIndex++ : state.page++; }
       else if (id === "inv_last")   { state.view === "card" ? state.cardIndex = pairs.length - 1 : state.page = tlp - 1; }
       else if (id === "inv_toggle") {
-        if (state.view === "list") { state.cardIndex = state.page * PAGE_SIZE; state.view = "card"; }
-        else { state.page = Math.floor(state.cardIndex / PAGE_SIZE); state.view = "list"; }
+        if (state.view === "list") {
+          state.cardIndex = state.page * PAGE_SIZE;
+          state.view = "card";
+          // Fetch total copies in game lazily
+          if (Object.keys(totalCopiesMap).length === 0) {
+            const cardIds = pairs.map(p => p.card.cardId);
+            const totals = await PlayerCard.aggregate([
+              { $match: { cardId: { $in: cardIds } } },
+              { $group: { _id: "$cardId", total: { $sum: "$quantity" } } },
+            ]);
+            for (const t of totals) totalCopiesMap[t._id] = t.total;
+          }
+        } else { state.page = Math.floor(state.cardIndex / PAGE_SIZE); state.view = "list"; }
         state.openDropdown = null;
       }
       else if (id === "inv_open_sort")   { state.openDropdown = state.openDropdown === "sort"   ? null : "sort"; }

@@ -157,7 +157,7 @@ module.exports = {
           "currency.gold":               reward.gold || 0,
           "currency.regularTickets":     reward.regularTickets || 0,
           "currency.pickupTickets":      reward.pickupTickets || 0,
-          "currency.premiumCurrency":    reward.jade || 0,
+          ...(reward.jade ? { "currency.premiumCurrency": reward.jade } : {}),
           "stats.totalGoldEverEarned":   reward.gold || 0,
         },
         accountLevel: lvResult.newLevel,
