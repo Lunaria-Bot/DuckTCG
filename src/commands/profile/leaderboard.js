@@ -1,73 +1,50 @@
 const {
   SlashCommandBuilder, EmbedBuilder,
-  ActionRowBuilder, ButtonBuilder, ButtonStyle,
-  ComponentType, AttachmentBuilder,
+  ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType,
 } = require("discord.js");
 const { requireProfile } = require("../../utils/requireProfile");
 const User = require("../../models/User");
 
-const NYAN = "<:Nyan:1495048966528831508>";
+const NYAN   = "<:Nyan:1495048966528831508>";
+const JADE   = "<:Jade:1495038405866688703>";
+const EXP    = "<:exp:1495018483233067078>";
 
 const CATEGORIES = {
-  cp:    { label: "Combat Power", emoji: "⚔",  field: "combatPower",                  format: v => v.toLocaleString(),  unit: "CP"      },
-  gold:  { label: "Nyang",     emoji: "💎",   field: "currency.gold",                format: v => v.toLocaleString(),  unit: "💎"     },
-  level: { label: "Level",        emoji: "⭐",   field: "accountLevel",                  format: v => `${v}`,              unit: "Lv."     },
-  cards: { label: "Cards",        emoji: "📦",  field: "stats.totalCardsEverObtained",  format: v => v.toLocaleString(),  unit: "cards"   },
+  cp:    { label: "Combat Power", icon: "⚔",  field: "combatPower",                  format: v => v.toLocaleString(),  unit: "CP",     color: 0xE53935 },
+  gold:  { label: "Nyang",        icon: NYAN,  field: "currency.gold",                format: v => v.toLocaleString(),  unit: "Nyang",  color: 0xf59e0b },
+  level: { label: "Level",        icon: EXP,   field: "accountLevel",                  format: v => `Lv. ${v}`,         unit: "",       color: 0x8b5cf6 },
+  cards: { label: "Cards",        icon: "📦",  field: "stats.totalCardsEverObtained",  format: v => v.toLocaleString(),  unit: "cards",  color: 0x3b82f6 },
 };
 
-const MEDALS  = ["🥇", "🥈", "🥉"];
-const COLORS  = { cp: 0xE53935, gold: 0xFFD700, level: 0xAB47BC, cards: 0x42A5F5 };
-const BAR_COLORS = { cp: "#E53935", gold: "#FFD700", level: "#AB47BC", cards: "#42A5F5" };
+const RANK_ICONS = ["🥇", "🥈", "🥉"];
 
-function getNestedValue(obj, path) {
+function getVal(obj, path) {
   return path.split(".").reduce((o, k) => o?.[k], obj) ?? 0;
 }
 
-function buildBar(value, max, color, width = 18) {
-  if (max === 0) return "`" + "░".repeat(width) + "`";
-  const filled = Math.round((value / max) * width);
-  const empty  = width - filled;
-  return `\`${"█".repeat(filled)}${"░".repeat(empty)}\``;
-}
+function buildEmbed(players, category, selfRank, self) {
+  const cat  = CATEGORIES[category];
+  const lines = players.map((p, i) => {
+    const val    = getVal(p, cat.field);
+    const isSelf = p.userId === self?.userId;
+    const rank   = i < 3 ? RANK_ICONS[i] : `\`${String(i + 1).padStart(2)}.\``;
+    const name  = isSelf ? `**${p.username}** ◀` : p.username;
+    const value = cat.format(val);
+    return `${rank} ${name} — **${value}** ${cat.unit}`;
+  });
 
-function buildEmbed(players, category, selfRank, selfUser) {
-  const cat   = CATEGORIES[category];
-  const color = COLORS[category];
-
-  const maxVal = getNestedValue(players[0], cat.field) || 1;
-
-  // Top 3 with bars
-  const top3Lines = players.slice(0, 3).map((p, i) => {
-    const val    = getNestedValue(p, cat.field);
-    const bar    = buildBar(val, maxVal, BAR_COLORS[category]);
-    const medal  = MEDALS[i];
-    const isSelf = p.userId === selfUser?.userId;
-    const name   = isSelf ? `**${p.username}** ←` : `**${p.username}**`;
-    return `${medal} ${name}\n${bar} ${cat.format(val)} ${cat.unit}`;
-  }).join("\n\n");
-
-  // Rest of top 10 as table
-  const restLines = players.slice(3, 10).map((p, i) => {
-    const val    = getNestedValue(p, cat.field);
-    const rank   = String(i + 4).padStart(2, " ");
-    const isSelf = p.userId === selfUser?.userId;
-    const name   = isSelf ? `**${p.username}** ←` : p.username;
-    return `\`${rank}.\` ${name} — **${cat.format(val)}** ${cat.unit}`;
-  }).join("\n");
-
-  const desc = [top3Lines, restLines ? "\n" + restLines : ""].join("").trim() || "*No players yet.*";
+  const desc = lines.join("\n") || "*No players yet.*";
 
   const embed = new EmbedBuilder()
-    .setTitle(`${cat.emoji} Top 10 — ${cat.label}`)
+    .setTitle(`${category === "gold" ? "🪙" : category === "level" ? "✨" : CATEGORIES[category].icon} Leaderboard — ${cat.label}`)
     .setDescription(desc)
-    .setColor(color);
+    .setColor(cat.color);
 
-  // Self rank footer
   if (selfRank > 10) {
-    const selfVal = getNestedValue(selfUser, cat.field);
-    embed.setFooter({ text: `Your rank: #${selfRank} — ${cat.format(selfVal)} ${cat.unit}` });
-  } else if (selfRank) {
-    embed.setFooter({ text: `You are ranked #${selfRank}` });
+    const selfVal = getVal(self, cat.field);
+    embed.setFooter({ text: `Your rank: #${selfRank} · ${cat.format(selfVal)} ${cat.unit}` });
+  } else {
+    embed.setFooter({ text: `Your rank: #${selfRank}` });
   }
 
   return embed;
@@ -79,7 +56,6 @@ function buildRow(current) {
       new ButtonBuilder()
         .setCustomId(`lb_${key}`)
         .setLabel(cat.label)
-        .setEmoji(cat.emoji)
         .setStyle(current === key ? ButtonStyle.Primary : ButtonStyle.Secondary)
     )
   );
@@ -101,7 +77,7 @@ module.exports = {
     async function getData() {
       const cat     = CATEGORIES[category];
       const players = await User.find().sort({ [cat.field]: -1 }).limit(10).lean();
-      const selfVal = getNestedValue(self, cat.field);
+      const selfVal = getVal(self, cat.field);
       const above   = await User.countDocuments({ [cat.field]: { $gt: selfVal } });
       return { players, selfRank: above + 1 };
     }
