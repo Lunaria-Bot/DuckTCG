@@ -2,7 +2,7 @@ const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
 const { requireProfile } = require("../../utils/requireProfile");
 const User = require("../../models/User");
 const {
-  qiMax, dantianMax, regenDantian,
+  qiMax, dantianMax, regenDantian, regenQi,
   qiCooldownRemaining, formatCooldown,
 } = require("../../services/mana");
 
@@ -20,8 +20,7 @@ module.exports = {
     const currentDantian = regenDantian(user);
     const maxQi      = qiMax(user.accountLevel);
     const maxDantian = dantianMax(user.accountLevel);
-    const currentQi  = user.mana?.qi ?? maxQi;
-    const cooldownSecs = qiCooldownRemaining(user);
+    const currentQi  = regenQi(user);
 
     if (currentQi >= maxQi) {
       return interaction.editReply({
@@ -35,38 +34,29 @@ module.exports = {
       });
     }
 
-    // Transfer: fill Qi to max OR use all available Dantian
+    // Transfer Dantian → Qi, always clears cooldown
     const needed     = maxQi - currentQi;
     const transfer   = Math.min(needed, Math.floor(currentDantian));
     const newQi      = currentQi + transfer;
     const newDantian = currentDantian - transfer;
 
-    const update = {
+    await User.findOneAndUpdate({ userId: interaction.user.id }, {
       "mana.qi":               newQi,
+      "mana.lastQiUpdate":     new Date(),
       "mana.dantian":          Math.floor(newDantian),
       "mana.lastDantianUpdate": new Date(),
-    };
-    // Only clear cooldown if it's over (Qi recharges first, then we can refill)
-    if (cooldownSecs <= 0) {
-      update["mana.qiCooldownUntil"] = null;
-    }
-
-    await User.findOneAndUpdate({ userId: interaction.user.id }, update);
+      "mana.qiCooldownUntil":  null,
+    });
 
     const embed = new EmbedBuilder()
       .setTitle("⚡ Qi Refilled")
       .setDescription(`Transferred **${transfer}** energy from your Dantian into your Qi.`)
       .setColor(0x5B21B6)
       .addFields(
-        { name: "⚡ Qi",      value: `**${newQi}** / ${maxQi}`,               inline: true },
-        { name: "🌀 Dantian", value: `**${Math.floor(newDantian)}** / ${maxDantian}`, inline: true },
-      );
-
-    if (cooldownSecs > 0) {
-      embed.setFooter({ text: `⏳ Qi still recharging — ${formatCooldown(cooldownSecs)} remaining. Refill queued from Dantian.` });
-    } else {
-      embed.setFooter({ text: "Use /roll to spend your Qi!" });
-    }
+        { name: "⚡ Qi",      value: `**${newQi}** / ${maxQi}`,                        inline: true },
+        { name: "🌀 Dantian", value: `**${Math.floor(newDantian)}** / ${maxDantian}`,   inline: true },
+      )
+      .setFooter({ text: "Use /roll to spend your Qi!" });
 
     return interaction.editReply({ embeds: [embed] });
   },

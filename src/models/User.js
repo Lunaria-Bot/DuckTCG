@@ -45,7 +45,8 @@ const UserSchema = new Schema({
   // ── Mana system ──────────────────────────────────────────────────────────
   mana: {
     // Inner Qi — used for rolling, cooldown after depleted
-    qi:          { type: Number, default: 10 },   // current inner qi (Lv1=10, Lv25=40)
+    qi:          { type: Number, default: 10 },
+    lastQiUpdate: { type: Date, default: null },   // current inner qi (Lv1=10, Lv25=40)
     qiCooldownUntil: { type: Date, default: null }, // null = ready
 
     // Dantian — stored mana, passive regen

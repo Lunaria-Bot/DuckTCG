@@ -6,7 +6,7 @@ const {
 const { requireProfile } = require("../../utils/requireProfile");
 const User = require("../../models/User");
 const {
-  qiMax, dantianMax, regenDantian,
+  qiMax, dantianMax, regenDantian, regenQi,
   isQiReady, qiCooldownRemaining, formatCooldown, DANTIAN_FILL_MS,
 } = require("../../services/mana");
 
@@ -128,7 +128,7 @@ module.exports = {
       // Re-fetch fresh state
       const freshUser  = await User.findOne({ userId: interaction.user.id });
       const freshDantian = regenDantian(freshUser);
-      const freshQi    = freshUser.mana?.qi ?? maxQi;
+      const freshQi    = regenQi(freshUser);
       const maxDantian = dantianMax(freshUser.accountLevel);
 
       if (freshQi >= maxQi) {
@@ -153,6 +153,7 @@ module.exports = {
 
       await User.findOneAndUpdate({ userId: interaction.user.id }, {
         "mana.qi":               newQi,
+        "mana.lastQiUpdate":     new Date(),
         "mana.dantian":          Math.floor(newDantian),
         "mana.lastDantianUpdate": new Date(),
         "mana.qiCooldownUntil":  null,

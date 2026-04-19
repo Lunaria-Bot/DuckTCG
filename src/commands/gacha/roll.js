@@ -12,7 +12,7 @@ const PlayerCard          = require("../../models/PlayerCard");
 const Banner              = require("../../models/Banner");
 const { calculateStats }  = require("../../services/cardStats");
 const {
-  qiMax, dantianMax, regenDantian,
+  qiMax, dantianMax, regenDantian, regenQi,
   isQiReady, qiCooldownRemaining, formatCooldown, QI_COOLDOWN_MS,
 } = require("../../services/mana");
 
@@ -130,13 +130,13 @@ module.exports = {
     const currentDantian = regenDantian(user);
     const maxQi      = qiMax(user.accountLevel);
     const maxDantian = dantianMax(user.accountLevel);
-    const currentQi  = user.mana?.qi ?? maxQi;
+    const currentQi  = regenQi(user);
 
-    // Check Qi cooldown
-    if (!isQiReady(user)) {
+    // Check Qi cooldown — only block if Qi is actually empty
+    if (!isQiReady(user) && currentQi <= 0) {
       const secs = qiCooldownRemaining(user);
       return interaction.editReply({
-        content: `⏳ Your Qi is recharging. Ready in **${formatCooldown(secs)}**.\nUse \`/refill\` once it's ready to restore your Qi from your Dantian.`,
+        content: `⏳ Your Qi is recharging. Ready in **${formatCooldown(secs)}**.\nUse \`/refill\` to restore your Qi from your Dantian.`,
       });
     }
 
@@ -167,9 +167,10 @@ module.exports = {
 
     await User.findOneAndUpdate({ userId: interaction.user.id }, {
       "mana.qi":              newQi,
+      "mana.lastQiUpdate":    newQi > 0 ? new Date() : user.mana?.lastQiUpdate,
       "mana.dantian":         currentDantian,
       "mana.lastDantianUpdate": new Date(),
-      ...(cooldownAt ? { "mana.qiCooldownUntil": cooldownAt } : {}),
+      "mana.qiCooldownUntil": null,
       $inc: { "stats.totalPullsDone": actualAmount },
     });
 
