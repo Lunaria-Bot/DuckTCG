@@ -825,11 +825,11 @@ app.get("/banners/new", auth, editorOrAdmin, (req, res) => {
         </div>
         <div class="form-row3">
           <div class="form-group"><label>Common %</label><input type="number" name="rateCommon" value="60"/></div>
-          <div class="form-group"><label>Rare %</label><input type="number" name="rateRare" value="25"/></div>
-          <div class="form-group"><label>Special %</label><input type="number" name="rateSpecial" value="12"/></div>
+          <div class="form-group"><label>Rare %</label><input type="number" name="rateRare" value="2"/></div>
+          <div class="form-group"><label>Special %</label><input type="number" name="rateSpecial" value="2.5"/></div>
         </div>
         <div class="form-row">
-          <div class="form-group"><label>Exceptional %</label><input type="number" name="rateExceptional" value="3"/></div>
+          <div class="form-group"><label>Exceptional %</label><input type="number" name="rateExceptional" value="0.5"/></div>
           <div class="form-group"><label>Hard Pity</label><input type="number" name="hardPity" value="90"/></div>
         </div>
         <div class="form-actions"><button type="submit" class="btn">Create Banner</button><a href="/banners" class="btn btn-ghost">Cancel</a></div>

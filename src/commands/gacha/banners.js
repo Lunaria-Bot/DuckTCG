@@ -1,21 +1,24 @@
 const {
-  SlashCommandBuilder,
-  EmbedBuilder,
-  ActionRowBuilder,
-  ButtonBuilder,
-  ButtonStyle,
-  StringSelectMenuBuilder,
-  StringSelectMenuOptionBuilder,
+  SlashCommandBuilder, EmbedBuilder,
+  ActionRowBuilder, ButtonBuilder, ButtonStyle,
+  StringSelectMenuBuilder, StringSelectMenuOptionBuilder,
+  ComponentType,
 } = require("discord.js");
-const Banner = require("../../models/Banner");
-const Card = require("../../models/Card");
+const Banner     = require("../../models/Banner");
+const Card       = require("../../models/Card");
 const PlayerCard = require("../../models/PlayerCard");
-const User = require("../../models/User");
-const { doPulls } = require("../../services/gacha");
-const { processBadges } = require("../../services/badges");
+const User       = require("../../models/User");
+const { doPulls }          = require("../../services/gacha");
+const { processBadges }    = require("../../services/badges");
 const { incrementProgress } = require("../../services/quests");
-const { getRedis } = require("../../services/redis");
-const { requireProfile } = require("../../utils/requireProfile");
+const { getRedis }         = require("../../services/redis");
+const { requireProfile }   = require("../../utils/requireProfile");
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+const NYAN    = "<:Nyan:1495048966528831508>";
+const JADE    = "<:Jade:1495038405866688703>";
+const PERMA   = "<:perma_ticket:1494344593863344258>";
+const PICKUP  = "<:pickup_ticket:1494344547046523091>";
 
 const RARITY_COLOR = {
   common:      0x9E9E9E,
@@ -23,14 +26,21 @@ const RARITY_COLOR = {
   special:     0xAB47BC,
   exceptional: 0xFFD700,
 };
-
 const RARITY_LABEL = {
-  common:      "Common",
-  rare:        "Rare ✦",
-  special:     "Special ✦✦",
-  exceptional: "Exceptional ✦✦✦",
+  common:      "⬜ Common",
+  rare:        "🟦 Rare ✦",
+  special:     "🟪 Special ✦✦",
+  exceptional: "🌟 Exceptional ✦✦✦",
+};
+const RARITY_STAR = {
+  common: "★", rare: "★★", special: "★★★", exceptional: "★★★★★",
 };
 
+// Jade cost per pull
+const JADE_SINGLE = 160;
+const JADE_MULTI  = 1600;
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 function getActiveBanners() {
   const now = new Date();
   return Banner.find({
@@ -42,208 +52,338 @@ function getActiveBanners() {
 
 function formatDate(date) {
   if (!date) return "Permanent";
-  return date.toLocaleDateString("en-GB").replace(/\//g, "/");
+  return date.toLocaleDateString("en-GB");
 }
 
 function isValidUrl(str) {
   try { return Boolean(new URL(str)); } catch { return false; }
 }
 
-function buildBannerEmbed(banner) {
-  const start = formatDate(banner.startsAt);
-  const end   = formatDate(banner.endsAt);
+function daysLeft(endsAt) {
+  if (!endsAt) return null;
+  const diff = new Date(endsAt) - Date.now();
+  return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
+}
+
+// ─── Main banner embed — Genshin-style ────────────────────────────────────────
+function buildBannerEmbed(banner, user) {
+  const isPickup = banner.type === "pickup";
+  const color    = isPickup ? 0x9c59b6 : 0x2980b9;
+  const typeTag  = isPickup ? "✦ Limited · Pick Up" : "✧ Standard · Regular";
+  const days     = daysLeft(banner.endsAt);
+  const daysStr  = days !== null ? `${days} day${days !== 1 ? "s" : ""} remaining` : "Permanent";
+  const ticket   = isPickup ? PICKUP : PERMA;
+  const ticketCount = isPickup
+    ? (user?.currency?.pickupTickets ?? 0)
+    : (user?.currency?.regularTickets ?? 0);
+  const jadeCount = user?.currency?.premiumCurrency ?? 0;
+
   const embed = new EmbedBuilder()
+    .setColor(color)
+    .setAuthor({ name: typeTag })
     .setTitle(banner.name)
-    .setColor(banner.type === "pickup" ? 0xAB47BC : 0x42A5F5)
-    .addFields({ name: "\u200b", value: `From ${start} - ${end}` });
-  if (banner.imageUrl && isValidUrl(banner.imageUrl)) embed.setImage(banner.imageUrl);
-  return embed;
-}
-
-function buildInfoEmbed(banner) {
-  const featuredList = banner.featuredCards.length
-    ? banner.featuredCards.map((id, i) => `${i + 1}. <:pickup_ticket:1494344547046523091> ${id}`).join("\n")
-    : "*No featured cards*";
-  const start = formatDate(banner.startsAt);
-  const end   = formatDate(banner.endsAt);
-  const embed = new EmbedBuilder()
-    .setTitle("Gacha Information")
-    .setColor(0x5865F2)
+    .setDescription([
+      `${ticket} **${ticketCount}** tickets  ·  ${JADE} **${jadeCount}** Jade`,
+      ``,
+      `⏳ ${formatDate(banner.startsAt)} — ${formatDate(banner.endsAt)}  *(${daysStr})*`,
+    ].join("\n"))
     .addFields(
-      { name: `Banner name: ${banner.name}`, value: "\u200b" },
-      { name: "Featured Cards in this Banner:", value: featuredList },
       {
-        name: "Drop rates for 10x summon",
-        value: [`⬜ Common: ${banner.rates.common}%`, `🟦 Rare: ${banner.rates.rare}%`, `🟪 Special: ${banner.rates.special}%`, `🌟 Exceptional: ${banner.rates.exceptional}%`].join("\n"),
+        name: "Drop Rates",
+        value: [
+          `🌟 Exceptional ✦✦✦  **${banner.rates.exceptional}%**`,
+          `🟪 Special ✦✦  **${banner.rates.special}%**`,
+          `🟦 Rare ✦  **${banner.rates.rare}%**`,
+          `⬜ Common  **${banner.rates.common}%**`,
+        ].join("\n"),
         inline: true,
       },
       {
-        name: "Drop rates for 1x summon",
-        value: [`⬜ Common: ${banner.rates.common}%`, `🟦 Rare: ${banner.rates.rare}%`, `🟪 Special: ${banner.rates.special}%`, `🌟 Exceptional: ${banner.rates.exceptional}%`].join("\n"),
+        name: "Cost per Pull",
+        value: [
+          `${ticket} **1** ticket / pull`,
+          `${JADE} **${JADE_SINGLE}** Jade / pull`,
+          ``,
+          `x10: ${ticket} **10**  or  ${JADE} **${JADE_MULTI}**`,
+        ].join("\n"),
         inline: true,
       },
-      { name: "Gacha duration", value: `From ${start} - ${end}` },
     );
+
   if (banner.imageUrl && isValidUrl(banner.imageUrl)) embed.setImage(banner.imageUrl);
   return embed;
 }
 
+// ─── Info embed ───────────────────────────────────────────────────────────────
+function buildInfoEmbed(banner) {
+  const featured = banner.featuredCards?.length
+    ? banner.featuredCards.map((id, i) => `${i + 1}. \`${id}\``).join("\n")
+    : "*No featured cards*";
+
+  return new EmbedBuilder()
+    .setTitle(`${banner.name} — Details`)
+    .setColor(banner.type === "pickup" ? 0x9c59b6 : 0x2980b9)
+    .addFields(
+      { name: "Featured Cards", value: featured, inline: false },
+      {
+        name: "Drop Rates",
+        value: [
+          `🌟 **Exceptional** ✦✦✦ — **${banner.rates.exceptional}%**`,
+          `🟪 **Special** ✦✦ — **${banner.rates.special}%**`,
+          `🟦 **Rare** ✦ — **${banner.rates.rare}%**`,
+          `⬜ **Common** — **${banner.rates.common}%**`,
+        ].join("\n"),
+        inline: true,
+      },
+      {
+        name: "Pity System",
+        value: [
+          `Soft pity: **${banner.pity?.softPityStart ?? 75}** pulls`,
+          `Hard pity: **${banner.pity?.hardPity ?? 90}** pulls`,
+          `50/50 on featured Exceptional`,
+        ].join("\n"),
+        inline: true,
+      },
+      { name: "Duration", value: `${formatDate(banner.startsAt)} — ${formatDate(banner.endsAt)}`, inline: false },
+    );
+}
+
+// ─── Rates embed ─────────────────────────────────────────────────────────────
+function buildRatesEmbed(banner) {
+  return new EmbedBuilder()
+    .setTitle("Drop Rates")
+    .setColor(0x5865f2)
+    .setDescription("Rates apply equally to ×1 and ×10 pulls.")
+    .addFields(
+      { name: "🌟 Exceptional ✦✦✦", value: `**${banner.rates.exceptional}%**\nSoft pity starts at **${banner.pity?.softPityStart ?? 75}**, guaranteed at **${banner.pity?.hardPity ?? 90}**`, inline: true },
+      { name: "🟪 Special ✦✦",      value: `**${banner.rates.special}%**`, inline: true },
+      { name: "🟦 Rare ✦",          value: `**${banner.rates.rare}%**`, inline: true },
+      { name: "⬜ Common",           value: `**${banner.rates.common}%**`, inline: true },
+      { name: "Jade Cost",           value: `×1: **${JADE_SINGLE}** ${JADE}\n×10: **${JADE_MULTI}** ${JADE}`, inline: true },
+    );
+}
+
+// ─── View cards embed ─────────────────────────────────────────────────────────
 async function buildViewCardsEmbed(banner, page, userId) {
-  const allCardIds = [...banner.pool.exceptional, ...banner.pool.special, ...banner.pool.rare, ...banner.pool.common];
-  if (!allCardIds.length) {
-    return { embed: new EmbedBuilder().setTitle("No cards in this banner yet.").setColor(0x9E9E9E), total: 0 };
+  const allIds = [
+    ...banner.pool.exceptional,
+    ...banner.pool.special,
+    ...banner.pool.rare,
+    ...banner.pool.common,
+  ];
+  if (!allIds.length) {
+    return { embed: new EmbedBuilder().setTitle("No cards in this banner.").setColor(0x9E9E9E), total: 0 };
   }
-  const cardId = allCardIds[page];
-  const card = await Card.findOne({ cardId });
-  const owned = userId ? await PlayerCard.countDocuments({ userId, cardId, isBurned: false }) : 0;
-  const RARITY_EMOJI = { common: "⬜", rare: "🟦", special: "🟪", exceptional: "🌟" };
+  const cardId = allIds[page];
+  const card   = await Card.findOne({ cardId });
+  const owned  = userId ? await PlayerCard.countDocuments({ userId, cardId, isBurned: false }) : 0;
+
   const embed = new EmbedBuilder()
     .setTitle(card?.name ?? cardId)
+    .setDescription(`*${card?.anime ?? ""}*`)
     .setColor(RARITY_COLOR[card?.rarity] ?? 0x9E9E9E)
-    .addFields({ name: banner.name, value: `ID: ${cardId}` })
-    .setFooter({ text: `${RARITY_EMOJI[card?.rarity] ?? ""} page ${page + 1} of ${allCardIds.length} | You Own: ${owned}` });
+    .addFields(
+      { name: "Rarity", value: RARITY_LABEL[card?.rarity] ?? card?.rarity ?? "—", inline: true },
+      { name: "You Own", value: `**${owned}** cop${owned !== 1 ? "ies" : "y"}`, inline: true },
+    )
+    .setFooter({ text: `Card ${page + 1} / ${allIds.length}  ·  ${banner.name}` });
   if (card?.imageUrl && isValidUrl(card.imageUrl)) embed.setImage(card.imageUrl);
-  return { embed, total: allCardIds.length };
+  return { embed, total: allIds.length };
 }
 
-const EMOJI_REGULAR = { id: "1494344593863344258", name: "perma_ticket" };
-const EMOJI_PICKUP  = { id: "1494344547046523091", name: "pickup_ticket" };
+// ─── Pull result embed ────────────────────────────────────────────────────────
+function buildPullEmbed(results, banner, user, payMethod) {
+  const ticketKey = banner.type === "pickup" ? "pickupTickets" : "regularTickets";
+  const remaining = payMethod === "jade"
+    ? `${JADE} ${user.currency.premiumCurrency} Jade left`
+    : `${banner.type === "pickup" ? PICKUP : PERMA} ${user.currency[ticketKey]} tickets left`;
 
-function bannerMainRow(bannerId, bannerType = "regular") {
-  const ticketEmoji = bannerType === "pickup" ? EMOJI_PICKUP : EMOJI_REGULAR;
+  if (results.length === 1) {
+    const { card, rarity } = results[0];
+    return new EmbedBuilder()
+      .setTitle(`${RARITY_STAR[rarity]} ${RARITY_LABEL[rarity]}`)
+      .setDescription(`**${card.name}**\n*${card.anime}*`)
+      .setColor(RARITY_COLOR[rarity])
+      .setThumbnail(card.imageUrl && isValidUrl(card.imageUrl) ? card.imageUrl : null)
+      .setFooter({ text: remaining });
+  }
+
+  const rarityOrder = ["exceptional", "special", "rare", "common"];
+  const best = rarityOrder.find(r => results.some(res => res.rarity === r));
+  const bestCard = results.find(r => r.rarity === best);
+
+  const lines = results.map(({ card, rarity }) =>
+    `${RARITY_LABEL[rarity]} — **${card.name}**`
+  );
+
+  const embed = new EmbedBuilder()
+    .setTitle(`✦ ×10 Pull — ${banner.name}`)
+    .setDescription(lines.join("\n"))
+    .setColor(RARITY_COLOR[best] ?? 0x9E9E9E)
+    .setFooter({ text: remaining });
+
+  if (bestCard?.card?.imageUrl && isValidUrl(bestCard.card.imageUrl)) {
+    embed.setThumbnail(bestCard.card.imageUrl);
+  }
+  return embed;
+}
+
+// ─── Rows ─────────────────────────────────────────────────────────────────────
+function mainRow(bannerId, bannerType) {
+  const ticket = bannerType === "pickup" ? EMOJI_PICKUP : EMOJI_REGULAR;
   return new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId(`pull_single_${bannerId}`).setLabel("Single").setStyle(ButtonStyle.Primary).setEmoji(ticketEmoji),
-    new ButtonBuilder().setCustomId(`pull_multi_${bannerId}`).setLabel("x10").setStyle(ButtonStyle.Primary).setEmoji(ticketEmoji),
-    new ButtonBuilder().setCustomId(`banner_info_${bannerId}`).setLabel("Info").setStyle(ButtonStyle.Success),
-    new ButtonBuilder().setCustomId("banner_list").setLabel("Banners").setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder().setCustomId(`banner_cards_${bannerId}_0`).setLabel("View Cards").setStyle(ButtonStyle.Danger),
+    new ButtonBuilder().setCustomId(`pull_single_${bannerId}`).setLabel("×1 Ticket").setEmoji(bannerType === "pickup" ? EMOJI_PICKUP : EMOJI_REGULAR).setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId(`pull_multi_${bannerId}`).setLabel("×10 Ticket").setEmoji(bannerType === "pickup" ? EMOJI_PICKUP : EMOJI_REGULAR).setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId(`pull_jade_single_${bannerId}`).setLabel(`×1 Jade`).setEmoji({ id: "1495038405866688703", name: "Jade" }).setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId(`pull_jade_multi_${bannerId}`).setLabel(`×10 Jade`).setEmoji({ id: "1495038405866688703", name: "Jade" }).setStyle(ButtonStyle.Secondary),
+  );
+}
+
+function subRow(bannerId) {
+  return new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId(`banner_info_${bannerId}`).setLabel("Details").setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId(`banner_rates_${bannerId}`).setLabel("Rates").setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId("banner_list").setLabel("All Banners").setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId(`banner_cards_${bannerId}_0`).setLabel("Cards").setStyle(ButtonStyle.Danger),
   );
 }
 
 function backRow(bannerId) {
   return new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId(`banner_view_${bannerId}`).setLabel("Back").setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId(`banner_view_${bannerId}`).setLabel("← Back").setStyle(ButtonStyle.Secondary),
   );
 }
 
 function cardsNavRow(bannerId, page, total) {
   return new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId(`banner_view_${bannerId}`).setLabel("Back").setStyle(ButtonStyle.Primary),
-    new ButtonBuilder().setCustomId(`banner_cards_${bannerId}_${page - 1}`).setLabel("◀").setStyle(ButtonStyle.Secondary).setDisabled(page === 0),
-    new ButtonBuilder().setCustomId(`banner_cards_${bannerId}_${page + 1}`).setLabel("▶").setStyle(ButtonStyle.Secondary).setDisabled(page >= total - 1),
+    new ButtonBuilder().setCustomId(`banner_view_${bannerId}`).setLabel("← Back").setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId(`banner_cards_${bannerId}_${page - 1}`).setEmoji("◀").setStyle(ButtonStyle.Secondary).setDisabled(page === 0),
+    new ButtonBuilder().setCustomId(`banner_page_${page}`).setLabel(`${page + 1} / ${total}`).setStyle(ButtonStyle.Secondary).setDisabled(true),
+    new ButtonBuilder().setCustomId(`banner_cards_${bannerId}_${page + 1}`).setEmoji("▶").setStyle(ButtonStyle.Secondary).setDisabled(page >= total - 1),
   );
 }
 
-function buildPullResultEmbed(results, banner, remaining) {
-  if (results.length === 1) {
-    const { card, playerCard, rarity } = results[0];
-    const embed = new EmbedBuilder()
-      .setTitle(RARITY_LABEL[rarity])
-      .setDescription(`**${card.name}** — *${card.anime}*`)
-      .setColor(RARITY_COLOR[rarity])
-      .setFooter({ text: `Remaining tickets: ${remaining}` });
-    if (card.imageUrl && isValidUrl(card.imageUrl)) embed.setThumbnail(card.imageUrl);
-    return embed;
-  }
-  const rarityOrder = ["exceptional", "special", "rare", "common"];
-  const best = rarityOrder.find(r => results.some(res => res.rarity === r));
-  const lines = results.map(({ card, playerCard, rarity }) =>
-    `${RARITY_LABEL[rarity]} — **${card.name}**`
-  );
-  return new EmbedBuilder()
-    .setTitle(`Multi ×10 — ${banner.name}`)
-    .setDescription(lines.join("\n"))
-    .setColor(RARITY_COLOR[best] ?? 0x9E9E9E)
-    .setFooter({ text: `Remaining tickets: ${remaining}` });
-}
+const EMOJI_REGULAR = { id: "1494344593863344258", name: "perma_ticket" };
+const EMOJI_PICKUP  = { id: "1494344547046523091", name: "pickup_ticket" };
 
-async function handleBannerInteraction(interaction, banners) {
+// ─── Interaction handler ──────────────────────────────────────────────────────
+async function handleBannerInteraction(interaction, banners, user) {
   const id = interaction.customId;
 
+  // Banner list dropdown
   if (id === "banner_list") {
     if (!banners.length) return interaction.update({ content: "No active banners.", embeds: [], components: [] });
     const select = new StringSelectMenuBuilder()
       .setCustomId("banner_select")
-      .setPlaceholder("select banner")
+      .setPlaceholder("Select a banner...")
       .addOptions(banners.map(b =>
         new StringSelectMenuOptionBuilder()
           .setLabel(b.name)
-          .setDescription(b.description ?? `${b.type === "pickup" ? "Pick Up" : "Regular"} banner`)
+          .setDescription(`${b.type === "pickup" ? "Limited · Pick Up" : "Standard · Regular"}`)
           .setValue(b.bannerId)
       ));
-    return interaction.update({ embeds: [buildBannerEmbed(banners[0])], components: [new ActionRowBuilder().addComponents(select)] });
+    return interaction.update({ embeds: [buildBannerEmbed(banners[0], user)], components: [new ActionRowBuilder().addComponents(select)] });
   }
 
   if (id === "banner_select") {
-    const bannerId = interaction.values[0];
-    const banner = banners.find(b => b.bannerId === bannerId);
+    const banner = banners.find(b => b.bannerId === interaction.values[0]);
     if (!banner) return interaction.update({ content: "Banner not found.", embeds: [], components: [] });
-    return interaction.update({ embeds: [buildBannerEmbed(banner)], components: [bannerMainRow(bannerId, banner.type)] });
+    return interaction.update({ embeds: [buildBannerEmbed(banner, user)], components: [mainRow(banner.bannerId, banner.type), subRow(banner.bannerId)] });
   }
 
   if (id.startsWith("banner_view_")) {
-    const bannerId = id.replace("banner_view_", "");
-    const banner = banners.find(b => b.bannerId === bannerId);
+    const banner = banners.find(b => b.bannerId === id.replace("banner_view_", ""));
     if (!banner) return interaction.update({ content: "Banner not found.", embeds: [], components: [] });
-    return interaction.update({ embeds: [buildBannerEmbed(banner)], components: [bannerMainRow(bannerId, banner.type)] });
+    const freshUser = await User.findOne({ userId: interaction.user.id });
+    return interaction.update({ embeds: [buildBannerEmbed(banner, freshUser)], components: [mainRow(banner.bannerId, banner.type), subRow(banner.bannerId)] });
   }
 
   if (id.startsWith("banner_info_")) {
-    const bannerId = id.replace("banner_info_", "");
-    const banner = banners.find(b => b.bannerId === bannerId);
+    const banner = banners.find(b => b.bannerId === id.replace("banner_info_", ""));
     if (!banner) return interaction.update({ content: "Banner not found.", embeds: [], components: [] });
-    return interaction.update({ embeds: [buildInfoEmbed(banner)], components: [backRow(bannerId)] });
+    return interaction.update({ embeds: [buildInfoEmbed(banner)], components: [backRow(banner.bannerId)] });
+  }
+
+  if (id.startsWith("banner_rates_")) {
+    const banner = banners.find(b => b.bannerId === id.replace("banner_rates_", ""));
+    if (!banner) return interaction.update({ content: "Banner not found.", embeds: [], components: [] });
+    return interaction.update({ embeds: [buildRatesEmbed(banner)], components: [backRow(banner.bannerId)] });
   }
 
   if (id.startsWith("banner_cards_")) {
-    const parts = id.split("_");
-    const page = parseInt(parts[parts.length - 1]);
+    const parts    = id.split("_");
+    const page     = parseInt(parts[parts.length - 1]);
     const bannerId = parts.slice(2, parts.length - 1).join("_");
-    const banner = banners.find(b => b.bannerId === bannerId);
+    const banner   = banners.find(b => b.bannerId === bannerId);
     if (!banner) return interaction.update({ content: "Banner not found.", embeds: [], components: [] });
     const { embed, total } = await buildViewCardsEmbed(banner, page, interaction.user.id);
     return interaction.update({ embeds: [embed], components: [cardsNavRow(bannerId, page, total)] });
   }
 
-  if (id.startsWith("pull_single_")) {
-    const bannerId = id.replace("pull_single_", "");
+  // ── Pulls ─────────────────────────────────────────────────────────────────
+  async function doPull(bannerId, count, payMethod) {
     const banner = banners.find(b => b.bannerId === bannerId);
     if (!banner) return interaction.update({ content: "Banner not found.", embeds: [], components: [] });
-    const user = await User.findOne({ userId: interaction.user.id });
-    if (!user) return interaction.update({ content: "You don't have a profile yet! Use `/register` first.", embeds: [], components: [] });
-    const ticketKey = banner.type === "pickup" ? "pickupTickets" : "regularTickets";
-    if (user.currency[ticketKey] < 1) return interaction.update({ content: `Not enough tickets! You have **${user.currency[ticketKey]}**.`, embeds: [], components: [] });
-    user.currency[ticketKey] -= 1;
-    await user.save();
-    const results = await doPulls(interaction.user.id, banner, 1);
-    await processBadges(user, interaction, "realtime");
-    const _redis1 = getRedis();
-    await incrementProgress(_redis1, interaction.user.id, "daily", "roll", 1);
-    await incrementProgress(_redis1, interaction.user.id, "weekly", "roll", 1);
-    return interaction.update({ embeds: [buildPullResultEmbed(results, banner, user.currency[ticketKey])], components: [bannerMainRow(bannerId, banner.type)] });
+
+    const freshUser = await User.findOne({ userId: interaction.user.id });
+    if (!freshUser) return interaction.update({ content: "Profile not found. Use `/register` first.", embeds: [], components: [] });
+
+    if (payMethod === "jade") {
+      const cost = count === 1 ? JADE_SINGLE : JADE_MULTI;
+      if ((freshUser.currency.premiumCurrency ?? 0) < cost) {
+        return interaction.update({
+          content: `${JADE} Not enough Jade! You need **${cost}**, you have **${freshUser.currency.premiumCurrency ?? 0}**.`,
+          embeds: [], components: [],
+        });
+      }
+      freshUser.currency.premiumCurrency -= cost;
+    } else {
+      const ticketKey = banner.type === "pickup" ? "pickupTickets" : "regularTickets";
+      if ((freshUser.currency[ticketKey] ?? 0) < count) {
+        return interaction.update({
+          content: `Not enough tickets! You need **${count}**, you have **${freshUser.currency[ticketKey]}**.`,
+          embeds: [], components: [],
+        });
+      }
+      freshUser.currency[ticketKey] -= count;
+    }
+
+    await freshUser.save();
+    const results = await doPulls(interaction.user.id, banner, count);
+    await processBadges(freshUser, interaction, "realtime");
+
+    const redis = getRedis();
+    await incrementProgress(redis, interaction.user.id, "daily", "roll", count);
+    await incrementProgress(redis, interaction.user.id, "weekly", "roll", count);
+    if (count >= 10) {
+      await incrementProgress(redis, interaction.user.id, "daily", "multi_roll", 1);
+      await incrementProgress(redis, interaction.user.id, "weekly", "multi_roll", 1);
+    }
+    for (const { rarity } of results) {
+      if (["rare","special","exceptional"].includes(rarity)) {
+        await incrementProgress(redis, interaction.user.id, "daily", "roll_rare", 1);
+        await incrementProgress(redis, interaction.user.id, "weekly", "roll_rare", 1);
+      }
+      if (["special","exceptional"].includes(rarity)) {
+        await incrementProgress(redis, interaction.user.id, "daily", "roll_special", 1);
+        await incrementProgress(redis, interaction.user.id, "weekly", "roll_special", 1);
+      }
+    }
+
+    const updatedUser = await User.findOne({ userId: interaction.user.id });
+    return interaction.update({
+      embeds: [buildPullEmbed(results, banner, updatedUser, payMethod)],
+      components: [mainRow(banner.bannerId, banner.type), subRow(banner.bannerId)],
+    });
   }
 
-  if (id.startsWith("pull_multi_")) {
-    const bannerId = id.replace("pull_multi_", "");
-    const banner = banners.find(b => b.bannerId === bannerId);
-    if (!banner) return interaction.update({ content: "Banner not found.", embeds: [], components: [] });
-    const user = await User.findOne({ userId: interaction.user.id });
-    if (!user) return interaction.update({ content: "You don't have a profile yet! Use `/register` first.", embeds: [], components: [] });
-    const ticketKey = banner.type === "pickup" ? "pickupTickets" : "regularTickets";
-    if (user.currency[ticketKey] < 10) return interaction.update({ content: `Not enough tickets! You need **10**, you have **${user.currency[ticketKey]}**.`, embeds: [], components: [] });
-    user.currency[ticketKey] -= 10;
-    await user.save();
-    const results = await doPulls(interaction.user.id, banner, 10);
-    await processBadges(user, interaction, "realtime");
-    const _redis10 = getRedis();
-    await incrementProgress(_redis10, interaction.user.id, "daily", "roll", 10);
-    await incrementProgress(_redis10, interaction.user.id, "weekly", "roll", 10);
-    await incrementProgress(_redis10, interaction.user.id, "daily", "multi_roll", 1);
-    await incrementProgress(_redis10, interaction.user.id, "weekly", "multi_roll", 1);
-    return interaction.update({ embeds: [buildPullResultEmbed(results, banner, user.currency[ticketKey])], components: [bannerMainRow(bannerId, banner.type)] });
-  }
+  if (id.startsWith("pull_single_"))      return doPull(id.replace("pull_single_", ""), 1, "ticket");
+  if (id.startsWith("pull_multi_"))       return doPull(id.replace("pull_multi_", ""), 10, "ticket");
+  if (id.startsWith("pull_jade_single_")) return doPull(id.replace("pull_jade_single_", ""), 1, "jade");
+  if (id.startsWith("pull_jade_multi_"))  return doPull(id.replace("pull_jade_multi_", ""), 10, "jade");
 }
 
+// ─── Command ─────────────────────────────────────────────────────────────────
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("banners")
@@ -256,26 +396,28 @@ module.exports = {
     if (!user) return;
 
     const banners = await getActiveBanners();
-    if (!banners.length) return interaction.editReply({ content: "No active banners at the moment." });
+    if (!banners.length) return interaction.editReply({ content: "No active banners at the moment. Check back soon!" });
 
     const first = banners[0];
     const msg = await interaction.editReply({
-      embeds: [buildBannerEmbed(first)],
-      components: [bannerMainRow(first.bannerId, first.type)],
+      embeds: [buildBannerEmbed(first, user)],
+      components: [mainRow(first.bannerId, first.type), subRow(first.bannerId)],
     });
 
     const collector = msg.createMessageComponentCollector({
       filter: i => i.user.id === interaction.user.id,
-      time: 5 * 60 * 1000,
+      time: 10 * 60 * 1000,
     });
 
     collector.on("collect", async i => {
       try {
+        await i.deferUpdate();
         const freshBanners = await getActiveBanners();
-        await handleBannerInteraction(i, freshBanners);
+        const freshUser    = await User.findOne({ userId: interaction.user.id });
+        await handleBannerInteraction(i, freshBanners, freshUser);
       } catch (err) {
         console.error("Banner interaction error:", err);
-        await i.update({ content: "An error occurred.", embeds: [], components: [] }).catch(() => {});
+        await i.followUp({ content: "An error occurred.", ephemeral: true }).catch(() => {});
       }
     });
 

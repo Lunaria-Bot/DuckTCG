@@ -22,10 +22,10 @@ const BannerSchema = new Schema({
   },
 
   rates: {
-    common: { type: Number, default: 60 },
-    rare: { type: Number, default: 25 },
-    special: { type: Number, default: 12 },
-    exceptional: { type: Number, default: 3 },
+    common:      { type: Number, default: 97 },
+    rare:        { type: Number, default: 2 },
+    special:     { type: Number, default: 2.5 },
+    exceptional: { type: Number, default: 0.5 },
   },
 
   pity: {
