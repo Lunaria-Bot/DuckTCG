@@ -1196,6 +1196,7 @@ app.get("/cards", auth, editorOrAdmin, async (req, res) => {
           <td style="display:flex;gap:5px">
             <a href="/cards/${c.cardId}/detail" class="btn btn-ghost btn-sm">Detail</a>
             <a href="/cards/${c.cardId}/edit" class="btn btn-gray btn-sm">Edit</a>
+            ${req.user?.isAdmin ? `<a href="/cards/${c.cardId}/delete" class="btn btn-red btn-sm" onclick="return confirm('Delete card \'${c.name}\'? This will also remove all player copies.')">Delete</a>` : ""}
           </td>
         </tr>`).join("")||`<tr><td colspan="7" class="empty-state">No cards found</td></tr>`}
         </tbody>
@@ -1272,6 +1273,18 @@ app.post("/cards/:id/edit", auth, editorOrAdmin, async (req, res) => {
   const before = await Card.findOne({ cardId: req.params.id });
   const after = await Card.findOneAndUpdate({ cardId: req.params.id }, { name, anime, imageUrl: imageUrl||null, rarity, role, seriesId: (seriesId && seriesId !== "") ? seriesId : null, isAvailable: isAvailable==="true", baseStats: { damage:parseInt(baseDamage), mana:parseInt(baseMana), hp:parseInt(baseHp) } }, { new: true });
   await audit(req.user, "update", "card", req.params.id, `Updated card "${name}"`, before?.toObject(), after?.toObject());
+  res.redirect("/cards");
+});
+
+
+app.get("/cards/:id/delete", auth, async (req, res) => {
+  if (!req.user?.isAdmin) return res.status(403).send("Forbidden");
+  const card = await Card.findOne({ cardId: req.params.id });
+  if (!card) return res.redirect("/cards");
+  const playerCopies = await PlayerCard.countDocuments({ cardId: req.params.id });
+  await Card.deleteOne({ cardId: req.params.id });
+  await PlayerCard.deleteMany({ cardId: req.params.id });
+  await audit(req.user, "delete", "card", req.params.id, `Deleted card "${card.name}" (${card.rarity}) — removed ${playerCopies} player copies`, card.toObject(), null);
   res.redirect("/cards");
 });
 
