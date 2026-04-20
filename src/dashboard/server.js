@@ -995,9 +995,20 @@ app.get("/banners/:id/stats", auth, editorOrAdmin, async (req, res) => {
 
 
 // ─── SERIES ───────────────────────────────────────────────────────────────────
+
+app.get("/debug/cards-series", auth, async (req, res) => {
+  if (req.user?.role !== "admin") return res.status(403).send("Forbidden");
+  const cards = await require("../models/Card").find({}).select("cardId name anime seriesId").lean();
+  const series = await require("../models/Series").find({}).select("seriesId name").lean();
+  res.json({ cards: cards.slice(0, 20), series });
+});
+
 app.get("/series", auth, editorOrAdmin, async (req, res) => {
   const seriesList = await Series.find().sort({ name: 1 });
-  const cardCounts = await Promise.all(seriesList.map(s => Card.countDocuments({ seriesId: s.seriesId.toString() })));
+  const cardCounts = await Promise.all(seriesList.map(async s => {
+    const count = await Card.countDocuments({ seriesId: s.seriesId });
+    return count;
+  }));
   res.send(renderPage("Series", `
     <div class="page-actions">
       <a href="/series/new" class="btn">+ New Series</a>
