@@ -411,13 +411,12 @@ module.exports = {
 
     collector.on("collect", async i => {
       try {
-        await i.deferUpdate();
         const freshBanners = await getActiveBanners();
         const freshUser    = await User.findOne({ userId: interaction.user.id });
         await handleBannerInteraction(i, freshBanners, freshUser);
       } catch (err) {
         console.error("Banner interaction error:", err);
-        await i.followUp({ content: "An error occurred.", ephemeral: true }).catch(() => {});
+        await i.update({ content: "An error occurred.", embeds: [], components: [] }).catch(() => {});
       }
     });
 
