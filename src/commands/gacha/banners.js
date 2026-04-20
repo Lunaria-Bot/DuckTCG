@@ -27,10 +27,10 @@ const RARITY_COLOR = {
   exceptional: 0xFFD700,
 };
 const RARITY_LABEL = {
-  common:      "⬜ Common",
-  rare:        "🟦 Rare ✦",
-  special:     "🟪 Special ✦✦",
-  exceptional: "🌟 Exceptional ✦✦✦",
+  common:      "<:Common:1495730171301462186> Common",
+  rare:        "<:Rare:1495730219561255112> Rare ✦",
+  special:     "<:SP:1495730276737745077> Special ✦✦",
+  exceptional: "<:EX:1495730346241822861> Exceptional ✦✦✦",
 };
 const RARITY_STAR = {
   common: "★", rare: "★★", special: "★★★", exceptional: "★★★★★",
@@ -91,10 +91,10 @@ function buildBannerEmbed(banner, user) {
       {
         name: "Drop Rates",
         value: [
-          `🌟 Exceptional ✦✦✦  **${banner.rates.exceptional}%**`,
-          `🟪 Special ✦✦  **${banner.rates.special}%**`,
-          `🟦 Rare ✦  **${banner.rates.rare}%**`,
-          `⬜ Common  **${banner.rates.common}%**`,
+          `<:EX:1495730346241822861> Exceptional ✦✦✦  **${banner.rates.exceptional}%**`,
+          `<:SP:1495730276737745077> Special ✦✦  **${banner.rates.special}%**`,
+          `<:Rare:1495730219561255112> Rare ✦  **${banner.rates.rare}%**`,
+          `<:Common:1495730171301462186> Common  **${banner.rates.common}%**`,
         ].join("\n"),
         inline: true,
       },
@@ -128,10 +128,10 @@ function buildInfoEmbed(banner) {
       {
         name: "Drop Rates",
         value: [
-          `🌟 **Exceptional** ✦✦✦ — **${banner.rates.exceptional}%**`,
-          `🟪 **Special** ✦✦ — **${banner.rates.special}%**`,
-          `🟦 **Rare** ✦ — **${banner.rates.rare}%**`,
-          `⬜ **Common** — **${banner.rates.common}%**`,
+          `<:EX:1495730346241822861> **Exceptional** ✦✦✦ — **${banner.rates.exceptional}%**`,
+          `<:SP:1495730276737745077> **Special** ✦✦ — **${banner.rates.special}%**`,
+          `<:Rare:1495730219561255112> **Rare** ✦ — **${banner.rates.rare}%**`,
+          `<:Common:1495730171301462186> **Common** — **${banner.rates.common}%**`,
         ].join("\n"),
         inline: true,
       },
@@ -155,10 +155,10 @@ function buildRatesEmbed(banner) {
     .setColor(0x5865f2)
     .setDescription("Rates apply equally to ×1 and ×10 pulls.")
     .addFields(
-      { name: "🌟 Exceptional ✦✦✦", value: `**${banner.rates.exceptional}%**\nSoft pity starts at **${banner.pity?.softPityStart ?? 75}**, guaranteed at **${banner.pity?.hardPity ?? 90}**`, inline: true },
-      { name: "🟪 Special ✦✦",      value: `**${banner.rates.special}%**`, inline: true },
-      { name: "🟦 Rare ✦",          value: `**${banner.rates.rare}%**`, inline: true },
-      { name: "⬜ Common",           value: `**${banner.rates.common}%**`, inline: true },
+      { name: "<:EX:1495730346241822861> Exceptional ✦✦✦", value: `**${banner.rates.exceptional}%**\nSoft pity starts at **${banner.pity?.softPityStart ?? 75}**, guaranteed at **${banner.pity?.hardPity ?? 90}**`, inline: true },
+      { name: "<:SP:1495730276737745077> Special ✦✦",      value: `**${banner.rates.special}%**`, inline: true },
+      { name: "<:Rare:1495730219561255112> Rare ✦",          value: `**${banner.rates.rare}%**`, inline: true },
+      { name: "<:Common:1495730171301462186> Common",           value: `**${banner.rates.common}%**`, inline: true },
       { name: "Jade Cost",           value: `×1: **${JADE_SINGLE}** ${JADE}\n×10: **${JADE_MULTI}** ${JADE}`, inline: true },
     );
 }

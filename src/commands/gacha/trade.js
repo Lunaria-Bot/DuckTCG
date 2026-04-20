@@ -11,7 +11,7 @@ const User = require("../../models/User");
 const { getRedis } = require("../../services/redis");
 const { calculateStats } = require("../../services/cardStats");
 
-const RARITY_EMOJI = { exceptional: "🌟", special: "🟪", rare: "🟦", common: "⬜" };
+const RARITY_EMOJI = { exceptional: "<:EX:1495730346241822861>", special: "<:SP:1495730276737745077>", rare: "<:Rare:1495730219561255112>", common: "<:Common:1495730171301462186>" };
 const RARITY_ORDER = { exceptional: 0, special: 1, rare: 2, common: 3 };
 const NYAN    = "<:Nyan:1495048966528831508>";
 const TRADE_TTL    = 5 * 60; // 5 min Redis TTL
@@ -47,7 +47,7 @@ async function offerValue(offer) {
   const lines = [];
   for (const cardId of offer.cardIds) {
     const card = await Card.findOne({ cardId });
-    if (card) lines.push(`${RARITY_EMOJI[card.rarity] ?? "⬜"} **${card.name}**`);
+    if (card) lines.push(`${RARITY_EMOJI[card.rarity] ?? "<:Common:1495730171301462186>"} **${card.name}**`);
   }
   if (offer.gold)    lines.push(`${NYAN} **${offer.gold.toLocaleString()}** Nyang`);
   if (offer.premium) lines.push(`💎 **${offer.premium.toLocaleString()}** Premium`);
@@ -353,7 +353,7 @@ module.exports = {
           await lm.edit({ ...updated, components: [buildTradeRow(uid, freshSession)] });
         }
       } catch {}
-      return interaction.editReply({ content: `Added **${RARITY_EMOJI[card.rarity] ?? "⬜"} ${card.name}** to your trade offer.` });
+      return interaction.editReply({ content: `Added **${RARITY_EMOJI[card.rarity] ?? "<:Common:1495730171301462186>"} ${card.name}** to your trade offer.` });
     }
 
     // ── ADD CURRENCY ──────────────────────────────────────────────────────────

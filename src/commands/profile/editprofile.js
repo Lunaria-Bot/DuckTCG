@@ -14,7 +14,7 @@ const PlayerCard = require("../../models/PlayerCard");
 const Card = require("../../models/Card");
 const User = require("../../models/User");
 
-const RARITY_EMOJI = { common: "⬜", rare: "🟦", special: "🟪", exceptional: "🌟" };
+const RARITY_EMOJI = { common: "<:Common:1495730171301462186>", rare: "<:Rare:1495730219561255112>", special: "<:SP:1495730276737745077>", exceptional: "<:EX:1495730346241822861>" };
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -145,7 +145,7 @@ if (sub === "bio") {
 
       const options = sorted.map(pc => {
         const card = cardMap[pc.cardId];
-        const emoji = RARITY_EMOJI[card.rarity] ?? "⬜";
+        const emoji = RARITY_EMOJI[card.rarity] ?? "<:Common:1495730171301462186>";
         return new StringSelectMenuOptionBuilder()
           .setLabel(`${card.name} — Lv.${pc.level}`)
           .setDescription(`${card.anime} · ${card.rarity}`)

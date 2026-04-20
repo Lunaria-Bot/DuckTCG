@@ -16,7 +16,7 @@ const {
   isQiReady, qiCooldownRemaining, formatCooldown, QI_COOLDOWN_MS,
 } = require("../../services/mana");
 
-const RARITY_EMOJI  = { exceptional: "🌟", special: "🟪", rare: "🟦", common: "⬜" };
+const RARITY_EMOJI  = { exceptional: "<:EX:1495730346241822861>", special: "<:SP:1495730276737745077>", rare: "<:Rare:1495730219561255112>", common: "<:Common:1495730171301462186>" };
 const RARITY_ORDER  = { exceptional: 0, special: 1, rare: 2, common: 3 };
 const RARITY_RATES  = { common: 60, rare: 30, special: 9, exceptional: 1 };
 
@@ -94,7 +94,7 @@ function buildRollEmbed(results, username) {
   const color = RARITY_COLOR[best.rarity] ?? 0x78909C;
 
   const lines = results.map(({ card, rarity }) =>
-    `${RARITY_EMOJI[rarity] ?? "⬜"} **${card.name}** — *${card.anime}*`
+    `${RARITY_EMOJI[rarity] ?? "<:Common:1495730171301462186>"} **${card.name}** — *${card.anime}*`
   );
 
   const embed = new EmbedBuilder()

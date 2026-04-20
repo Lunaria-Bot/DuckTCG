@@ -12,7 +12,7 @@ const Card = require("../../models/Card");
 const User = require("../../models/User");
 
 const BURN_VALUE = { common: 50, rare: 200, special: 800, exceptional: 3000 };
-const RARITY_EMOJI = { exceptional: "🌟", special: "🟪", rare: "🟦", common: "⬜" };
+const RARITY_EMOJI = { exceptional: "<:EX:1495730346241822861>", special: "<:SP:1495730276737745077>", rare: "<:Rare:1495730219561255112>", common: "<:Common:1495730171301462186>" };
 const RARITY_ORDER = { exceptional: 0, special: 1, rare: 2, common: 3 };
 const NYAN = "<:Nyan:1495048966528831508>";
 
@@ -59,7 +59,7 @@ module.exports = {
         .setLabel(`${card.name}${qty} — ${val.toLocaleString()} ${NYAN}`)
         .setDescription(`${card.anime} · ${card.rarity} · Lv.${pc.level}`)
         .setValue(pc._id.toString())
-        .setEmoji(RARITY_EMOJI[card.rarity] ?? "⬜");
+        .setEmoji(RARITY_EMOJI[card.rarity] ?? "<:Common:1495730171301462186>");
     });
 
     const selectRow = new ActionRowBuilder().addComponents(

@@ -128,7 +128,7 @@ module.exports = {
                 : newStreak >= 14 ? 0x8b5cf6
                 : 0x6d28d9;
 
-    const titlePrefix = milestone   ? "🌟 Milestone — "
+    const titlePrefix = milestone   ? "<:EX:1495730346241822861> Milestone — "
                       : streakReset ? "Daily Reward"
                       : "Daily Reward";
 

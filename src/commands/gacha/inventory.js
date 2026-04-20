@@ -12,7 +12,7 @@ const User = require("../../models/User");
 const PAGE_SIZE = 8;
 
 const RARITY_ORDER = { exceptional: 0, special: 1, rare: 2, common: 3 };
-const RARITY_EMOJI = { exceptional: "🌟", special: "🟪", rare: "🟦", common: "⬜" };
+const RARITY_EMOJI = { exceptional: "<:EX:1495730346241822861>", special: "<:SP:1495730276737745077>", rare: "<:Rare:1495730219561255112>", common: "<:Common:1495730171301462186>" };
 const RARITY_COLOR = { exceptional: 0xFFD700, special: 0xAB47BC, rare: 0x42A5F5, common: 0x78909C };
 const RARITY_LABEL = { exceptional: "Exceptional ✦✦✦", special: "Special ✦✦", rare: "Rare ✦", common: "Common" };
 const ROLE_EMOJI   = { dps: "⚔️", support: "💚", tank: "🛡️" };
@@ -44,7 +44,7 @@ function buildListEmbed(pairs, page, username, sortBy, filterRarity, filterRole)
   const totalCards = pairs.reduce((sum, p) => sum + (p.pc.quantity ?? 1), 0);
 
   const lines = slice.map(({ pc, card }) => {
-    const rar  = RARITY_EMOJI[card.rarity] ?? "⬜";
+    const rar  = RARITY_EMOJI[card.rarity] ?? "<:Common:1495730171301462186>";
     const rol  = ROLE_EMOJI[card.role] ?? "";
     const qty  = (pc.quantity ?? 1) > 1 ? ` ×${pc.quantity}` : "";
     const cp   = pc.cachedStats?.combatPower ?? 0;
@@ -85,7 +85,7 @@ function buildCardEmbed(pairs, index, username, totalCopiesMap) {
   const ownedLine = `Owned: ${ownedCopies} cop${ownedCopies > 1 ? "ies" : "y"}  ·  In Game: ${totalCopies} total`;
 
   const embed = new EmbedBuilder()
-    .setTitle(`${RARITY_EMOJI[card.rarity] ?? "⬜"} ${RARITY_LABEL[card.rarity] ?? card.rarity} — ${card.name}`)
+    .setTitle(`${RARITY_EMOJI[card.rarity] ?? "<:Common:1495730171301462186>"} ${RARITY_LABEL[card.rarity] ?? card.rarity} — ${card.name}`)
     .setDescription(`*${card.anime}*\nLevel **${pc.level}** / ${pc.isAscended ? 125 : 100}\n${ROLE_EMOJI[card.role] ?? ""} **${card.role.toUpperCase()}**  ·  CP **${(pc.cachedStats?.combatPower ?? 0).toLocaleString()}**`)
     .setColor(RARITY_COLOR[card.rarity] ?? 0x5B21B6)
     .setFooter({ text: `${ownedLine}` });
@@ -121,7 +121,7 @@ function buildControlRow(activeSort, activeRarity, activeRole) {
 function buildSortDropdown() {
   return new ActionRowBuilder().addComponents(
     new StringSelectMenuBuilder().setCustomId("inv_sort").setPlaceholder("Sort by...").addOptions([
-      new StringSelectMenuOptionBuilder().setLabel("Rarity (best first)").setValue("rarity").setEmoji("🌟"),
+      new StringSelectMenuOptionBuilder().setLabel("Rarity (best first)").setValue("rarity").setEmoji("<:EX:1495730346241822861>"),
       new StringSelectMenuOptionBuilder().setLabel("Level (highest first)").setValue("level").setEmoji("⬆️"),
       new StringSelectMenuOptionBuilder().setLabel("Anime (A → Z)").setValue("anime").setEmoji("📚"),
       new StringSelectMenuOptionBuilder().setLabel("Recently obtained").setValue("date").setEmoji("🕐"),
@@ -133,10 +133,10 @@ function buildRarityDropdown() {
   return new ActionRowBuilder().addComponents(
     new StringSelectMenuBuilder().setCustomId("inv_filter_rarity").setPlaceholder("Filter by rarity...").addOptions([
       new StringSelectMenuOptionBuilder().setLabel("All rarities").setValue("all").setEmoji("✨"),
-      new StringSelectMenuOptionBuilder().setLabel("Exceptional").setValue("exceptional").setEmoji("🌟"),
-      new StringSelectMenuOptionBuilder().setLabel("Special").setValue("special").setEmoji("🟪"),
-      new StringSelectMenuOptionBuilder().setLabel("Rare").setValue("rare").setEmoji("🟦"),
-      new StringSelectMenuOptionBuilder().setLabel("Common").setValue("common").setEmoji("⬜"),
+      new StringSelectMenuOptionBuilder().setLabel("Exceptional").setValue("exceptional").setEmoji("<:EX:1495730346241822861>"),
+      new StringSelectMenuOptionBuilder().setLabel("Special").setValue("special").setEmoji("<:SP:1495730276737745077>"),
+      new StringSelectMenuOptionBuilder().setLabel("Rare").setValue("rare").setEmoji("<:Rare:1495730219561255112>"),
+      new StringSelectMenuOptionBuilder().setLabel("Common").setValue("common").setEmoji("<:Common:1495730171301462186>"),
     ])
   );
 }
