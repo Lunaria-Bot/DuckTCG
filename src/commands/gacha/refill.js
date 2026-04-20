@@ -46,6 +46,8 @@ module.exports = {
       "mana.dantian":          Math.floor(newDantian),
       "mana.lastDantianUpdate": new Date(),
       "mana.qiCooldownUntil":  null,
+      "notifiedFull.qi":       false,
+      "notifiedFull.dantian":  false,
     });
 
     const embed = new EmbedBuilder()

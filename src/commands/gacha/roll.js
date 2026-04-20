@@ -172,6 +172,7 @@ module.exports = {
       "mana.dantian":         currentDantian,
       "mana.lastDantianUpdate": new Date(),
       "mana.qiCooldownUntil": null,
+      "notifiedFull.qi":      false, // spent Qi → allow notif again when full
       $inc: { "stats.totalPullsDone": actualAmount },
     });
 

@@ -1,6 +1,7 @@
 const {
   SlashCommandBuilder, EmbedBuilder,
   ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType,
+  StringSelectMenuBuilder, StringSelectMenuOptionBuilder,
 } = require("discord.js");
 const { requireProfile } = require("../../utils/requireProfile");
 const User = require("../../models/User");
@@ -54,7 +55,7 @@ const NYANG_ITEMS = [
   {
     id: "faction_pass",
     name: "Faction Pass",
-    desc: "Monthly exclusive pass granting bonus rewards and faction access. One per month.",
+    desc: "Monthly pass allowing you to change your Faction (feature coming soon). One per month.",
     price: 15000,
     currency: "gold",
     emoji: "🎫",
@@ -77,7 +78,7 @@ const NYANG_ITEMS = [
   {
     id: "lesser_qi_pill",
     name: "Lesser Qi Pill",
-    desc: `A pill that instantly refills your ${DANTIAN} Dantian to full. Max 2 per week.`,
+    desc: `A pill that restores **1/4** of your ${DANTIAN} Dantian capacity. Max 2 per week.`,
     price: 8000,
     currency: "gold",
     emoji: DANTIAN,
@@ -216,18 +217,23 @@ function buildTabRow(tab) {
   );
 }
 
-function buildBuyRow(tab) {
+function buildBuyDropdown(tab) {
   const items = tab === "nyang" ? NYANG_ITEMS : JADE_ITEMS;
+  const currency = tab === "nyang" ? "Nyang" : "Jade";
   return new ActionRowBuilder().addComponents(
-    items.map((item, i) => {
-      const btn = new ButtonBuilder()
-        .setCustomId(`shop_buy_${tab}_${item.id}`)
-        .setLabel(`Buy ${i + 1}`)
-        .setStyle(ButtonStyle.Secondary);
-      // Only set emoji if it's a standard Unicode emoji (not a custom <:name:id>)
-      if (item.emoji && !item.emoji.startsWith("<")) btn.setEmoji(item.emoji);
-      return btn;
-    })
+    new StringSelectMenuBuilder()
+      .setCustomId(`shop_buy_${tab}`)
+      .setPlaceholder(`Select an item to buy...`)
+      .addOptions(items.map(item => {
+        const priceStr = tab === "nyang" ? `${item.price.toLocaleString()} Nyang` : `${item.price} Jade`;
+        const opt = new StringSelectMenuOptionBuilder()
+          .setLabel(item.name)
+          .setDescription(`${priceStr} · ${item.limit}`)
+          .setValue(item.id);
+        // Only set emoji for standard Unicode, not custom Discord emojis
+        if (item.emoji && !item.emoji.startsWith("<")) opt.setEmoji(item.emoji);
+        return opt;
+      }))
   );
 }
 
@@ -247,12 +253,12 @@ module.exports = {
 
     const msg = await interaction.editReply({
       embeds: [buildShopEmbed(tab, user)],
-      components: [buildTabRow(tab), buildBuyRow(tab)],
+      components: [buildTabRow(tab), buildBuyDropdown(tab)],
     });
 
     const collector = msg.createMessageComponentCollector({
       componentType: ComponentType.Button,
-      filter: i => i.user.id === interaction.user.id,
+      filter: i => i.user.id === interaction.user.id && (i.isButton() || i.isStringSelectMenu()),
       time: 5 * 60 * 1000,
     });
 
@@ -269,11 +275,12 @@ module.exports = {
         });
       }
 
-      // Buy
-      if (i.customId.startsWith("shop_buy_")) {
-        const [,, , itemTab, itemId] = i.customId.split("_");
-        const items = itemTab === "nyang" ? NYANG_ITEMS : JADE_ITEMS;
-        const item = items.find(x => x.id === itemId);
+      // Buy via dropdown
+      if (i.customId === "shop_buy_nyang" || i.customId === "shop_buy_jade") {
+        const itemTab = i.customId === "shop_buy_nyang" ? "nyang" : "jade";
+        const itemId  = i.values[0];
+        const items   = itemTab === "nyang" ? NYANG_ITEMS : JADE_ITEMS;
+        const item    = items.find(x => x.id === itemId);
         if (!item) return;
 
         user = await User.findOne({ userId: interaction.user.id });

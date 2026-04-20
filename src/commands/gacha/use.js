@@ -11,13 +11,19 @@ const USABLE_ITEMS = {
     field: "items.lesserQiPill",
     use: async (user) => {
       if ((user.items?.lesserQiPill ?? 0) < 1) return { error: "You don't have any Lesser Qi Pills." };
-      const max = dantianMax(user.accountLevel);
+      const max     = dantianMax(user.accountLevel);
+      const restore = Math.floor(max / 4);
+      // Import regenDantian to get current value
+      const { regenDantian } = require("../../services/mana");
+      const current   = regenDantian(user);
+      const newDantian = Math.min(current + restore, max);
       await User.findOneAndUpdate({ userId: user.userId }, {
         $inc: { "items.lesserQiPill": -1 },
-        "mana.dantian": max,
+        "mana.dantian": newDantian,
         "mana.lastDantianUpdate": new Date(),
+        "notifiedFull.dantian": false,
       });
-      return { msg: `${DANTIAN} **Lesser Qi Pill** used! Your Dantian has been fully restored to **${max}/${max}**.` };
+      return { msg: `${DANTIAN} **Lesser Qi Pill** used! Restored **+${restore}** Dantian → **${newDantian}/${max}**.` };
     },
   },
 };

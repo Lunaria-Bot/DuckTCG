@@ -63,9 +63,14 @@ const UserSchema = new Schema({
 
   // ── Notification settings ─────────────────────────────────────────────────
   notifications: {
-    qiFull:      { type: Boolean, default: false }, // DM when Qi is full
-    dantianFull: { type: Boolean, default: false }, // DM when Dantian is full
-    questDone:   { type: Boolean, default: false }, // DM when a quest is completable
+    qiFull:      { type: Boolean, default: false },
+    dantianFull: { type: Boolean, default: false },
+    questDone:   { type: Boolean, default: false },
+  },
+  // Tracks whether we already sent the "full" DM — resets when value drops below max
+  notifiedFull: {
+    qi:      { type: Boolean, default: false },
+    dantian: { type: Boolean, default: false },
   },
   // ── Mana system ──────────────────────────────────────────────────────────
   mana: {
