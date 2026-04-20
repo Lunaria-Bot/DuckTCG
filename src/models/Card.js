@@ -32,6 +32,7 @@ const CardSchema = new Schema({
   pickupBannerId: { type: String, default: null },
 
   isAvailable: { type: Boolean, default: true },
+  seriesId:    { type: String, default: null },
 }, { timestamps: true });
 
 module.exports = model("Card", CardSchema);
