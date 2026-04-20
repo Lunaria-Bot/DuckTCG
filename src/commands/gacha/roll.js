@@ -113,9 +113,9 @@ module.exports = {
     .setDescription("Roll for cards using your Qi")
     .addIntegerOption(opt =>
       opt.setName("amount")
-        .setDescription("Number of rolls (1-5, costs that much Qi)")
+        .setDescription("Number of rolls (costs that much Qi)")
         .setMinValue(1)
-        .setMaxValue(5)
+        .setMaxValue(10) // actual cap enforced at runtime via rollLimit
     ),
 
   async execute(interaction) {
@@ -124,7 +124,8 @@ module.exports = {
     const user = await requireProfile(interaction);
     if (!user) return;
 
-    const amount = interaction.options.getInteger("amount") ?? 1;
+    const maxRolls = user.rollLimit ?? 5;
+    const amount = Math.min(interaction.options.getInteger("amount") ?? 1, maxRolls);
 
     // Apply Dantian regen
     const currentDantian = regenDantian(user);

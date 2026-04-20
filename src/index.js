@@ -157,6 +157,20 @@ Use \`/refill\` to transfer energy to your Qi.`);
   }, 5 * 60_000); // every 5 minutes
 }
 
+
+// Premium expiry checker — runs every hour
+function startPremiumExpiryChecker() {
+  const User = require("./models/User");
+  setInterval(async () => {
+    const now = new Date();
+    const expired = await User.find({ isPremium: true, premiumUntil: { $lte: now } });
+    for (const u of expired) {
+      await u.updateOne({ isPremium: false });
+      logger.info(`Premium expired for user ${u.userId}`);
+    }
+  }, 60 * 60_000); // every hour
+}
+
 // Start
 (async () => {
   await connectMongo();
@@ -166,6 +180,7 @@ Use \`/refill\` to transfer energy to your Qi.`);
   startMessageScheduler();
   startBannerExpirationChecker();
   startManaNotificationChecker();
+  startPremiumExpiryChecker();
 })();
 
 module.exports = client;

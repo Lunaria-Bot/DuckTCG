@@ -41,7 +41,25 @@ const UserSchema = new Schema({
   favoriteCardId: { type: Schema.Types.ObjectId, ref: "PlayerCard", default: null },
   bio: { type: String, default: null, maxlength: 150 },
   guild: { type: String, default: null, maxlength: 50 },
-  isPremium: { type: Boolean, default: false },
+  isPremium:       { type: Boolean, default: false },
+  premiumUntil:    { type: Date, default: null },   // Premium expiry date
+  rollLimit:       { type: Number, default: 5 },    // max rolls per /roll command
+
+  // ── Items inventory ───────────────────────────────────────────────────────
+  items: {
+    lesserQiPill:  { type: Number, default: 0 },    // recharges Dantian to full
+    gearBox:       { type: Number, default: 0 },    // random gear reward
+    petTreatBox:   { type: Number, default: 0 },    // pet treat reward
+    specialCardBox:{ type: Number, default: 0 },    // roll special-rarity card
+  },
+
+  // ── Shop limits ───────────────────────────────────────────────────────────
+  shopLimits: {
+    rollUpgradeBought: { type: Boolean, default: false }, // one-time roll upgrade
+    factionPassLastBought: { type: Date, default: null },  // monthly faction pass
+    lesserQiPillWeekly: { type: Number, default: 0 },      // weekly pill purchase count
+    lesserQiPillWeekReset: { type: Date, default: null },  // week reset date
+  },
 
   // ── Notification settings ─────────────────────────────────────────────────
   notifications: {
