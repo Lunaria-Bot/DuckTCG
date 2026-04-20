@@ -997,7 +997,7 @@ app.get("/banners/:id/stats", auth, editorOrAdmin, async (req, res) => {
 // ─── SERIES ───────────────────────────────────────────────────────────────────
 app.get("/series", auth, editorOrAdmin, async (req, res) => {
   const seriesList = await Series.find().sort({ name: 1 });
-  const cardCounts = await Promise.all(seriesList.map(s => Card.countDocuments({ seriesId: s.seriesId })));
+  const cardCounts = await Promise.all(seriesList.map(s => Card.countDocuments({ seriesId: s.seriesId.toString() })));
   res.send(renderPage("Series", `
     <div class="page-actions">
       <a href="/series/new" class="btn">+ New Series</a>
@@ -1090,11 +1090,15 @@ app.get("/series/:id/toggle", auth, editorOrAdmin, async (req, res) => {
 app.get("/series/:id/cards", auth, editorOrAdmin, async (req, res) => {
   const series = await Series.findOne({ seriesId: req.params.id });
   if (!series) return res.redirect("/series");
-  const cards = await Card.find({ seriesId: series.seriesId }).sort({ rarity: 1, name: 1 });
+  const cards = await Card.find({ seriesId: series.seriesId.toString() }).sort({ rarity: 1, name: 1 });
   const allCards = await Card.find({ $or: [{ seriesId: null }, { seriesId: "" }, { seriesId: { $exists: false } }] }).sort({ anime: 1, name: 1 });
   const rarityBadge = { common:"badge-gray",rare:"badge-blue",special:"badge-purple",exceptional:"badge-yellow" };
   res.send(renderPage(`Cards — ${series.name}`, `
     <a href="/series" class="back-link">← Back to Series</a>
+    <div style="margin-bottom:12px;display:flex;gap:8px;align-items:center">
+      <a href="/series/${series.seriesId}/sync-by-anime" class="btn btn-gray btn-sm" onclick="return confirm('Auto-assign all cards whose anime matches \'${series.name}\'?')">🔄 Auto-assign by Anime Name</a>
+      <span class="text-dim text-sm">Assigns cards where anime = "${series.name}"</span>
+    </div>
     <div class="two-col" style="align-items:flex-start">
       <div class="card" style="margin-bottom:0">
         <div class="card-header"><h2>Cards in this series <span class="badge badge-purple">${cards.length}</span></h2></div>
@@ -1124,6 +1128,17 @@ app.get("/series/:id/cards", auth, editorOrAdmin, async (req, res) => {
       </div>
     </div>
   `, req.user, "/series"));
+});
+
+app.get("/series/:id/sync-by-anime", auth, editorOrAdmin, async (req, res) => {
+  const series = await Series.findOne({ seriesId: req.params.id });
+  if (!series) return res.redirect("/series");
+  const result = await Card.updateMany(
+    { anime: series.name, $or: [{ seriesId: null }, { seriesId: "" }, { seriesId: { $exists: false } }] },
+    { seriesId: series.seriesId }
+  );
+  await audit(req.user, "update", "series", req.params.id, `Auto-synced ${result.modifiedCount} cards by anime name "${series.name}"`, null, null);
+  res.redirect(`/series/${req.params.id}/cards`);
 });
 
 app.get("/series/:id/add-card", auth, editorOrAdmin, async (req, res) => {
