@@ -219,13 +219,15 @@ function buildTabRow(tab) {
 function buildBuyRow(tab) {
   const items = tab === "nyang" ? NYANG_ITEMS : JADE_ITEMS;
   return new ActionRowBuilder().addComponents(
-    items.map((item, i) =>
-      new ButtonBuilder()
+    items.map((item, i) => {
+      const btn = new ButtonBuilder()
         .setCustomId(`shop_buy_${tab}_${item.id}`)
         .setLabel(`Buy ${i + 1}`)
-        .setEmoji(item.emoji.startsWith("<") ? undefined : item.emoji)
-        .setStyle(ButtonStyle.Secondary)
-    ).filter(b => b)
+        .setStyle(ButtonStyle.Secondary);
+      // Only set emoji if it's a standard Unicode emoji (not a custom <:name:id>)
+      if (item.emoji && !item.emoji.startsWith("<")) btn.setEmoji(item.emoji);
+      return btn;
+    })
   );
 }
 
