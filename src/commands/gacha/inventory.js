@@ -14,7 +14,7 @@ const PAGE_SIZE = 8;
 const RARITY_ORDER = { exceptional: 0, special: 1, rare: 2, common: 3 };
 const RARITY_EMOJI = { exceptional: "<:EX:1495730346241822861>", special: "<:SP:1495730276737745077>", rare: "<:Rare:1495730219561255112>", common: "<:Common:1495730171301462186>" };
 const RARITY_COLOR = { exceptional: 0xFFD700, special: 0xAB47BC, rare: 0x42A5F5, common: 0x78909C };
-const RARITY_LABEL = { exceptional: "Exceptional ✦✦✦", special: "Special ✦✦", rare: "Rare ✦", common: "Common" };
+const RARITY_LABEL = { exceptional: "Exceptional", special: "Special", rare: "Rare", common: "Common" };
 const ROLE_EMOJI   = { dps: "⚔️", support: "💚", tank: "🛡️" };
 
 function sortCards(pairs, sortBy) {
