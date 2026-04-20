@@ -1091,7 +1091,7 @@ app.get("/series/:id/cards", auth, editorOrAdmin, async (req, res) => {
   const series = await Series.findOne({ seriesId: req.params.id });
   if (!series) return res.redirect("/series");
   const cards = await Card.find({ seriesId: series.seriesId.toString() }).sort({ rarity: 1, name: 1 });
-  const allCards = await Card.find({ $or: [{ seriesId: null }, { seriesId: "" }, { seriesId: { $exists: false } }] }).sort({ anime: 1, name: 1 });
+  const allCards = await Card.find({ seriesId: { $ne: series.seriesId } }).sort({ anime: 1, name: 1 });
   const rarityBadge = { common:"badge-gray",rare:"badge-blue",special:"badge-purple",exceptional:"badge-yellow" };
   res.send(renderPage(`Cards — ${series.name}`, `
     <a href="/series" class="back-link">← Back to Series</a>
@@ -1133,8 +1133,9 @@ app.get("/series/:id/cards", auth, editorOrAdmin, async (req, res) => {
 app.get("/series/:id/sync-by-anime", auth, editorOrAdmin, async (req, res) => {
   const series = await Series.findOne({ seriesId: req.params.id });
   if (!series) return res.redirect("/series");
+  // Case-insensitive match on anime name, assign regardless of current seriesId
   const result = await Card.updateMany(
-    { anime: series.name, $or: [{ seriesId: null }, { seriesId: "" }, { seriesId: { $exists: false } }] },
+    { anime: { $regex: `^${series.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, $options: "i" } },
     { seriesId: series.seriesId }
   );
   await audit(req.user, "update", "series", req.params.id, `Auto-synced ${result.modifiedCount} cards by anime name "${series.name}"`, null, null);
