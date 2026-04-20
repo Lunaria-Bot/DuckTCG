@@ -107,19 +107,14 @@ function startManaNotificationChecker() {
   const { qiMax, dantianMax, regenQi, regenDantian } = require("./services/mana");
   const User = require("./models/User");
 
-  // In-memory flags: Set of "userId_qi" / "userId_dantian"
-  // Added when full DM sent, removed when value drops below max
-  const notified = new Set();
-
   setInterval(async () => {
     try {
-      // Fetch all users who have any notification on OR have regen in progress
       const users = await User.find({
         $or: [
           { "notifications.qiFull": true },
           { "notifications.dantianFull": true },
-          { "mana.qi": { $gt: 0 } }, // has partial Qi to update
-          { "mana.dantian": { $gt: 0 } }, // has partial Dantian to update
+          { "mana.qi": { $gt: 0 } },
+          { "mana.dantian": { $gt: 0 } },
         ],
       });
 
@@ -130,50 +125,61 @@ function startManaNotificationChecker() {
           const newQi      = regenQi(user);
           const newDantian = regenDantian(user);
 
-          const qiKey      = `${user.userId}_qi`;
-          const dantianKey = `${user.userId}_dantian`;
+          const dbUpdate = {};
 
-          // Only write to DB if value actually changed
-          const qiChanged      = newQi      !== (user.mana?.qi      ?? maxQi);
-          const dantianChanged = newDantian !== (user.mana?.dantian ?? maxDantian);
-
-          if (qiChanged || dantianChanged) {
-            const update = {};
-            if (qiChanged) {
-              update["mana.qi"] = newQi;
-              // Reset lastQiUpdate to now so next tick calculates from current value
-              update["mana.lastQiUpdate"] = new Date();
-            }
-            if (dantianChanged) {
-              update["mana.dantian"] = newDantian;
-              update["mana.lastDantianUpdate"] = new Date();
-            }
-            await User.findOneAndUpdate({ userId: user.userId }, update);
+          // Progressive regen writes
+          if (newQi !== (user.mana?.qi ?? maxQi)) {
+            dbUpdate["mana.qi"]          = newQi;
+            dbUpdate["mana.lastQiUpdate"] = new Date();
+          }
+          if (newDantian !== (user.mana?.dantian ?? maxDantian)) {
+            dbUpdate["mana.dantian"]           = newDantian;
+            dbUpdate["mana.lastDantianUpdate"] = new Date();
           }
 
-          // ── Notifications ─────────────────────────────────────────────────
+          // ── Qi notification ───────────────────────────────────────────────
+          // Rule: send DM only when transitioning from not-full → full
+          // notifiedFull.qi = true means we already sent the DM since last time it was spent
+          const qiWasFull    = user.notifiedFull?.qi === true;
+          const qiIsNowFull  = newQi >= maxQi;
+          const qiWasNotFull = newQi < maxQi;
 
-          // Qi full — notify only first time after reaching max, reset flag when drops below
-          if (newQi < maxQi) {
-            notified.delete(qiKey); // dropped below full → ready to notify again next time
-          } else if (user.notifications?.qiFull && newQi >= maxQi && !notified.has(qiKey)) {
-            notified.add(qiKey);
+          if (qiWasNotFull && qiWasFull) {
+            // Value dropped below max — reset flag so next fill triggers a new DM
+            dbUpdate["notifiedFull.qi"] = false;
+          } else if (qiIsNowFull && !qiWasFull && user.notifications?.qiFull) {
+            // Just reached full AND haven't notified yet → set flag first, then DM
+            dbUpdate["notifiedFull.qi"] = true;
+          }
+
+          // ── Dantian notification ──────────────────────────────────────────
+          const dantianWasFull   = user.notifiedFull?.dantian === true;
+          const dantianIsNowFull = newDantian >= maxDantian;
+          const dantianWasNotFull = newDantian < maxDantian;
+
+          if (dantianWasNotFull && dantianWasFull) {
+            dbUpdate["notifiedFull.dantian"] = false;
+          } else if (dantianIsNowFull && !dantianWasFull && user.notifications?.dantianFull) {
+            dbUpdate["notifiedFull.dantian"] = true;
+          }
+
+          // Write DB changes first
+          if (Object.keys(dbUpdate).length) {
+            await User.findOneAndUpdate({ userId: user.userId }, dbUpdate);
+          }
+
+          // Send DMs AFTER DB write — only if flag just became true
+          if (qiIsNowFull && !qiWasFull && user.notifications?.qiFull) {
             try {
-              const discordUser = await client.users.fetch(user.userId);
-              await discordUser.send(`<:Qi:1495523502961459200> **Your Qi is full!** (${maxQi}/${maxQi})
-Use \`/roll\` to spend it.`);
+              const du = await client.users.fetch(user.userId);
+              await du.send(`<:Qi:1495523502961459200> **Your Qi is full!** (${maxQi}/${maxQi})\nUse \`/roll\` to spend it.`);
             } catch {}
           }
 
-          // Dantian full — same logic
-          if (newDantian < maxDantian) {
-            notified.delete(dantianKey);
-          } else if (user.notifications?.dantianFull && newDantian >= maxDantian && !notified.has(dantianKey)) {
-            notified.add(dantianKey);
+          if (dantianIsNowFull && !dantianWasFull && user.notifications?.dantianFull) {
             try {
-              const discordUser = await client.users.fetch(user.userId);
-              await discordUser.send(`<:Dantian:1495528597610303608> **Your Dantian is full!** (${maxDantian}/${maxDantian})
-Use \`/refill\` to transfer energy to your Qi.`);
+              const du = await client.users.fetch(user.userId);
+              await du.send(`<:Dantian:1495528597610303608> **Your Dantian is full!** (${maxDantian}/${maxDantian})\nUse \`/refill\` to transfer energy to your Qi.`);
             } catch {}
           }
 
@@ -182,7 +188,7 @@ Use \`/refill\` to transfer energy to your Qi.`);
     } catch (err) {
       logger.error("Mana tick error:", err);
     }
-  }, 5 * 60_000); // every 5 minutes
+  }, 5 * 60_000);
 }
 
 
