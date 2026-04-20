@@ -29,7 +29,7 @@ function buildListEmbed(cards, page, totalPages, filters) {
   return new EmbedBuilder()
     .setTitle("🃏 Card List")
     .setDescription(
-      `Browse all ${cards.length} card${cards.length !== 1 ? "s" : ""} in DuckTCG.\n\n` +
+      `Browse all ${cards.length} card${cards.length !== 1 ? "s" : ""} in SeorinTCG.\n\n` +
       (lines.join("\n") || "*No cards match your filters.*")
     )
     .setColor(0x5B21B6)
@@ -165,7 +165,7 @@ function buildAnimeDropdown(animes, page = 0) {
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("card")
-    .setDescription("Browse all available cards in DuckTCG"),
+    .setDescription("Browse all available cards in SeorinTCG"),
 
   async execute(interaction) {
     await interaction.deferReply();

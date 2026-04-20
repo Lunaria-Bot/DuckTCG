@@ -96,8 +96,8 @@ function renderPage(title, content, user = null, activePage = "") {
   const sidebar = user ? `
     <aside class="sidebar">
       <div class="sidebar-brand">
-        <span class="brand-duck">🦆</span>
-        <span class="brand-name">DuckyTCG</span>
+        <span class="brand-duck">🌸</span>
+        <span class="brand-name">SeorinTCG</span>
       </div>
       <nav class="sidebar-nav">
         ${navItems.map(n => `
@@ -122,7 +122,7 @@ function renderPage(title, content, user = null, activePage = "") {
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>${title} — DuckyTCG</title>
+  <title>${title} — SeorinTCG</title>
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
   <style>
@@ -474,7 +474,7 @@ app.get("/login", (req, res) => {
   const state = crypto.randomBytes(16).toString("hex");
   res.cookie("oauth_state", state, { httpOnly: true, maxAge: 5 * 60 * 1000 });
   const params = new URLSearchParams({ client_id: DISCORD_CLIENT_ID, redirect_uri: REDIRECT_URI, response_type: "code", scope: "identify", state });
-  res.send(`<!DOCTYPE html><html><head><meta charset="UTF-8"/><link rel="preconnect" href="https://fonts.googleapis.com"/><link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700&display=swap" rel="stylesheet"/><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Outfit',sans-serif;background:#0c0c11;color:#e8e8f0;min-height:100vh;display:flex;align-items:center;justify-content:center}.login-card{background:#18181f;border:1px solid #2a2a38;border-radius:14px;padding:40px;width:340px;text-align:center}.duck{font-size:48px;margin-bottom:16px}.title{font-size:22px;font-weight:700;margin-bottom:6px}.sub{font-size:13px;color:#9090aa;margin-bottom:24px}.discord-btn{display:flex;align-items:center;justify-content:center;gap:10px;background:#5865F2;color:#fff;border:none;border-radius:6px;padding:12px 20px;font-size:14px;font-weight:600;font-family:'Outfit',sans-serif;cursor:pointer;width:100%;text-decoration:none;transition:background 0.15s}.discord-btn:hover{background:#4752c4}</style></head><body><div class="login-card"><div class="duck">🦆</div><div class="title">DuckyTCG Admin</div><div class="sub">Sign in with your Discord account</div><a href="https://discord.com/api/oauth2/authorize?${params}" class="discord-btn"><svg width="20" height="20" viewBox="0 0 71 55" fill="white"><path d="M60.1 4.9A58.5 58.5 0 0 0 45.6.4a40 40 0 0 0-1.8 3.6 54.2 54.2 0 0 0-16.2 0A40 40 0 0 0 25.8.4 58.5 58.5 0 0 0 11.2 4.9C1.6 19.2-.9 33.1.3 46.8a59 59 0 0 0 17.9 9 42 42 0 0 0 3.7-6 38.3 38.3 0 0 1-5.8-2.8l1.4-1.1a42 42 0 0 0 36.2 0l1.4 1.1a38.3 38.3 0 0 1-5.8 2.8 42 42 0 0 0 3.6 6 58.7 58.7 0 0 0 17.9-9C72.3 30.8 68.4 17 60.1 4.9zM23.7 38.3c-3.5 0-6.4-3.2-6.4-7.2s2.8-7.2 6.4-7.2c3.5 0 6.4 3.3 6.3 7.2 0 4-2.8 7.2-6.3 7.2zm23.6 0c-3.5 0-6.4-3.2-6.4-7.2s2.8-7.2 6.4-7.2c3.5 0 6.4 3.3 6.3 7.2 0 4-2.8 7.2-6.3 7.2z"/></svg>Login with Discord</a></div></body></html>`);
+  res.send(`<!DOCTYPE html><html><head><meta charset="UTF-8"/><link rel="preconnect" href="https://fonts.googleapis.com"/><link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700&display=swap" rel="stylesheet"/><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Outfit',sans-serif;background:#0c0c11;color:#e8e8f0;min-height:100vh;display:flex;align-items:center;justify-content:center}.login-card{background:#18181f;border:1px solid #2a2a38;border-radius:14px;padding:40px;width:340px;text-align:center}.duck{font-size:48px;margin-bottom:16px}.title{font-size:22px;font-weight:700;margin-bottom:6px}.sub{font-size:13px;color:#9090aa;margin-bottom:24px}.discord-btn{display:flex;align-items:center;justify-content:center;gap:10px;background:#5865F2;color:#fff;border:none;border-radius:6px;padding:12px 20px;font-size:14px;font-weight:600;font-family:'Outfit',sans-serif;cursor:pointer;width:100%;text-decoration:none;transition:background 0.15s}.discord-btn:hover{background:#4752c4}</style></head><body><div class="login-card"><div class="duck">🌸</div><div class="title">SeorinTCG Admin</div><div class="sub">Sign in with your Discord account</div><a href="https://discord.com/api/oauth2/authorize?${params}" class="discord-btn"><svg width="20" height="20" viewBox="0 0 71 55" fill="white"><path d="M60.1 4.9A58.5 58.5 0 0 0 45.6.4a40 40 0 0 0-1.8 3.6 54.2 54.2 0 0 0-16.2 0A40 40 0 0 0 25.8.4 58.5 58.5 0 0 0 11.2 4.9C1.6 19.2-.9 33.1.3 46.8a59 59 0 0 0 17.9 9 42 42 0 0 0 3.7-6 38.3 38.3 0 0 1-5.8-2.8l1.4-1.1a42 42 0 0 0 36.2 0l1.4 1.1a38.3 38.3 0 0 1-5.8 2.8 42 42 0 0 0 3.6 6 58.7 58.7 0 0 0 17.9-9C72.3 30.8 68.4 17 60.1 4.9zM23.7 38.3c-3.5 0-6.4-3.2-6.4-7.2s2.8-7.2 6.4-7.2c3.5 0 6.4 3.3 6.3 7.2 0 4-2.8 7.2-6.3 7.2zm23.6 0c-3.5 0-6.4-3.2-6.4-7.2s2.8-7.2 6.4-7.2c3.5 0 6.4 3.3 6.3 7.2 0 4-2.8 7.2-6.3 7.2z"/></svg>Login with Discord</a></div></body></html>`);
 });
 
 app.get("/auth/callback", async (req, res) => {

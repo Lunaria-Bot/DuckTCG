@@ -32,7 +32,7 @@ const CATEGORIES = [
     label: "👤 Profile",
     color: 0x6d28d9,
     commands: [
-      { name: "/register",     desc: "Create your DuckTCG profile to get started." },
+      { name: "/register",     desc: "Create your SeorinTCG profile to get started." },
       { name: "/profile",      desc: "View your profile — level, stats, favorite card and badges." },
       { name: "/editprofile",  desc: "Edit your bio, guild or favorite card." },
       { name: "/daily",        desc: `Claim your daily reward. ${NYAN} Nyang, tickets and more on a 28-day cycle.` },
@@ -62,7 +62,7 @@ function buildEmbed(catIndex) {
     .setTitle(`${cat.label}`)
     .setDescription(lines.join("\n\n"))
     .setColor(cat.color)
-    .setFooter({ text: `Category ${catIndex + 1} / ${CATEGORIES.length}  ·  DuckTCG Help` });
+    .setFooter({ text: `Category ${catIndex + 1} / ${CATEGORIES.length}  ·  SeorinTCG Help` });
 }
 
 function buildRow(catIndex) {
@@ -89,7 +89,7 @@ function buildRow(catIndex) {
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("help")
-    .setDescription("Browse all DuckTCG commands"),
+    .setDescription("Browse all SeorinTCG commands"),
 
   async execute(interaction) {
     await interaction.deferReply();

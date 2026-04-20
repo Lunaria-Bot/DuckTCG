@@ -241,7 +241,7 @@ function buildBuyDropdown(tab) {
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("shop")
-    .setDescription("Browse and purchase items from the DuckTCG shop"),
+    .setDescription("Browse and purchase items from the SeorinTCG shop"),
 
   async execute(interaction) {
     await interaction.deferReply();
