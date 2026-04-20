@@ -271,7 +271,7 @@ module.exports = {
         user = await User.findOne({ userId: interaction.user.id });
         return interaction.editReply({
           embeds: [buildShopEmbed(tab, user)],
-          components: [buildTabRow(tab), buildBuyRow(tab)],
+          components: [buildTabRow(tab), buildBuyDropdown(tab)],
         });
       }
 
@@ -302,7 +302,7 @@ module.exports = {
 
         await interaction.editReply({
           embeds: [embed],
-          components: [buildTabRow(tab), buildBuyRow(tab)],
+          components: [buildTabRow(tab), buildBuyDropdown(tab)],
         });
       }
     });
