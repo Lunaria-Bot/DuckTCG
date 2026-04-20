@@ -1091,7 +1091,7 @@ app.get("/series/:id/cards", auth, editorOrAdmin, async (req, res) => {
   const series = await Series.findOne({ seriesId: req.params.id });
   if (!series) return res.redirect("/series");
   const cards = await Card.find({ seriesId: series.seriesId }).sort({ rarity: 1, name: 1 });
-  const allCards = await Card.find({ seriesId: { $in: [null, ""] } }).sort({ anime: 1, name: 1 });
+  const allCards = await Card.find({ $or: [{ seriesId: null }, { seriesId: "" }, { seriesId: { $exists: false } }] }).sort({ anime: 1, name: 1 });
   const rarityBadge = { common:"badge-gray",rare:"badge-blue",special:"badge-purple",exceptional:"badge-yellow" };
   res.send(renderPage(`Cards — ${series.name}`, `
     <a href="/series" class="back-link">← Back to Series</a>
@@ -1128,14 +1128,18 @@ app.get("/series/:id/cards", auth, editorOrAdmin, async (req, res) => {
 
 app.get("/series/:id/add-card", auth, editorOrAdmin, async (req, res) => {
   const { cardId } = req.query;
-  await Card.findOneAndUpdate({ cardId }, { seriesId: req.params.id });
+  const series = await Series.findOne({ seriesId: req.params.id });
+  const update = { seriesId: req.params.id };
+  if (series) update.anime = series.name; // keep anime in sync
+  await Card.findOneAndUpdate({ cardId }, update);
   await audit(req.user, "update", "series", req.params.id, `Added card "${cardId}" to series`, null, null);
   res.redirect(`/series/${req.params.id}/cards`);
 });
 
 app.get("/series/:id/remove-card", auth, editorOrAdmin, async (req, res) => {
   const { cardId } = req.query;
-  await Card.findOneAndUpdate({ cardId }, { seriesId: null });
+  const card = await Card.findOne({ cardId });
+  await Card.findOneAndUpdate({ cardId }, { seriesId: null, anime: card?.name ?? cardId });
   await audit(req.user, "update", "series", req.params.id, `Removed card "${cardId}" from series`, null, null);
   res.redirect(`/series/${req.params.id}/cards`);
 });
@@ -1214,7 +1218,7 @@ app.post("/cards/new", auth, editorOrAdmin, async (req, res) => {
     // Derive anime from series name if available, else use card name
     let anime = name;
     if (seriesId) { const s = await Series.findOne({ seriesId }); if (s) anime = s.name; }
-    const card = await Card.create({ cardId, name, anime, imageUrl: imageUrl||null, rarity, role, bannerType, seriesId: seriesId||null, isAvailable: isAvailable==="true", baseStats: { damage:parseInt(baseDamage), mana:parseInt(baseMana), hp:parseInt(baseHp) } });
+    const card = await Card.create({ cardId, name, anime, imageUrl: imageUrl||null, rarity, role, bannerType, seriesId: (seriesId && seriesId !== "") ? seriesId : null, isAvailable: isAvailable==="true", baseStats: { damage:parseInt(baseDamage), mana:parseInt(baseMana), hp:parseInt(baseHp) } });
     if (addToBanner) await Banner.findOneAndUpdate({ bannerId: addToBanner }, { $addToSet: { [`pool.${rarity}`]: cardId } });
     await audit(req.user, "create", "card", cardId, `Created card "${name}" (${rarity} ${role})`, null, card.toObject());
     res.redirect("/cards");
@@ -1250,7 +1254,7 @@ app.post("/cards/:id/edit", auth, editorOrAdmin, async (req, res) => {
   let anime = name;
   if (seriesId) { const s = await Series.findOne({ seriesId }); if (s) anime = s.name; }
   const before = await Card.findOne({ cardId: req.params.id });
-  const after = await Card.findOneAndUpdate({ cardId: req.params.id }, { name, anime, imageUrl: imageUrl||null, rarity, role, seriesId: seriesId||null, isAvailable: isAvailable==="true", baseStats: { damage:parseInt(baseDamage), mana:parseInt(baseMana), hp:parseInt(baseHp) } }, { new: true });
+  const after = await Card.findOneAndUpdate({ cardId: req.params.id }, { name, anime, imageUrl: imageUrl||null, rarity, role, seriesId: (seriesId && seriesId !== "") ? seriesId : null, isAvailable: isAvailable==="true", baseStats: { damage:parseInt(baseDamage), mana:parseInt(baseMana), hp:parseInt(baseHp) } }, { new: true });
   await audit(req.user, "update", "card", req.params.id, `Updated card "${name}"`, before?.toObject(), after?.toObject());
   res.redirect("/cards");
 });
