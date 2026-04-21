@@ -18,9 +18,10 @@ const {
 
 const RARITY_EMOJI  = { exceptional: "<:EX:1495730346241822861>", special: "<:SP:1495730276737745077>", rare: "<:Rare:1496150241462849536>", common: "<:Common:1495730171301462186>" };
 const RARITY_ORDER  = { exceptional: 0, special: 1, rare: 2, common: 3 };
-const RARITY_RATES  = { common: 60, rare: 30, special: 9, exceptional: 1 };
+const RARITY_RATES  = { common: 62.5, rare: 30, special: 7.5 }; // exceptional excluded from /roll
 
 function rollRarity() {
+  // Exceptional is banner-only — never rolled via /roll
   const roll = Math.random() * 100;
   let cum = 0;
   for (const [r, rate] of Object.entries(RARITY_RATES)) {
@@ -34,7 +35,7 @@ async function drawCard(userId) {
   const rarity = rollRarity();
 
   // Try rolled rarity first, then fallback down to any available rarity
-  const rarityFallback = ["common", "rare", "special", "exceptional"];
+  const rarityFallback = ["common", "rare", "special"]; // exceptional excluded from /roll
   let card = null;
   let actualRarity = rarity;
 
