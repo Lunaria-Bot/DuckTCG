@@ -13,7 +13,7 @@ const QI     = "<:Qi:1495523502961459200>";
 const DAN    = "<:Dantian:1495528597610303608>";
 const EX     = "<:EX:1495730346241822861>";
 const SP     = "<:SP:1495730276737745077>";
-const RARE   = "<:Rare:1495730219561255112>";
+const RARE   = "<:Rare:1496150241462849536>";
 const COM    = "<:Common:1495730171301462186>";
 
 const WELCOME_GOLD    = 1000;

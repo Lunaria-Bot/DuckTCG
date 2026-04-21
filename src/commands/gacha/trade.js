@@ -11,7 +11,7 @@ const User = require("../../models/User");
 const { getRedis } = require("../../services/redis");
 const { calculateStats } = require("../../services/cardStats");
 
-const RARITY_EMOJI = { exceptional: "<:EX:1495730346241822861>", special: "<:SP:1495730276737745077>", rare: "<:Rare:1495730219561255112>", common: "<:Common:1495730171301462186>" };
+const RARITY_EMOJI = { exceptional: "<:EX:1495730346241822861>", special: "<:SP:1495730276737745077>", rare: "<:Rare:1496150241462849536>", common: "<:Common:1495730171301462186>" };
 const RARITY_ORDER = { exceptional: 0, special: 1, rare: 2, common: 3 };
 const NYAN    = "<:Nyan:1495048966528831508>";
 const TRADE_TTL    = 5 * 60; // 5 min Redis TTL
