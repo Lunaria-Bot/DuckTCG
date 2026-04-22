@@ -88,6 +88,7 @@ function renderPage(title, content, user = null, activePage = "") {
     { href: "/calendar", icon: "◫",  label: "Calendar",   show: isEditor },
     { href: "/messages", icon: "▤",  label: "Messages",   always: true },
     { href: "/team",     icon: "◎",  label: "Team",       show: isAdmin },
+    { href: "/tasks",    icon: "☑",  label: "Tasks",      show: isEditor },
     { href: "/audit",    icon: "▦",  label: "Audit Log",  always: true },
   ].filter(n => n.always || n.show) : [];
 
@@ -1200,16 +1201,28 @@ app.post("/cards/upload-image", auth, editorOrAdmin, cardImgUpload.single("image
   res.json({ url, filename: req.file.filename });
 });
 
-// List card images for picker
-app.get("/cards/images", auth, editorOrAdmin, (req, res) => {
+// List card images for picker — annotated with anime from DB
+app.get("/cards/images", auth, editorOrAdmin, async (req, res) => {
   const dir = path.join(UPLOADS_DIR, "card");
   if (!fs.existsSync(dir)) return res.json([]);
   const baseUrl = `${req.protocol}://${req.get("host")}`;
   const files = fs.readdirSync(dir)
     .filter(f => /\.(jpg|jpeg|png|gif|webp)$/i.test(f))
-    .reverse()
-    .map(f => ({ filename: f, url: `${baseUrl}/uploads/card/${f}` }));
-  res.json(files);
+    .reverse();
+  // Match filenames against card imageUrls to get anime grouping
+  const cards = await Card.find({ imageUrl: { $regex: "/uploads/card/" } }).select("name anime imageUrl").lean();
+  const urlToAnime = {};
+  for (const card of cards) {
+    if (card.imageUrl) {
+      const fname = card.imageUrl.split("/uploads/card/").pop();
+      if (fname) urlToAnime[fname] = { anime: card.anime, name: card.name };
+    }
+  }
+  const result = files.map(f => {
+    const info = urlToAnime[f] || {};
+    return { filename: f, url: `${baseUrl}/uploads/card/${f}`, anime: info.anime || "Uncategorized", cardName: info.name || "" };
+  });
+  res.json(result);
 });
 
 // ─── CARDS ────────────────────────────────────────────────────────────────────
@@ -1274,19 +1287,20 @@ app.get("/cards/new", auth, editorOrAdmin, async (req, res) => {
               <input type="text" name="imageUrl" id="imageUrl_new" placeholder="https://..." style="flex:1;min-width:180px"/>
               <label class="btn btn-gray btn-sm" style="cursor:pointer;margin:0">
                 📁 Upload
-                <input type="file" accept="image/*" style="display:none" onchange="uploadCardImage(this, 'imageUrl_new', 'preview_new')"/>
+                <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" style="display:none" onchange="uploadCardImage(this, 'imageUrl_new', 'preview_new')"/>
               </label>
               <button type="button" class="btn btn-ghost btn-sm" onclick="openImagePicker('imageUrl_new', 'preview_new')">🖼️ Pick</button>
             </div>
             <img id="preview_new" id="preview_new" src="" style="display:none;margin-top:8px;max-width:120px;border-radius:6px;object-fit:cover"/>
           </div>
           <div id="imgpicker" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9999;padding:40px;overflow:auto" onclick="if(event.target===this)this.style.display='none'">
-            <div style="background:var(--bg2);border-radius:var(--radius);padding:20px;max-width:960px;margin:0 auto">
-              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-                <h3 style="margin:0">Pick a Card Image</h3>
-                <button onclick="document.getElementById('imgpicker').style.display='none'" class="btn btn-ghost">✕</button>
+            <div style="background:var(--bg2);border-radius:var(--radius);padding:20px;max-width:1000px;margin:0 auto" onclick="event.stopPropagation()">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+                <h3 style="margin:0">🖼️ Pick a Card Image</h3>
+                <button onclick="document.getElementById('imgpicker').style.display='none'" class="btn btn-ghost">✕ Close</button>
               </div>
-              <div id="imgpicker_grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;max-height:60vh;overflow-y:auto"></div>
+              <input id="imgpicker_search" type="text" placeholder="Search by name or anime..." style="width:100%;margin-bottom:14px;padding:8px 12px;border-radius:6px;border:1px solid var(--border);background:var(--bg3);color:var(--text)" oninput="renderPickerGrid('imgpicker_grid', this.value)"/>
+              <div id="imgpicker_grid" style="max-height:65vh;overflow-y:auto;padding-right:4px"></div>
             </div>
           </div>
 
@@ -1303,36 +1317,64 @@ app.get("/cards/new", auth, editorOrAdmin, async (req, res) => {
               p.src = d.url; p.style.display = "block";
             }
           }
+          let _allImages = [];
           async function openImagePicker(targetId, previewId) {
             const picker = document.getElementById("imgpicker");
-            const grid   = document.getElementById("imgpicker_grid");
-            grid.innerHTML = "Loading...";
             picker.style.display = "block";
             picker._target  = targetId;
             picker._preview = previewId;
-            const images = await fetch("/cards/images").then(r => r.json());
-            if (!images.length) {
-              grid.innerHTML = "No images yet. Upload via Media > Card.";
-              return;
-            }
+            document.getElementById("imgpicker_search").value = "";
+            renderPickerGrid("imgpicker_grid", "");
+            if (_allImages.length) return;
+            document.getElementById("imgpicker_grid").innerHTML = "<div style=\"color:var(--muted);padding:20px\">Loading...</div>";
+            _allImages = await fetch("/cards/images").then(r => r.json());
+            renderPickerGrid("imgpicker_grid", "");
+          }
+          function renderPickerGrid(gridId, search) {
+            const grid = document.getElementById(gridId);
+            if (!_allImages.length) { grid.innerHTML = "<div style=\"color:var(--muted);padding:20px\">No images yet.</div>"; return; }
+            const q = search.trim().toLowerCase();
+            const filtered = q ? _allImages.filter(i => i.filename.toLowerCase().includes(q) || (i.anime||"").toLowerCase().includes(q) || (i.cardName||"").toLowerCase().includes(q)) : _allImages;
+            if (!filtered.length) { grid.innerHTML = "<div style=\"color:var(--muted);padding:20px\">No results.</div>"; return; }
+            // Group by anime
+            const groups = {};
+            filtered.forEach(img => {
+              const key = img.anime || "Uncategorized";
+              if (!groups[key]) groups[key] = [];
+              groups[key].push(img);
+            });
             grid.innerHTML = "";
-            images.forEach(function(img) {
-              const div = document.createElement("div");
-              div.style.cssText = "cursor:pointer;border-radius:6px;overflow:hidden;border:2px solid transparent;transition:.15s";
-              div.addEventListener("mouseenter", function(){ this.style.borderColor = "var(--primary)"; });
-              div.addEventListener("mouseleave", function(){ this.style.borderColor = "transparent"; });
-              div.addEventListener("click", function() {
-                selectPickedImage(img.url, document.getElementById("imgpicker")._target, document.getElementById("imgpicker")._preview);
+            Object.keys(groups).sort().forEach(function(anime) {
+              const section = document.createElement("div");
+              section.style.cssText = "grid-column:1/-1;margin-top:12px";
+              const heading = document.createElement("div");
+              heading.style.cssText = "font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);padding:4px 0 8px;border-bottom:1px solid var(--border);margin-bottom:8px";
+              heading.textContent = anime + " (" + groups[anime].length + ")";
+              section.appendChild(heading);
+              const subgrid = document.createElement("div");
+              subgrid.style.cssText = "display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px";
+              groups[anime].forEach(function(img) {
+                const div = document.createElement("div");
+                div.style.cssText = "cursor:pointer;border-radius:6px;overflow:hidden;border:2px solid transparent;transition:.15s;background:var(--bg3)";
+                div.addEventListener("mouseenter", function(){ this.style.borderColor="var(--primary)"; });
+                div.addEventListener("mouseleave", function(){ this.style.borderColor="transparent"; });
+                div.addEventListener("click", function() {
+                  selectPickedImage(img.url, document.getElementById("imgpicker")._target, document.getElementById("imgpicker")._preview);
+                  _allImages = []; // refresh next time
+                });
+                const isGif = img.filename.toLowerCase().endsWith(".gif");
+                const imgEl = document.createElement(isGif ? "img" : "img");
+                imgEl.src = img.url;
+                imgEl.style.cssText = "width:100%;height:100px;object-fit:cover;display:block";
+                const label = document.createElement("div");
+                label.style.cssText = "padding:4px 6px;font-size:10px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis";
+                label.textContent = img.cardName || img.filename;
+                div.appendChild(imgEl);
+                div.appendChild(label);
+                subgrid.appendChild(div);
               });
-              const imgEl = document.createElement("img");
-              imgEl.src = img.url;
-              imgEl.style.cssText = "width:100%;height:110px;object-fit:cover;display:block";
-              const label = document.createElement("div");
-              label.style.cssText = "padding:4px 6px;font-size:10px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis";
-              label.textContent = img.filename;
-              div.appendChild(imgEl);
-              div.appendChild(label);
-              grid.appendChild(div);
+              section.appendChild(subgrid);
+              grid.appendChild(section);
             });
           }
           function selectPickedImage(url, targetId, previewId) {
@@ -1387,7 +1429,7 @@ app.get("/cards/:id/edit", auth, editorOrAdmin, async (req, res) => {
               <input type="text" name="imageUrl" id="imageUrl_edit" value="${card.imageUrl||""}" placeholder="https://..." style="flex:1;min-width:200px"/>
               <label class="btn btn-gray" style="cursor:pointer;white-space:nowrap">
                 📁 Upload
-                <input type="file" accept="image/*" style="display:none" onchange="uploadCardImage(this, 'imageUrl_edit', 'preview_edit')"/>
+                <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" style="display:none" onchange="uploadCardImage(this, 'imageUrl_edit', 'preview_edit')"/>
               </label>
               <button type="button" class="btn btn-ghost" onclick="openImagePicker('imageUrl_edit', 'preview_edit')">🖼️ Pick</button>
             </div>
@@ -1695,6 +1737,132 @@ app.post("/media/delete", auth, (req, res) => {
   const CATS=["banner","card","other"]; const { filename, category }=req.body; const cat=CATS.includes(category)?category:"other";
   if(filename&&/^[a-z0-9_\-.]+$/i.test(filename)){const fp=path.join(UPLOADS_DIR,cat,filename);if(fs.existsSync(fp))fs.unlinkSync(fp);}
   res.redirect(`/media?cat=${cat}`);
+});
+
+
+// ─── TASK BOARD ───────────────────────────────────────────────────────────────
+const TASKS_FILE = path.join(__dirname, "tasks.json");
+function loadTasks() {
+  try { return JSON.parse(fs.readFileSync(TASKS_FILE, "utf8")); } catch { return []; }
+}
+function saveTasks(tasks) {
+  fs.writeFileSync(TASKS_FILE, JSON.stringify(tasks, null, 2));
+}
+function nextTaskId(tasks) {
+  return tasks.length ? Math.max(...tasks.map(t => t.id || 0)) + 1 : 1;
+}
+
+const TASK_COLS = ["Todo", "In Progress", "Done"];
+const TASK_PRIORITIES = ["low", "normal", "high"];
+
+app.get("/tasks", auth, editorOrAdmin, (req, res) => {
+  const tasks = loadTasks();
+  const cols = TASK_COLS.map(col => ({
+    col,
+    tasks: tasks.filter(t => t.col === col).sort((a,b) => {
+      const pri = { high: 0, normal: 1, low: 2 };
+      return (pri[a.priority]??1) - (pri[b.priority]??1);
+    }),
+  }));
+  const priorityBadge = { high: "badge-red", normal: "badge-purple", low: "badge-gray" };
+  const priorityLabel = { high: "🔴 High", normal: "🟡 Normal", low: "⚪ Low" };
+
+  res.send(renderPage("Task Board", `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+      <h1 style="margin:0">☑ Task Board</h1>
+      <button onclick="document.getElementById('newtask').style.display='flex'" class="btn">+ New Task</button>
+    </div>
+
+    <!-- New Task Modal -->
+    <div id="newtask" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9999;align-items:center;justify-content:center" onclick="if(event.target===this)this.style.display='none'">
+      <div style="background:var(--bg2);border-radius:var(--radius);padding:24px;width:100%;max-width:500px" onclick="event.stopPropagation()">
+        <h3 style="margin:0 0 16px">New Task</h3>
+        <form method="POST" action="/tasks/new" style="display:flex;flex-direction:column;gap:10px">
+          <input name="title" placeholder="Task title..." required style="padding:8px 12px;border-radius:6px;border:1px solid var(--border);background:var(--bg3);color:var(--text)"/>
+          <textarea name="desc" placeholder="Description (optional)..." rows="3" style="padding:8px 12px;border-radius:6px;border:1px solid var(--border);background:var(--bg3);color:var(--text);resize:vertical"></textarea>
+          <div style="display:flex;gap:10px">
+            <select name="col" style="flex:1;padding:8px;border-radius:6px;border:1px solid var(--border);background:var(--bg3);color:var(--text)">
+              ${TASK_COLS.map(c => `<option>${c}</option>`).join("")}
+            </select>
+            <select name="priority" style="flex:1;padding:8px;border-radius:6px;border:1px solid var(--border);background:var(--bg3);color:var(--text)">
+              <option value="normal">🟡 Normal</option>
+              <option value="high">🔴 High</option>
+              <option value="low">⚪ Low</option>
+            </select>
+          </div>
+          <input name="assignee" placeholder="Assignee (optional)" style="padding:8px 12px;border-radius:6px;border:1px solid var(--border);background:var(--bg3);color:var(--text)"/>
+          <div style="display:flex;gap:8px;justify-content:flex-end">
+            <button type="button" onclick="document.getElementById('newtask').style.display='none'" class="btn btn-ghost">Cancel</button>
+            <button type="submit" class="btn">Create</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Board -->
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;align-items:flex-start">
+      ${cols.map(({ col, tasks: colTasks }) => `
+        <div style="background:var(--bg2);border-radius:var(--radius);padding:16px;border:1px solid var(--border)">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+            <span style="font-weight:700;font-size:13px;text-transform:uppercase;letter-spacing:.06em">${col}</span>
+            <span class="badge badge-gray" style="font-size:11px">${colTasks.length}</span>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:10px">
+            ${colTasks.length ? colTasks.map(t => `
+              <div style="background:var(--bg3);border-radius:8px;padding:12px;border:1px solid var(--border)">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:6px">
+                  <span style="font-weight:600;font-size:13px;line-height:1.3">${t.title}</span>
+                  <span class="badge ${priorityBadge[t.priority]||"badge-gray"}" style="font-size:10px;white-space:nowrap">${priorityLabel[t.priority]||t.priority}</span>
+                </div>
+                ${t.desc ? `<div style="font-size:12px;color:var(--muted);margin-bottom:8px;line-height:1.4">${t.desc}</div>` : ""}
+                ${t.assignee ? `<div style="font-size:11px;color:var(--muted)">👤 ${t.assignee}</div>` : ""}
+                <div style="display:flex;gap:5px;margin-top:10px;flex-wrap:wrap">
+                  ${TASK_COLS.filter(c2 => c2 !== col).map(c2 =>
+                    `<form method="POST" action="/tasks/${t.id}/move" style="margin:0"><input type="hidden" name="col" value="${c2}"/><button class="btn btn-gray btn-sm" style="font-size:10px">→ ${c2}</button></form>`
+                  ).join("")}
+                  <form method="POST" action="/tasks/${t.id}/delete" style="margin:0" onsubmit="return confirm('Delete this task?')">
+                    <button class="btn btn-red btn-sm" style="font-size:10px">✕</button>
+                  </form>
+                </div>
+              </div>
+            `).join("") : `<div style="color:var(--muted);font-size:12px;text-align:center;padding:20px 0">No tasks</div>`}
+          </div>
+        </div>
+      `).join("")}
+    </div>
+  `, req.user, "/tasks"));
+});
+
+app.post("/tasks/new", auth, editorOrAdmin, (req, res) => {
+  const tasks = loadTasks();
+  const { title, desc, col, priority, assignee } = req.body;
+  if (!title?.trim()) return res.redirect("/tasks");
+  tasks.push({
+    id: nextTaskId(tasks),
+    title: title.trim(),
+    desc: (desc||"").trim(),
+    col: TASK_COLS.includes(col) ? col : "Todo",
+    priority: TASK_PRIORITIES.includes(priority) ? priority : "normal",
+    assignee: (assignee||"").trim(),
+    createdBy: req.user?.username || "unknown",
+    createdAt: new Date().toISOString(),
+  });
+  saveTasks(tasks);
+  res.redirect("/tasks");
+});
+
+app.post("/tasks/:id/move", auth, editorOrAdmin, (req, res) => {
+  const tasks = loadTasks();
+  const task = tasks.find(t => t.id === parseInt(req.params.id));
+  if (task && TASK_COLS.includes(req.body.col)) task.col = req.body.col;
+  saveTasks(tasks);
+  res.redirect("/tasks");
+});
+
+app.post("/tasks/:id/delete", auth, editorOrAdmin, (req, res) => {
+  const tasks = loadTasks().filter(t => t.id !== parseInt(req.params.id));
+  saveTasks(tasks);
+  res.redirect("/tasks");
 });
 
 // ─── TEAM ─────────────────────────────────────────────────────────────────────

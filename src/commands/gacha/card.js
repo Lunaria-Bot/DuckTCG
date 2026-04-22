@@ -62,13 +62,16 @@ function buildCardSelectMenu(cards, page) {
     new StringSelectMenuBuilder()
       .setCustomId("card_view_select")
       .setPlaceholder("🖼️ View card image...")
-      .addOptions(slice.map(c => {
-        const rarityEmoji = RARITY_EMOJI[c.rarity] ?? "";
-        return new StringSelectMenuOptionBuilder()
-          .setLabel(c.name.slice(0, 100))
-          .setDescription(`${c.anime} · ${c.rarity}`)
-          .setValue(c.cardId)
-          .setEmoji(rarityEmoji.startsWith("<") ? { id: rarityEmoji.match(/\d+/)?.[0], name: rarityEmoji.match(/:([^:]+):/)?.[1] } : rarityEmoji);
+      .addOptions(slice.map(card => {
+        const rawEmoji = RARITY_EMOJI[card.rarity] ?? "";
+        // Parse <:name:id> correctly — match last number group as id
+        const emojiMatch = rawEmoji.match(/^<a?:([^:]+):(\d+)>$/);
+        const opt = new StringSelectMenuOptionBuilder()
+          .setLabel(card.name.slice(0, 100))
+          .setDescription(`${card.anime} · ${card.rarity}`.slice(0, 100))
+          .setValue(card.cardId);
+        if (emojiMatch) opt.setEmoji({ id: emojiMatch[2], name: emojiMatch[1] });
+        return opt;
       }))
   );
 }
