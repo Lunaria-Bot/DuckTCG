@@ -55,10 +55,29 @@ function buildCardEmbed(card, seriesName) {
   return embed;
 }
 
+function buildCardSelectMenu(cards, page) {
+  const slice = cards.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+  if (!slice.length) return null;
+  return new ActionRowBuilder().addComponents(
+    new StringSelectMenuBuilder()
+      .setCustomId("card_view_select")
+      .setPlaceholder("🖼️ View card image...")
+      .addOptions(slice.map(c => {
+        const rarityEmoji = RARITY_EMOJI[c.rarity] ?? "";
+        return new StringSelectMenuOptionBuilder()
+          .setLabel(c.name.slice(0, 100))
+          .setDescription(`${c.anime} · ${c.rarity}`)
+          .setValue(c.cardId)
+          .setEmoji(rarityEmoji.startsWith("<") ? { id: rarityEmoji.match(/\d+/)?.[0], name: rarityEmoji.match(/:([^:]+):/)?.[1] } : rarityEmoji);
+      }))
+  );
+}
+
 function buildNavRow(page, totalPages) {
   return new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId("card_first").setEmoji("⏮").setStyle(ButtonStyle.Secondary).setDisabled(page === 0),
     new ButtonBuilder().setCustomId("card_prev").setEmoji("◀").setStyle(ButtonStyle.Primary).setDisabled(page === 0),
+    new ButtonBuilder().setCustomId("card_page").setLabel(`${page + 1} / ${totalPages}`).setStyle(ButtonStyle.Secondary).setDisabled(true),
     new ButtonBuilder().setCustomId("card_next").setEmoji("▶").setStyle(ButtonStyle.Primary).setDisabled(page >= totalPages - 1),
     new ButtonBuilder().setCustomId("card_last").setEmoji("⏭").setStyle(ButtonStyle.Secondary).setDisabled(page >= totalPages - 1),
   );
@@ -229,9 +248,13 @@ module.exports = {
       const filterRow = buildFilterRow({ rarity: state.filterRarity, role: state.filterRole, anime: state.filterAnime, series: state.filterSeries, seriesName: state.filterSeriesName });
       const components = [buildNavRow(state.page, totalPages), filterRow];
       if (state.openDropdown === "rarity") components.push(buildRarityDropdown());
-      if (state.openDropdown === "role")   components.push(buildRoleDropdown());
-      if (state.openDropdown === "series") components.push(buildSeriesDropdown(seriesList));
-      if (state.openDropdown === "anime")  components.push(buildAnimeDropdown(uniqueAnimes, state.animePage));
+      else if (state.openDropdown === "role")   components.push(buildRoleDropdown());
+      else if (state.openDropdown === "series") components.push(buildSeriesDropdown(seriesList));
+      else if (state.openDropdown === "anime")  components.push(buildAnimeDropdown(uniqueAnimes, state.animePage));
+      else {
+        const cardMenu = buildCardSelectMenu(filtered, state.page);
+        if (cardMenu) components.push(cardMenu);
+      }
 
       return {
         embeds: [buildListEmbed(filtered, state.page, totalPages, filters)],
@@ -260,6 +283,10 @@ module.exports = {
       else if (id === "card_open_series") { state.openDropdown = state.openDropdown === "series" ? null : "series"; }
       else if (id === "card_open_anime")  { state.openDropdown = state.openDropdown === "anime"  ? null : "anime"; state.animePage = 0; }
       else if (id === "card_reset")       { state.filterRarity = ""; state.filterRole = ""; state.filterAnime = ""; state.filterSeries = ""; state.filterSeriesName = ""; state.page = 0; state.openDropdown = null; }
+      else if (id === "card_view_select") {
+        state.detailCard = i.values[0];
+        state.openDropdown = null;
+      }
 
       else if (id === "card_filter_rarity") {
         state.filterRarity = i.values[0] === "all" ? "" : i.values[0];

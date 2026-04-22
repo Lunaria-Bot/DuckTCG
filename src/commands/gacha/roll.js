@@ -169,7 +169,7 @@ module.exports = {
 
     await User.findOneAndUpdate({ userId: interaction.user.id }, {
       "mana.qi":              newQi,
-      "mana.lastQiUpdate":    newQi > 0 ? new Date() : user.mana?.lastQiUpdate,
+      "mana.lastQiUpdate":    new Date(), // always reset so regen starts from newQi at this moment
       "mana.dantian":         currentDantian,
       "mana.lastDantianUpdate": new Date(),
       "mana.qiCooldownUntil": null,
@@ -283,7 +283,7 @@ Use \`/refill\` to restore your Qi.`);
 
       await User.findOneAndUpdate({ userId: interaction.user.id }, {
         "mana.qi":              newQi2,
-        "mana.lastQiUpdate":    newQi2 > 0 ? new Date() : freshUser2.mana?.lastQiUpdate,
+        "mana.lastQiUpdate":    new Date(),
         "mana.dantian":         freshDantian2,
         "mana.lastDantianUpdate": new Date(),
         "mana.qiCooldownUntil": null,

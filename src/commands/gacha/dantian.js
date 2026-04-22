@@ -97,12 +97,14 @@ module.exports = {
     const user = await requireProfile(interaction);
     if (!user) return;
 
-    let currentDantian = regenDantian(user);
-    const maxQi   = qiMax(user.accountLevel);
-    let currentQi = user.mana?.qi ?? maxQi;
+    const currentDantian = regenDantian(user);
+    const currentQi      = regenQi(user);
+    const maxQi          = qiMax(user.accountLevel);
 
-    // Save updated dantian
+    // Save both values to DB so they're accurate
     await User.findOneAndUpdate({ userId: interaction.user.id }, {
+      "mana.qi":                currentQi,
+      "mana.lastQiUpdate":      currentQi < maxQi ? new Date() : user.mana?.lastQiUpdate,
       "mana.dantian":           Math.floor(currentDantian),
       "mana.lastDantianUpdate": new Date(),
     });

@@ -46,7 +46,8 @@ async function renderHTML(html, size = { width: 500, height: 400 }) {
   const page = await br.newPage();
   try {
     await page.setViewport({ width: size.width, height: size.height, deviceScaleFactor: 2 });
-    await page.setContent(html, { waitUntil: "networkidle0", timeout: 15000 });
+    await page.setContent(html, { waitUntil: "domcontentloaded", timeout: 15000 });
+    await new Promise(r => setTimeout(r, 300)); // allow base64 images to render
     const bodyHeight = await page.evaluate(() => document.body.scrollHeight);
     await page.setViewport({ width: size.width, height: bodyHeight, deviceScaleFactor: 2 });
     return await page.screenshot({ type: "png", fullPage: true });

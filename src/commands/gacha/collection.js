@@ -8,6 +8,28 @@ const Card       = require("../../models/Card");
 const Series     = require("../../models/Series");
 const PlayerCard = require("../../models/PlayerCard");
 const { renderHTML } = require("../../services/renderer");
+const https = require("https");
+const http  = require("http");
+
+// Fetch image as base64 for Puppeteer rendering
+function fetchImageBase64(url) {
+  return new Promise((resolve) => {
+    if (!url) return resolve(null);
+    try {
+      const mod = url.startsWith("https") ? https : http;
+      mod.get(url, { timeout: 5000 }, (res) => {
+        const chunks = [];
+        res.on("data", c => chunks.push(c));
+        res.on("end", () => {
+          const mime = res.headers["content-type"] || "image/jpeg";
+          resolve(`data:${mime};base64,${Buffer.concat(chunks).toString("base64")}`);
+        });
+        res.on("error", () => resolve(null));
+      }).on("error", () => resolve(null))
+        .on("timeout", () => resolve(null));
+    } catch { resolve(null); }
+  });
+}
 
 const PAGE_SIZE  = 8; // cards per page (2 rows × 4)
 const CARD_W     = 100;
@@ -21,7 +43,7 @@ const RARITY_COLOR = {
 };
 
 // ─── HTML renderer ────────────────────────────────────────────────────────────
-function buildCollectionHTML(cards, ownedSet, title, subtitle, pageInfo) {
+function buildCollectionHTML(cards, ownedSet, title, subtitle, pageInfo, imageMap = {}) {
   const cardItems = cards.map(card => {
     const owned = ownedSet.has(card.cardId);
     const color = RARITY_COLOR[card.rarity] ?? "#6b7280";
@@ -173,6 +195,15 @@ module.exports = {
       const { cards: slice, label: groupLabel } = pages[pg];
       const ownedInSlice = slice.filter(c => ownedSet.has(c.cardId)).length;
 
+      // Preload images as base64 so Puppeteer doesn't need network
+      const imageMap = {};
+      await Promise.all(slice.map(async card => {
+        if (card.imageUrl) {
+          const b64 = await fetchImageBase64(card.imageUrl);
+          if (b64) imageMap[card.cardId] = b64;
+        }
+      }));
+
       const filterLabel = [
         animeFilter  ? `anime: ${animeFilter}`   : null,
         rarityFilter ? rarityFilter               : null,
@@ -189,7 +220,8 @@ module.exports = {
           total: totalPages,
           ownedInGroup: ownedInSlice,
           totalInGroup: slice.length,
-        }
+        },
+        imageMap
       );
 
       return renderHTML(html, { width: COLS * (CARD_W + 14) + 32, height: 600 });
