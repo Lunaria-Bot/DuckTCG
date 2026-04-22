@@ -98,10 +98,29 @@ function buildClaimRows(dailyData, weeklyData) {
         .setStyle(ButtonStyle.Primary)
     );
 
-  const all = [...dailyButtons, ...weeklyButtons];
-  for (let i = 0; i < Math.min(all.length, 10); i += 5) {
-    rows.push(new ActionRowBuilder().addComponents(all.slice(i, i + 5)));
+  const claimable = [...dailyButtons, ...weeklyButtons];
+  const hasClaimable = claimable.length > 0;
+
+  // Individual claim buttons (max 10 across rows)
+  for (let i = 0; i < Math.min(claimable.length, 10); i += 5) {
+    rows.push(new ActionRowBuilder().addComponents(claimable.slice(i, i + 5)));
   }
+
+  // Control row: Refresh + Claim All
+  const controlRow = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId("quests_refresh")
+      .setLabel("Refresh")
+      .setEmoji("🔄")
+      .setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder()
+      .setCustomId("quests_claim_all")
+      .setLabel("Claim All")
+      .setEmoji("🎁")
+      .setStyle(ButtonStyle.Success)
+      .setDisabled(!hasClaimable),
+  );
+  rows.push(controlRow);
 
   return rows;
 }
@@ -130,52 +149,106 @@ module.exports = {
 
     const msg = await interaction.editReply({ embeds: [embed], components: rows });
 
-    if (!rows.length) return;
-
     const collector = msg.createMessageComponentCollector({
       componentType: ComponentType.Button,
       filter: i => i.user.id === interaction.user.id,
-      time: 3 * 60 * 1000,
+      time: 10 * 60 * 1000,
     });
 
-    collector.on("collect", async i => {
-      await i.deferUpdate();
-
-      const parts   = i.customId.split("_");
-      const type    = parts[1];
-      const questId = parts.slice(2).join("_");
-
+    async function applyClaim(type, questId) {
       const reward = await claimQuest(redis, userId, type, questId);
-      if (!reward || reward === "already_claimed" || reward === "not_complete") return;
-
-      // Apply rewards
+      if (!reward || reward === "already_claimed" || reward === "not_complete") return null;
       const freshUser = await User.findOne({ userId });
       const lvResult  = applyExp(freshUser.accountLevel, freshUser.accountExp, reward.accountExp || 0);
-
       await User.findOneAndUpdate({ userId }, {
         $inc: {
-          "currency.gold":               reward.gold || 0,
-          "currency.regularTickets":     reward.regularTickets || 0,
-          "currency.pickupTickets":      reward.pickupTickets || 0,
+          "currency.gold":             reward.gold || 0,
+          "currency.regularTickets":   reward.regularTickets || 0,
+          "currency.pickupTickets":    reward.pickupTickets || 0,
           ...(reward.jade ? { "currency.premiumCurrency": reward.jade } : {}),
-          "stats.totalGoldEverEarned":   reward.gold || 0,
+          "stats.totalGoldEverEarned": reward.gold || 0,
         },
         accountLevel: lvResult.newLevel,
         accountExp:   lvResult.newExp,
       });
+      return { reward, lvResult };
+    }
+
+    collector.on("collect", async i => {
+      await i.deferUpdate();
+      const id = i.customId;
+
+      // ── Refresh ──────────────────────────────────────────────────────────
+      if (id === "quests_refresh") {
+        const [newDaily, newWeekly] = await Promise.all([
+          getOrCreateQuests(redis, userId, "daily"),
+          getOrCreateQuests(redis, userId, "weekly"),
+        ]);
+        await interaction.editReply({
+          embeds: [buildQuestsEmbed(newDaily, newWeekly, interaction.user.username)],
+          components: buildClaimRows(newDaily, newWeekly),
+        });
+        return;
+      }
+
+      // ── Claim All ─────────────────────────────────────────────────────────
+      if (id === "quests_claim_all") {
+        const [d, w] = await Promise.all([
+          getOrCreateQuests(redis, userId, "daily"),
+          getOrCreateQuests(redis, userId, "weekly"),
+        ]);
+        const claimable = [
+          ...d.quests.filter(q => !d.claimed[q.id] && (d.progress[q.id] || 0) >= q.target).map(q => ({ type: "daily", q })),
+          ...w.quests.filter(q => !w.claimed[q.id] && (w.progress[q.id] || 0) >= q.target).map(q => ({ type: "weekly", q })),
+        ];
+        if (!claimable.length) return;
+
+        const totals = { gold: 0, jade: 0, regularTickets: 0, pickupTickets: 0, accountExp: 0 };
+        let leveledUp = false;
+        let newLevel  = 0;
+
+        for (const { type, q } of claimable) {
+          const res = await applyClaim(type, q.id);
+          if (!res) continue;
+          totals.gold           += res.reward.gold || 0;
+          totals.jade           += res.reward.jade || 0;
+          totals.regularTickets += res.reward.regularTickets || 0;
+          totals.pickupTickets  += res.reward.pickupTickets || 0;
+          totals.accountExp     += res.reward.accountExp || 0;
+          if (res.lvResult.leveledUp) { leveledUp = true; newLevel = res.lvResult.newLevel; }
+        }
+
+        const summaryLines = [`✅ Claimed **${claimable.length}** quest${claimable.length > 1 ? "s" : ""}!`, `Total: ${fmtReward(totals)}`];
+        if (leveledUp) summaryLines.push(`🎉 Level up! You are now **Level ${newLevel}**!`);
+        await i.followUp({ content: summaryLines.join("\n"), ephemeral: true });
+
+        const [newDaily, newWeekly] = await Promise.all([
+          getOrCreateQuests(redis, userId, "daily"),
+          getOrCreateQuests(redis, userId, "weekly"),
+        ]);
+        await interaction.editReply({
+          embeds: [buildQuestsEmbed(newDaily, newWeekly, interaction.user.username)],
+          components: buildClaimRows(newDaily, newWeekly),
+        });
+        return;
+      }
+
+      // ── Individual claim ──────────────────────────────────────────────────
+      const parts   = id.split("_");
+      const type    = parts[1];
+      const questId = parts.slice(2).join("_");
+
+      const res = await applyClaim(type, questId);
+      if (!res) return;
+
+      const rewardMsg = [`✅ Reward claimed! ${fmtReward(res.reward)}`];
+      if (res.lvResult.leveledUp) rewardMsg.push(`🎉 Level up! You are now **Level ${res.lvResult.newLevel}**!`);
+      await i.followUp({ content: rewardMsg.join("\n"), ephemeral: true });
 
       const [newDaily, newWeekly] = await Promise.all([
         getOrCreateQuests(redis, userId, "daily"),
         getOrCreateQuests(redis, userId, "weekly"),
       ]);
-
-      // DM notification if quest was completed (not just claimed)
-      // (we notify when quest becomes claimable, not on claim)
-
-      const rewardMsg = [`✅ Reward claimed! ${fmtReward(reward)}`];
-      if (lvResult.leveledUp) rewardMsg.push(`🎉 Level up! You are now **Level ${lvResult.newLevel}**!`);
-
-      await interaction.followUp({ content: rewardMsg.join("\n"), ephemeral: true });
       await interaction.editReply({
         embeds: [buildQuestsEmbed(newDaily, newWeekly, interaction.user.username)],
         components: buildClaimRows(newDaily, newWeekly),
