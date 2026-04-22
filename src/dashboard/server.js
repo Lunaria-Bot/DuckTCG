@@ -26,8 +26,12 @@ const DASHBOARD_URL         = (process.env.DASHBOARD_URL || `http://localhost:${
 const REDIRECT_URI          = `${DASHBOARD_URL}/auth/callback`;
 const DEFAULT_ADMIN_ID      = "912376040142307419";
 
-app.use(express.json({ limit: "100mb" }));
-app.use(express.urlencoded({ extended: true, limit: "100mb" }));
+app.use(express.json({ limit: "10mb" }));
+app.use((req, res, next) => {
+  // Skip body parsing for multipart uploads - let multer handle those
+  if (req.headers["content-type"] && req.headers["content-type"].includes("multipart/form-data")) return next();
+  express.urlencoded({ extended: true, limit: "10mb" })(req, res, next);
+});
 app.use(cookieParser(SECRET));
 
 const UPLOADS_DIR = path.join(__dirname, "uploads");
