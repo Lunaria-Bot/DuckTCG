@@ -26,7 +26,7 @@ const DASHBOARD_URL         = (process.env.DASHBOARD_URL || `http://localhost:${
 const REDIRECT_URI          = `${DASHBOARD_URL}/auth/callback`;
 const DEFAULT_ADMIN_ID      = "912376040142307419";
 
-app.use(express.json({ limit: "10mb" }));
+app.use(express.json());
 app.use((req, res, next) => {
   // Skip body parsing for multipart uploads - let multer handle those
   if (req.headers["content-type"] && req.headers["content-type"].includes("multipart/form-data")) return next();
@@ -1696,14 +1696,16 @@ const cardImgUpload = multer({
                 ["image/jpeg","image/png","image/gif","image/webp","image/jpg"].includes(mime);
     cb(null, ok);
   },
-  limits: { fileSize: 16 * 1024 * 1024 },
+  limits: { fileSize: 50 * 1024 * 1024 },
 });
 
-app.post("/cards/upload-image", auth, editorOrAdmin, cardImgUpload.single("image"), (req, res) => {
-  if (!req.file) return res.status(400).json({ error: "No file uploaded" });
-  const baseUrl = `${req.protocol}://${req.get("host")}`;
-  const url = `${baseUrl}/uploads/card/${req.file.filename}`;
-  res.json({ url, filename: req.file.filename });
+app.post("/cards/upload-image", auth, editorOrAdmin, (req, res) => {
+  cardImgUpload.single("image")(req, res, (err) => {
+    if (err) return res.status(400).json({ error: err.code === "LIMIT_FILE_SIZE" ? "File too large (max 16MB)" : err.message });
+    if (!req.file) return res.status(400).json({ error: "No file uploaded or invalid format" });
+    const baseUrl = `${req.protocol}://${req.get("host")}`;
+    res.json({ url: `${baseUrl}/uploads/card/${req.file.filename}`, filename: req.file.filename });
+  });
 });
 
 // List card images for picker — annotated with anime from DB
@@ -2251,14 +2253,20 @@ const dynamicMediaUpload = multer({
     const validMime = ["image/jpeg","image/jpg","image/png","image/gif","image/webp"].includes(mime);
     cb(null, validExt || validMime || mime.startsWith("image/"));
   },
-  limits: { fileSize: 16 * 1024 * 1024 }, // 16MB
+  limits: { fileSize: 50 * 1024 * 1024 }, // 50MB
 });
 
-app.post("/media/upload", auth, editorOrAdmin, dynamicMediaUpload.single("image"), (req, res) => {
-  const cat    = ["banner","card","other"].includes(req.query.cat) ? req.query.cat : "other";
-  const folder = req.query.folder || "";
-  if (folder) res.redirect(`/media?cat=${cat}&folder=${encodeURIComponent(folder)}`);
-  else res.redirect(`/media?cat=${cat}`);
+app.post("/media/upload", auth, editorOrAdmin, (req, res) => {
+  dynamicMediaUpload.single("image")(req, res, (err) => {
+    const cat    = ["banner","card","other"].includes(req.query.cat) ? req.query.cat : "other";
+    const folder = req.query.folder || "";
+    const back   = folder ? `/media?cat=${cat}&folder=${encodeURIComponent(folder)}` : `/media?cat=${cat}`;
+    if (err) {
+      const msg = err.code === "LIMIT_FILE_SIZE" ? "File too large (max 50MB)" : err.message;
+      return res.send(renderPage("Upload Error", `<div class="alert alert-red">${msg}</div><a href="${back}" class="btn">← Back</a>`, req.user, "/media"));
+    }
+    res.redirect(back);
+  });
 });
 app.post("/media/delete", auth, editorOrAdmin, (req, res) => {
   const CATS = ["banner","card","other"];
