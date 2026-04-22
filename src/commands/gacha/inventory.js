@@ -12,7 +12,7 @@ const User = require("../../models/User");
 const PAGE_SIZE = 8;
 
 const RARITY_ORDER = { exceptional: 0, special: 1, rare: 2, common: 3 };
-const RARITY_EMOJI = { exceptional: "<:Exceptional:1496204269110563038>", special: "<:Special:1496200970042872010>", rare: "<:Rare:1496150241462849536>", common: "<:Common:1495730171301462186>" };
+const RARITY_EMOJI = { exceptional: "<:Exceptional:1496532355719102656>", special: "<:Special:1496200970042872010>", rare: "<:Rare:1496204151447748811>", common: "<:Common:1495730171301462186>" };
 const RARITY_COLOR = { exceptional: 0xFFD700, special: 0xAB47BC, rare: 0x42A5F5, common: 0x78909C };
 const RARITY_LABEL = { exceptional: "Exceptional", special: "Special", rare: "Rare", common: "Common" };
 const ROLE_EMOJI   = { dps: "⚔️", support: "💚", tank: "🛡️" };
@@ -121,7 +121,7 @@ function buildControlRow(activeSort, activeRarity, activeRole) {
 function buildSortDropdown() {
   return new ActionRowBuilder().addComponents(
     new StringSelectMenuBuilder().setCustomId("inv_sort").setPlaceholder("Sort by...").addOptions([
-      new StringSelectMenuOptionBuilder().setLabel("Rarity (best first)").setValue("rarity").setEmoji("<:Exceptional:1496204269110563038>"),
+      new StringSelectMenuOptionBuilder().setLabel("Rarity (best first)").setValue("rarity").setEmoji("<:Exceptional:1496532355719102656>"),
       new StringSelectMenuOptionBuilder().setLabel("Level (highest first)").setValue("level").setEmoji("⬆️"),
       new StringSelectMenuOptionBuilder().setLabel("Anime (A → Z)").setValue("anime").setEmoji("📚"),
       new StringSelectMenuOptionBuilder().setLabel("Recently obtained").setValue("date").setEmoji("🕐"),
@@ -133,9 +133,9 @@ function buildRarityDropdown() {
   return new ActionRowBuilder().addComponents(
     new StringSelectMenuBuilder().setCustomId("inv_filter_rarity").setPlaceholder("Filter by rarity...").addOptions([
       new StringSelectMenuOptionBuilder().setLabel("All rarities").setValue("all").setEmoji("✨"),
-      new StringSelectMenuOptionBuilder().setLabel("Exceptional").setValue("exceptional").setEmoji("<:Exceptional:1496204269110563038>"),
+      new StringSelectMenuOptionBuilder().setLabel("Exceptional").setValue("exceptional").setEmoji("<:Exceptional:1496532355719102656>"),
       new StringSelectMenuOptionBuilder().setLabel("Special").setValue("special").setEmoji("<:Special:1496200970042872010>"),
-      new StringSelectMenuOptionBuilder().setLabel("Rare").setValue("rare").setEmoji("<:Rare:1496150241462849536>"),
+      new StringSelectMenuOptionBuilder().setLabel("Rare").setValue("rare").setEmoji("<:Rare:1496204151447748811>"),
       new StringSelectMenuOptionBuilder().setLabel("Common").setValue("common").setEmoji("<:Common:1495730171301462186>"),
     ])
   );

@@ -1692,7 +1692,7 @@ const cardImgUpload = multer({
                 ["image/jpeg","image/png","image/gif","image/webp","image/jpg"].includes(mime);
     cb(null, ok);
   },
-  limits: { fileSize: 8 * 1024 * 1024 },
+  limits: { fileSize: 16 * 1024 * 1024 },
 });
 
 app.post("/cards/upload-image", auth, editorOrAdmin, cardImgUpload.single("image"), (req, res) => {
@@ -2221,35 +2221,40 @@ app.post("/media/folder", auth, editorOrAdmin, (req, res) => {
   }
   res.redirect("/media?cat=card");
 });
-app.post("/media/upload", auth, editorOrAdmin, async (req, res) => {
-  const cat    = ["banner","card","other"].includes(req.query.cat) ? req.query.cat : "other";
-  const folder = req.query.folder || req.body.folder || "";
-  const destDir = cat === "card" && folder
-    ? path.join(UPLOADS_DIR, "card", folder.replace(/[^a-z0-9_-]/gi, "_"))
-    : path.join(UPLOADS_DIR, cat);
-  if (!fs.existsSync(destDir)) fs.mkdirSync(destDir, { recursive: true });
-  const uploadMid = multer({
-    storage: multer.diskStorage({
-      destination: (req2, file, cb) => cb(null, destDir),
-      filename:    (req2, file, cb) => {
-        const ext  = path.extname(file.originalname).toLowerCase();
-        const name = path.basename(file.originalname, ext).replace(/[^a-z0-9_-]/gi, "_").toLowerCase();
-        cb(null, `${name}_${Date.now()}${ext}`);
-      },
-    }),
-    fileFilter: (req2, file, cb) => {
-      const ext2 = path.extname(file.originalname).toLowerCase();
-      const mime2 = file.mimetype || "";
-      const ok2 = [".jpg",".jpeg",".png",".gif",".webp"].includes(ext2) ||
-                  ["image/jpeg","image/png","image/gif","image/webp","image/jpg"].includes(mime2);
-      cb(null, ok2);
+// Dynamic media uploader — destination resolved from query params
+const dynamicMediaUpload = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => {
+      const cat    = ["banner","card","other"].includes(req.query.cat) ? req.query.cat : "other";
+      const folder = (req.query.folder || "").replace(/[^a-z0-9_-]/gi, "_");
+      const dir    = cat === "card" && folder
+        ? path.join(UPLOADS_DIR, "card", folder)
+        : path.join(UPLOADS_DIR, cat);
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      cb(null, dir);
     },
-    limits: { fileSize: 8 * 1024 * 1024 },
-  }).single("image");
-  uploadMid(req, res, (err) => {
-    if (folder) res.redirect(`/media?cat=${cat}&folder=${encodeURIComponent(folder)}`);
-    else res.redirect(`/media?cat=${cat}`);
-  });
+    filename: (req, file, cb) => {
+      const ext  = path.extname(file.originalname).toLowerCase() || ".webp";
+      const name = path.basename(file.originalname, ext).replace(/[^a-z0-9_-]/gi, "_").toLowerCase() || "image";
+      cb(null, `${name}_${Date.now()}${ext}`);
+    },
+  }),
+  fileFilter: (req, file, cb) => {
+    const ext  = path.extname(file.originalname).toLowerCase();
+    const mime = file.mimetype || "";
+    // Accept all common image types including webp
+    const validExt  = [".jpg",".jpeg",".png",".gif",".webp"].includes(ext);
+    const validMime = ["image/jpeg","image/jpg","image/png","image/gif","image/webp"].includes(mime);
+    cb(null, validExt || validMime || mime.startsWith("image/"));
+  },
+  limits: { fileSize: 16 * 1024 * 1024 }, // 16MB
+});
+
+app.post("/media/upload", auth, editorOrAdmin, dynamicMediaUpload.single("image"), (req, res) => {
+  const cat    = ["banner","card","other"].includes(req.query.cat) ? req.query.cat : "other";
+  const folder = req.query.folder || "";
+  if (folder) res.redirect(`/media?cat=${cat}&folder=${encodeURIComponent(folder)}`);
+  else res.redirect(`/media?cat=${cat}`);
 });
 app.post("/media/delete", auth, editorOrAdmin, (req, res) => {
   const CATS = ["banner","card","other"];
