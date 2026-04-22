@@ -453,6 +453,116 @@ ${sidebar}
   <div class="container">
     ${content}
   </div>` : content}
+
+<!-- Global Image Picker Modal -->
+<div id="imgpicker" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:9999;padding:20px;overflow:auto;align-items:flex-start;justify-content:center" onclick="if(event.target===this)closeImgPicker()">
+  <div style="background:var(--bg2);border-radius:var(--radius);padding:20px;width:100%;max-width:1000px;margin:auto;margin-top:40px" onclick="event.stopPropagation()">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <h3 style="margin:0">🖼️ Pick a Card Image</h3>
+      <button onclick="closeImgPicker()" class="btn btn-ghost">✕ Close</button>
+    </div>
+    <input id="imgpicker_search" type="text" placeholder="Search by name or anime..." style="width:100%;margin-bottom:14px;padding:8px 12px;border-radius:6px;border:1px solid var(--border);background:var(--bg3);color:var(--text)" oninput="renderPickerGrid(this.value)"/>
+    <div id="imgpicker_grid" style="max-height:65vh;overflow-y:auto;padding-right:4px"></div>
+  </div>
+</div>
+<script>
+  var _pickerImages = [];
+  var _pickerTarget = null;
+  var _pickerPreview = null;
+
+  async function openImagePicker(targetId, previewId) {
+    _pickerTarget  = targetId;
+    _pickerPreview = previewId;
+    const picker = document.getElementById("imgpicker");
+    picker.style.display = "flex";
+    document.getElementById("imgpicker_search").value = "";
+    if (_pickerImages.length) { renderPickerGrid(""); return; }
+    document.getElementById("imgpicker_grid").innerHTML = "<div style='color:var(--muted);padding:20px'>Loading...</div>";
+    try {
+      _pickerImages = await fetch("/cards/images").then(r => r.json());
+    } catch(e) {
+      document.getElementById("imgpicker_grid").innerHTML = "<div style='color:var(--muted);padding:20px'>Failed to load images.</div>";
+      return;
+    }
+    renderPickerGrid("");
+  }
+
+  function closeImgPicker() {
+    document.getElementById("imgpicker").style.display = "none";
+    _pickerImages = []; // refresh next open
+  }
+
+  function renderPickerGrid(search) {
+    const grid = document.getElementById("imgpicker_grid");
+    if (!_pickerImages.length) { grid.innerHTML = "<div style='color:var(--muted);padding:20px'>No images uploaded yet. Use Media > Card to upload.</div>"; return; }
+    const q = (search||"").trim().toLowerCase();
+    const filtered = q ? _pickerImages.filter(i =>
+      i.filename.toLowerCase().includes(q) ||
+      (i.anime||"").toLowerCase().includes(q) ||
+      (i.cardName||"").toLowerCase().includes(q)
+    ) : _pickerImages;
+    if (!filtered.length) { grid.innerHTML = "<div style='color:var(--muted);padding:20px'>No results.</div>"; return; }
+    const groups = {};
+    filtered.forEach(function(img) {
+      const key = img.anime || "Uncategorized";
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(img);
+    });
+    grid.innerHTML = "";
+    Object.keys(groups).sort().forEach(function(anime) {
+      const section = document.createElement("div");
+      section.style.cssText = "margin-bottom:18px";
+      const heading = document.createElement("div");
+      heading.style.cssText = "font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);padding:4px 0 8px;border-bottom:1px solid var(--border);margin-bottom:10px";
+      heading.textContent = anime + " (" + groups[anime].length + ")";
+      section.appendChild(heading);
+      const subgrid = document.createElement("div");
+      subgrid.style.cssText = "display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px";
+      groups[anime].forEach(function(img) {
+        const div = document.createElement("div");
+        div.style.cssText = "cursor:pointer;border-radius:6px;overflow:hidden;border:2px solid transparent;transition:.15s;background:var(--bg3)";
+        div.addEventListener("mouseenter", function(){ this.style.borderColor="var(--primary)"; });
+        div.addEventListener("mouseleave", function(){ this.style.borderColor="transparent"; });
+        div.addEventListener("click", function() {
+          if (_pickerTarget) document.getElementById(_pickerTarget).value = img.url;
+          if (_pickerPreview) {
+            var p = document.getElementById(_pickerPreview);
+            if (p) { p.src = img.url; p.style.display = "block"; }
+          }
+          closeImgPicker();
+        });
+        const imgEl = document.createElement("img");
+        imgEl.src = img.url;
+        imgEl.style.cssText = "width:100%;height:100px;object-fit:cover;display:block";
+        imgEl.loading = "lazy";
+        const label = document.createElement("div");
+        label.style.cssText = "padding:4px 6px;font-size:10px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis";
+        label.textContent = img.cardName || img.filename;
+        div.appendChild(imgEl);
+        div.appendChild(label);
+        subgrid.appendChild(div);
+      });
+      section.appendChild(subgrid);
+      grid.appendChild(section);
+    });
+  }
+
+  async function uploadCardImage(input, targetId, previewId) {
+    if (!input.files[0]) return;
+    const fd = new FormData();
+    fd.append("image", input.files[0]);
+    try {
+      const r = await fetch("/cards/upload-image", { method: "POST", body: fd });
+      const d = await r.json();
+      if (d.url) {
+        document.getElementById(targetId).value = d.url;
+        var p = document.getElementById(previewId);
+        if (p) { p.src = d.url; p.style.display = "block"; }
+        _pickerImages = []; // reset cache
+      }
+    } catch(e) { alert("Upload failed: " + e.message); }
+  }
+</script>
 </div>
 </body>
 </html>`;
@@ -1293,16 +1403,7 @@ app.get("/cards/new", auth, editorOrAdmin, async (req, res) => {
             </div>
             <img id="preview_new" id="preview_new" src="" style="display:none;margin-top:8px;max-width:120px;border-radius:6px;object-fit:cover"/>
           </div>
-          <div id="imgpicker" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9999;padding:40px;overflow:auto" onclick="if(event.target===this)this.style.display='none'">
-            <div style="background:var(--bg2);border-radius:var(--radius);padding:20px;max-width:1000px;margin:0 auto" onclick="event.stopPropagation()">
-              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-                <h3 style="margin:0">🖼️ Pick a Card Image</h3>
-                <button onclick="document.getElementById('imgpicker').style.display='none'" class="btn btn-ghost">✕ Close</button>
-              </div>
-              <input id="imgpicker_search" type="text" placeholder="Search by name or anime..." style="width:100%;margin-bottom:14px;padding:8px 12px;border-radius:6px;border:1px solid var(--border);background:var(--bg3);color:var(--text)" oninput="renderPickerGrid('imgpicker_grid', this.value)"/>
-              <div id="imgpicker_grid" style="max-height:65vh;overflow-y:auto;padding-right:4px"></div>
-            </div>
-          </div>
+
 
         <script>
           async function uploadCardImage(input, targetId, previewId) {
@@ -1317,73 +1418,7 @@ app.get("/cards/new", auth, editorOrAdmin, async (req, res) => {
               p.src = d.url; p.style.display = "block";
             }
           }
-          let _allImages = [];
-          async function openImagePicker(targetId, previewId) {
-            const picker = document.getElementById("imgpicker");
-            picker.style.display = "block";
-            picker._target  = targetId;
-            picker._preview = previewId;
-            document.getElementById("imgpicker_search").value = "";
-            renderPickerGrid("imgpicker_grid", "");
-            if (_allImages.length) return;
-            document.getElementById("imgpicker_grid").innerHTML = "<div style=\"color:var(--muted);padding:20px\">Loading...</div>";
-            _allImages = await fetch("/cards/images").then(r => r.json());
-            renderPickerGrid("imgpicker_grid", "");
-          }
-          function renderPickerGrid(gridId, search) {
-            const grid = document.getElementById(gridId);
-            if (!_allImages.length) { grid.innerHTML = "<div style=\"color:var(--muted);padding:20px\">No images yet.</div>"; return; }
-            const q = search.trim().toLowerCase();
-            const filtered = q ? _allImages.filter(i => i.filename.toLowerCase().includes(q) || (i.anime||"").toLowerCase().includes(q) || (i.cardName||"").toLowerCase().includes(q)) : _allImages;
-            if (!filtered.length) { grid.innerHTML = "<div style=\"color:var(--muted);padding:20px\">No results.</div>"; return; }
-            // Group by anime
-            const groups = {};
-            filtered.forEach(img => {
-              const key = img.anime || "Uncategorized";
-              if (!groups[key]) groups[key] = [];
-              groups[key].push(img);
-            });
-            grid.innerHTML = "";
-            Object.keys(groups).sort().forEach(function(anime) {
-              const section = document.createElement("div");
-              section.style.cssText = "grid-column:1/-1;margin-top:12px";
-              const heading = document.createElement("div");
-              heading.style.cssText = "font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);padding:4px 0 8px;border-bottom:1px solid var(--border);margin-bottom:8px";
-              heading.textContent = anime + " (" + groups[anime].length + ")";
-              section.appendChild(heading);
-              const subgrid = document.createElement("div");
-              subgrid.style.cssText = "display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px";
-              groups[anime].forEach(function(img) {
-                const div = document.createElement("div");
-                div.style.cssText = "cursor:pointer;border-radius:6px;overflow:hidden;border:2px solid transparent;transition:.15s;background:var(--bg3)";
-                div.addEventListener("mouseenter", function(){ this.style.borderColor="var(--primary)"; });
-                div.addEventListener("mouseleave", function(){ this.style.borderColor="transparent"; });
-                div.addEventListener("click", function() {
-                  selectPickedImage(img.url, document.getElementById("imgpicker")._target, document.getElementById("imgpicker")._preview);
-                  _allImages = []; // refresh next time
-                });
-                const isGif = img.filename.toLowerCase().endsWith(".gif");
-                const imgEl = document.createElement(isGif ? "img" : "img");
-                imgEl.src = img.url;
-                imgEl.style.cssText = "width:100%;height:100px;object-fit:cover;display:block";
-                const label = document.createElement("div");
-                label.style.cssText = "padding:4px 6px;font-size:10px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis";
-                label.textContent = img.cardName || img.filename;
-                div.appendChild(imgEl);
-                div.appendChild(label);
-                subgrid.appendChild(div);
-              });
-              section.appendChild(subgrid);
-              grid.appendChild(section);
-            });
-          }
-          function selectPickedImage(url, targetId, previewId) {
-            document.getElementById(targetId).value = url;
-            const p = document.getElementById(previewId);
-            p.src = url; p.style.display = "block";
-            document.getElementById("imgpicker").style.display = "none";
-          }
-        </script>
+
 
         <div class="form-row"><div class="form-group"><label>Rarity</label><select name="rarity"><option value="common">Common</option><option value="rare">Rare</option><option value="special">Special</option><option value="exceptional">Exceptional</option></select></div><div class="form-group"><label>Role</label><select name="role"><option value="dps">DPS</option><option value="support">Support</option><option value="tank">Tank</option></select></div></div>
         <div class="form-group"><label>Add to Banner (optional)</label><select name="addToBanner"><option value="">— Don't add —</option>${bannerOptions}</select></div>
