@@ -817,7 +817,7 @@ app.get("/banners/new", auth, editorOrAdmin, (req, res) => {
         </div>
         <div class="form-group"><label>Name</label><input name="name" placeholder="Pick Up! Naruto" required/></div>
         <div class="form-group"><label>Anime</label><input name="anime" placeholder="Naruto" required/></div>
-        <div class="form-group"><label>Image URL</label><input name="imageUrl" placeholder="https://..."/></div>
+
         <div class="form-group"><label>Description</label><input name="description" placeholder="Banner description..."/></div>
         <div class="form-row">
           <div class="form-group"><label>Starts At</label><input type="date" name="startsAt" required/></div>
@@ -1171,6 +1171,47 @@ app.get("/series/:id/remove-card", auth, editorOrAdmin, async (req, res) => {
   res.redirect(`/series/${req.params.id}/cards`);
 });
 
+
+// ─── CARD IMAGE UPLOAD (inline, returns JSON) ─────────────────────────────────
+const cardImgUpload = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => {
+      const dir = path.join(UPLOADS_DIR, "card");
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      cb(null, dir);
+    },
+    filename: (req, file, cb) => {
+      const ext  = path.extname(file.originalname).toLowerCase();
+      const name = path.basename(file.originalname, ext).replace(/[^a-z0-9_-]/gi, "_").toLowerCase();
+      cb(null, `${name}_${Date.now()}${ext}`);
+    },
+  }),
+  fileFilter: (req, file, cb) => {
+    if ([".jpg", ".jpeg", ".png", ".gif", ".webp"].includes(path.extname(file.originalname).toLowerCase())) return cb(null, true);
+    cb(new Error("Images only"));
+  },
+  limits: { fileSize: 8 * 1024 * 1024 },
+});
+
+app.post("/cards/upload-image", auth, editorOrAdmin, cardImgUpload.single("image"), (req, res) => {
+  if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+  const baseUrl = `${req.protocol}://${req.get("host")}`;
+  const url = `${baseUrl}/uploads/card/${req.file.filename}`;
+  res.json({ url, filename: req.file.filename });
+});
+
+// List card images for picker
+app.get("/cards/images", auth, editorOrAdmin, (req, res) => {
+  const dir = path.join(UPLOADS_DIR, "card");
+  if (!fs.existsSync(dir)) return res.json([]);
+  const baseUrl = `${req.protocol}://${req.get("host")}`;
+  const files = fs.readdirSync(dir)
+    .filter(f => /\.(jpg|jpeg|png|gif|webp)$/i.test(f))
+    .reverse()
+    .map(f => ({ filename: f, url: `${baseUrl}/uploads/card/${f}` }));
+  res.json(files);
+});
+
 // ─── CARDS ────────────────────────────────────────────────────────────────────
 app.get("/cards", auth, editorOrAdmin, async (req, res) => {
   const search = (req.query.q||"").trim();
@@ -1226,7 +1267,82 @@ app.get("/cards/new", auth, editorOrAdmin, async (req, res) => {
     <div class="form-box">
       <form method="POST" action="/cards/new" style="display:flex;flex-direction:column;gap:0">
         <div class="form-row"><div class="form-group"><label>Card ID</label><input name="cardId" placeholder="naruto_001" required/></div><div class="form-group"><label>Name</label><input name="name" placeholder="Naruto Uzumaki" required/></div></div>
-        <div class="form-group"><label>Image URL</label><input name="imageUrl" placeholder="https://..."/></div>
+
+          <div class="form-group">
+            <label>Card Image</label>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+              <input type="text" name="imageUrl" id="imageUrl_new" placeholder="https://..." style="flex:1;min-width:180px"/>
+              <label class="btn btn-gray btn-sm" style="cursor:pointer;margin:0">
+                📁 Upload
+                <input type="file" accept="image/*" style="display:none" onchange="uploadCardImage(this, 'imageUrl_new', 'preview_new')"/>
+              </label>
+              <button type="button" class="btn btn-ghost btn-sm" onclick="openImagePicker('imageUrl_new', 'preview_new')">🖼️ Pick</button>
+            </div>
+            <img id="preview_new" id="preview_new" src="" style="display:none;margin-top:8px;max-width:120px;border-radius:6px;object-fit:cover"/>
+          </div>
+          <div id="imgpicker" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9999;padding:40px;overflow:auto" onclick="if(event.target===this)this.style.display='none'">
+            <div style="background:var(--bg2);border-radius:var(--radius);padding:20px;max-width:960px;margin:0 auto">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+                <h3 style="margin:0">Pick a Card Image</h3>
+                <button onclick="document.getElementById('imgpicker').style.display='none'" class="btn btn-ghost">✕</button>
+              </div>
+              <div id="imgpicker_grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;max-height:60vh;overflow-y:auto"></div>
+            </div>
+          </div>
+
+        <script>
+          async function uploadCardImage(input, targetId, previewId) {
+            if (!input.files[0]) return;
+            const fd = new FormData();
+            fd.append("image", input.files[0]);
+            const r = await fetch("/cards/upload-image", { method: "POST", body: fd });
+            const d = await r.json();
+            if (d.url) {
+              document.getElementById(targetId).value = d.url;
+              const p = document.getElementById(previewId);
+              p.src = d.url; p.style.display = "block";
+            }
+          }
+          async function openImagePicker(targetId, previewId) {
+            const picker = document.getElementById("imgpicker");
+            const grid   = document.getElementById("imgpicker_grid");
+            grid.innerHTML = "Loading...";
+            picker.style.display = "block";
+            picker._target  = targetId;
+            picker._preview = previewId;
+            const images = await fetch("/cards/images").then(r => r.json());
+            if (!images.length) {
+              grid.innerHTML = "No images yet. Upload via Media > Card.";
+              return;
+            }
+            grid.innerHTML = "";
+            images.forEach(function(img) {
+              const div = document.createElement("div");
+              div.style.cssText = "cursor:pointer;border-radius:6px;overflow:hidden;border:2px solid transparent;transition:.15s";
+              div.addEventListener("mouseenter", function(){ this.style.borderColor = "var(--primary)"; });
+              div.addEventListener("mouseleave", function(){ this.style.borderColor = "transparent"; });
+              div.addEventListener("click", function() {
+                selectPickedImage(img.url, document.getElementById("imgpicker")._target, document.getElementById("imgpicker")._preview);
+              });
+              const imgEl = document.createElement("img");
+              imgEl.src = img.url;
+              imgEl.style.cssText = "width:100%;height:110px;object-fit:cover;display:block";
+              const label = document.createElement("div");
+              label.style.cssText = "padding:4px 6px;font-size:10px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis";
+              label.textContent = img.filename;
+              div.appendChild(imgEl);
+              div.appendChild(label);
+              grid.appendChild(div);
+            });
+          }
+          function selectPickedImage(url, targetId, previewId) {
+            document.getElementById(targetId).value = url;
+            const p = document.getElementById(previewId);
+            p.src = url; p.style.display = "block";
+            document.getElementById("imgpicker").style.display = "none";
+          }
+        </script>
+
         <div class="form-row"><div class="form-group"><label>Rarity</label><select name="rarity"><option value="common">Common</option><option value="rare">Rare</option><option value="special">Special</option><option value="exceptional">Exceptional</option></select></div><div class="form-group"><label>Role</label><select name="role"><option value="dps">DPS</option><option value="support">Support</option><option value="tank">Tank</option></select></div></div>
         <div class="form-group"><label>Add to Banner (optional)</label><select name="addToBanner"><option value="">— Don't add —</option>${bannerOptions}</select></div>
         <div class="form-group"><label>Series (optional)</label><select name="seriesId"><option value="">— No series —</option>${seriesOptions}</select></div>
@@ -1265,7 +1381,18 @@ app.get("/cards/:id/edit", auth, editorOrAdmin, async (req, res) => {
       <div class="form-box" style="flex:1;margin-bottom:0">
         <form method="POST" action="/cards/${card.cardId}/edit" style="display:flex;flex-direction:column;gap:0">
           <div class="form-group"><label>Name</label><input name="name" value="${card.name}" required/></div>
-          <div class="form-group"><label>Image URL</label><input name="imageUrl" value="${card.imageUrl||""}"/></div>
+          <div class="form-group">
+            <label>Card Image</label>
+            <div style="display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap">
+              <input type="text" name="imageUrl" id="imageUrl_edit" value="${card.imageUrl||""}" placeholder="https://..." style="flex:1;min-width:200px"/>
+              <label class="btn btn-gray" style="cursor:pointer;white-space:nowrap">
+                📁 Upload
+                <input type="file" accept="image/*" style="display:none" onchange="uploadCardImage(this, 'imageUrl_edit', 'preview_edit')"/>
+              </label>
+              <button type="button" class="btn btn-ghost" onclick="openImagePicker('imageUrl_edit', 'preview_edit')">🖼️ Pick</button>
+            </div>
+            ${card.imageUrl ? `<img id="preview_edit" src="${card.imageUrl}" style="margin-top:8px;max-width:120px;border-radius:6px;object-fit:cover"/>` : `<img id="preview_edit" src="" style="display:none;margin-top:8px;max-width:120px;border-radius:6px;object-fit:cover"/>`}
+          </div>
           <div class="form-row"><div class="form-group"><label>Rarity</label><select name="rarity">${["common","rare","special","exceptional"].map(r=>`<option value="${r}"${card.rarity===r?" selected":""}>${r}</option>`).join("")}</select></div><div class="form-group"><label>Role</label><select name="role">${["dps","support","tank"].map(r=>`<option value="${r}"${card.role===r?" selected":""}>${r}</option>`).join("")}</select></div></div>
           <div class="form-group"><label>Series</label><select name="seriesId">${seriesOpts}</select></div>
           <div class="form-row3"><div class="form-group"><label>Base Damage</label><input type="number" name="baseDamage" value="${card.baseStats?.damage??100}"/></div><div class="form-group"><label>Base Mana</label><input type="number" name="baseMana" value="${card.baseStats?.mana??100}"/></div><div class="form-group"><label>Base HP</label><input type="number" name="baseHp" value="${card.baseStats?.hp??100}"/></div></div>
