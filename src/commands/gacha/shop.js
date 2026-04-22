@@ -171,7 +171,7 @@ const JADE_ITEMS = [
     desc: "Roll a random **Special** rarity card.",
     price: 150,
     currency: "premiumCurrency",
-    emoji: "<:SP:1495730276737745077>",
+    emoji: "<:Special:1496200970042872010>",
     limit: "unlimited",
     buy: async (user) => {
       const cost_scb = applyDiscount(150, user.isPremium);
@@ -190,7 +190,7 @@ const JADE_ITEMS = [
       await User.findOneAndUpdate({ userId: user.userId }, {
         $inc: { "currency.premiumCurrency": -cost_scb, "stats.totalCardsEverObtained": 1 },
       });
-      return { msg: `<:SP:1495730276737745077> You received **${card.name}** *(${card.anime})* — Special card!`, thumbnail: card.imageUrl };
+      return { msg: `<:Special:1496200970042872010> You received **${card.name}** *(${card.anime})* — Special card!`, thumbnail: card.imageUrl };
     },
   },
 ];

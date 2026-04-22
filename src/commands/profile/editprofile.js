@@ -14,7 +14,7 @@ const PlayerCard = require("../../models/PlayerCard");
 const Card = require("../../models/Card");
 const User = require("../../models/User");
 
-const RARITY_EMOJI = { common: "<:Common:1495730171301462186>", rare: "<:Rare:1496150241462849536>", special: "<:SP:1495730276737745077>", exceptional: "<:EX:1495730346241822861>" };
+const RARITY_EMOJI = { common: "<:Common:1495730171301462186>", rare: "<:Rare:1496150241462849536>", special: "<:Special:1496200970042872010>", exceptional: "<:Exceptional:1496204269110563038>" };
 
 module.exports = {
   data: new SlashCommandBuilder()

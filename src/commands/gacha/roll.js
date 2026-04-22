@@ -16,7 +16,7 @@ const {
   isQiReady, qiCooldownRemaining, formatCooldown, QI_COOLDOWN_MS,
 } = require("../../services/mana");
 
-const RARITY_EMOJI  = { exceptional: "<:EX:1495730346241822861>", special: "<:SP:1495730276737745077>", rare: "<:Rare:1496150241462849536>", common: "<:Common:1495730171301462186>" };
+const RARITY_EMOJI  = { exceptional: "<:Exceptional:1496204269110563038>", special: "<:Special:1496200970042872010>", rare: "<:Rare:1496150241462849536>", common: "<:Common:1495730171301462186>" };
 const RARITY_ORDER  = { exceptional: 0, special: 1, rare: 2, common: 3 };
 const RARITY_RATES  = { common: 62.5, rare: 30, special: 7.5 }; // exceptional excluded from /roll
 
