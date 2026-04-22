@@ -33,6 +33,7 @@ app.use(cookieParser(SECRET));
 const UPLOADS_DIR = path.join(__dirname, "uploads");
 if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 app.use("/uploads", express.static(UPLOADS_DIR));
+app.use("/static", express.static(path.join(__dirname, "public")));
 
 // ─── Session ──────────────────────────────────────────────────────────────────
 function setSession(res, data) {
@@ -830,125 +831,8 @@ ${user ? `
   </div>
 </div>
 
-<script>
-  // ── Image Picker ──
-  var _pickerImages = [];
-  var _pickerTarget = null;
-  var _pickerPreview = null;
-
-  async function openImagePicker(targetId, previewId) {
-    _pickerTarget  = targetId;
-    _pickerPreview = previewId;
-    document.getElementById("imgpicker").classList.add("open");
-    document.getElementById("imgpicker_search").value = "";
-    if (_pickerImages.length) { renderPickerGrid(""); return; }
-    document.getElementById("imgpicker_grid").innerHTML = "<div style=\"color:var(--text3);padding:30px;text-align:center\">Loading images...</div>";
-    try {
-      _pickerImages = await fetch("/cards/images").then(r => r.json());
-    } catch(e) {
-      document.getElementById("imgpicker_grid").innerHTML = "<div style=\"color:var(--red);padding:30px;text-align:center\">Failed to load images</div>";
-      return;
-    }
-    renderPickerGrid("");
-  }
-
-  function closeImgPicker() {
-    document.getElementById("imgpicker").classList.remove("open");
-    _pickerImages = [];
-  }
-
-  function renderPickerGrid(search) {
-    const grid = document.getElementById("imgpicker_grid");
-    if (!_pickerImages.length) {
-      grid.innerHTML = "<div style=\"color:var(--text3);padding:30px;text-align:center\">No images yet. Upload via Media \u2192 Card.</div>";
-      return;
-    }
-    const q = (search||"").trim().toLowerCase();
-    const filtered = q ? _pickerImages.filter(i =>
-      i.filename.toLowerCase().includes(q) ||
-      (i.anime||"").toLowerCase().includes(q) ||
-      (i.cardName||"").toLowerCase().includes(q)
-    ) : _pickerImages;
-    if (!filtered.length) {
-      grid.innerHTML = "<div style=\"color:var(--text3);padding:30px;text-align:center\">No results for \"" + q + "\"</div>";
-      return;
-    }
-    const groups = {};
-    filtered.forEach(function(img) {
-      const key = img.anime || "Uncategorized";
-      if (!groups[key]) groups[key] = [];
-      groups[key].push(img);
-    });
-    grid.innerHTML = "";
-    Object.keys(groups).sort().forEach(function(anime) {
-      const label = document.createElement("div");
-      label.className = "picker-group-label";
-      label.textContent = anime + " (" + groups[anime].length + ")";
-      grid.appendChild(label);
-      const row = document.createElement("div");
-      row.className = "picker-items";
-      groups[anime].forEach(function(img) {
-        const item = document.createElement("div");
-        item.className = "picker-item";
-        item.addEventListener("click", function() {
-          if (_pickerTarget) {
-            const el = document.getElementById(_pickerTarget);
-            if (el) el.value = img.url;
-          }
-          if (_pickerPreview) {
-            const p = document.getElementById(_pickerPreview);
-            if (p) { p.src = img.url; p.classList.add("visible"); }
-          }
-          closeImgPicker();
-        });
-        const imgEl = document.createElement("img");
-        imgEl.src = img.url;
-        imgEl.loading = "lazy";
-        const lbl = document.createElement("div");
-        lbl.className = "picker-item-label";
-        lbl.textContent = img.cardName || img.filename;
-        item.appendChild(imgEl);
-        item.appendChild(lbl);
-        row.appendChild(item);
-      });
-      grid.appendChild(row);
-    });
-  }
-
-  async function uploadCardImage(input, targetId, previewId) {
-    if (!input.files[0]) return;
-    const btn = input.closest("label");
-    if (btn) btn.style.opacity = "0.6";
-    const fd = new FormData();
-    fd.append("image", input.files[0]);
-    try {
-      const r = await fetch("/cards/upload-image", { method: "POST", body: fd });
-      const d = await r.json();
-      if (d.url) {
-        const el = document.getElementById(targetId);
-        if (el) el.value = d.url;
-        const p = document.getElementById(previewId);
-        if (p) { p.src = d.url; p.classList.add("visible"); }
-        _pickerImages = [];
-      } else {
-        alert("Upload failed: " + (d.error || "unknown error"));
-      }
-    } catch(e) { alert("Upload failed: " + e.message); }
-    finally { if (btn) btn.style.opacity = "1"; }
-  }
-
-  // Auto-show image preview if URL field already has value
-  document.addEventListener("DOMContentLoaded", function() {
-    document.querySelectorAll("[data-preview-for]").forEach(function(img) {
-      const inp = document.getElementById(img.dataset.previewFor);
-      if (inp && inp.value) { img.src = inp.value; img.classList.add("visible"); }
-      if (inp) inp.addEventListener("input", function() {
-        if (this.value) { img.src = this.value; img.classList.add("visible"); }
-        else img.classList.remove("visible");
-      });
-    });
-  });
-</script>
+<style>.picker-msg{color:#6060a0;padding:30px;text-align:center}.picker-msg-err{color:#ef4444}</style>
+<script src="/static/picker.js"></script>
 ${user ? "</div>" : ""}
 </body>
 </html>`;
