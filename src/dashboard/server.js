@@ -714,17 +714,20 @@ function renderPage(title, content, user = null, activePage = "") {
 
     /* ── Picker modal ── */
     .picker-overlay {
-      position: fixed; inset: 0;
-      background: rgba(0,0,0,0.85);
+      position: fixed;
+      top: 0; left: 0;
+      width: 100vw; height: 100vh;
+      background: rgba(0,0,0,0.88);
       backdrop-filter: blur(8px);
-      z-index: 9999;
+      -webkit-backdrop-filter: blur(8px);
+      z-index: 99999;
       display: none;
       align-items: flex-start;
       justify-content: center;
       padding: 40px 20px;
       overflow-y: auto;
     }
-    .picker-overlay.open { display: flex; animation: fadeInUp 0.2s ease; }
+    .picker-overlay.open { display: flex !important; animation: fadeInUp 0.2s ease; }
     .picker-modal {
       background: var(--bg3);
       border: 1px solid var(--border2);
@@ -839,11 +842,11 @@ ${user ? `
     document.getElementById("imgpicker").classList.add("open");
     document.getElementById("imgpicker_search").value = "";
     if (_pickerImages.length) { renderPickerGrid(""); return; }
-    document.getElementById("imgpicker_grid").innerHTML = "<div style='color:var(--text3);padding:30px;text-align:center'>Loading images...</div>";
+    document.getElementById("imgpicker_grid").innerHTML = "<div style=\"color:var(--text3);padding:30px;text-align:center\">Loading images...</div>";
     try {
       _pickerImages = await fetch("/cards/images").then(r => r.json());
     } catch(e) {
-      document.getElementById("imgpicker_grid").innerHTML = "<div style='color:var(--red);padding:30px;text-align:center'>Failed to load images</div>";
+      document.getElementById("imgpicker_grid").innerHTML = "<div style=\"color:var(--red);padding:30px;text-align:center\">Failed to load images</div>";
       return;
     }
     renderPickerGrid("");
@@ -857,7 +860,7 @@ ${user ? `
   function renderPickerGrid(search) {
     const grid = document.getElementById("imgpicker_grid");
     if (!_pickerImages.length) {
-      grid.innerHTML = "<div style='color:var(--text3);padding:30px;text-align:center'>No images yet. Upload via Media → Card.</div>";
+      grid.innerHTML = "<div style=\"color:var(--text3);padding:30px;text-align:center\">No images yet. Upload via Media \u2192 Card.</div>";
       return;
     }
     const q = (search||"").trim().toLowerCase();
@@ -867,7 +870,7 @@ ${user ? `
       (i.cardName||"").toLowerCase().includes(q)
     ) : _pickerImages;
     if (!filtered.length) {
-      grid.innerHTML = "<div style='color:var(--text3);padding:30px;text-align:center'>No results for \"" + q + "\"</div>";
+      grid.innerHTML = "<div style=\"color:var(--text3);padding:30px;text-align:center\">No results for \"" + q + "\"</div>";
       return;
     }
     const groups = {};
