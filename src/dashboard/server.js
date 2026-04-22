@@ -1686,8 +1686,11 @@ const cardImgUpload = multer({
     },
   }),
   fileFilter: (req, file, cb) => {
-    if ([".jpg", ".jpeg", ".png", ".gif", ".webp"].includes(path.extname(file.originalname).toLowerCase())) return cb(null, true);
-    cb(new Error("Images only"));
+    const ext = path.extname(file.originalname).toLowerCase();
+    const mime = file.mimetype || "";
+    const ok = [".jpg",".jpeg",".png",".gif",".webp"].includes(ext) ||
+                ["image/jpeg","image/png","image/gif","image/webp","image/jpg"].includes(mime);
+    cb(null, ok);
   },
   limits: { fileSize: 8 * 1024 * 1024 },
 });
@@ -2102,7 +2105,7 @@ const catStorage = multer.diskStorage({
   destination: (req, file, cb) => { const CATS=["banner","card","other"]; const cat=CATS.includes(req.body?.category)?req.body.category:"other"; const dir=path.join(UPLOADS_DIR,cat); if(!fs.existsSync(dir))fs.mkdirSync(dir,{recursive:true}); cb(null,dir); },
   filename: (req,file,cb) => { const ext=path.extname(file.originalname).toLowerCase(); const name=path.basename(file.originalname,ext).replace(/[^a-z0-9_-]/gi,"_").toLowerCase(); cb(null,`${name}_${Date.now()}${ext}`); },
 });
-const upload = multer({ storage: catStorage, fileFilter: (req,file,cb) => { if([".jpg",".jpeg",".png",".gif",".webp"].includes(path.extname(file.originalname).toLowerCase()))return cb(null,true); cb(new Error("Images only")); }});
+const upload = multer({ storage: catStorage, fileFilter: (req,file,cb) => { const ext=path.extname(file.originalname).toLowerCase(); const mime=file.mimetype||""; const ok=[".jpg",".jpeg",".png",".gif",".webp"].includes(ext)||["image/jpeg","image/png","image/gif","image/webp","image/jpg"].includes(mime); cb(null,ok); }});
 
 app.get("/media", auth, editorOrAdmin, async (req, res) => {
   // Categories: banner, card (with series subfolders), other
@@ -2235,8 +2238,11 @@ app.post("/media/upload", auth, editorOrAdmin, async (req, res) => {
       },
     }),
     fileFilter: (req2, file, cb) => {
-      if ([".jpg",".jpeg",".png",".gif",".webp"].includes(path.extname(file.originalname).toLowerCase())) return cb(null, true);
-      cb(new Error("Images only"));
+      const ext2 = path.extname(file.originalname).toLowerCase();
+      const mime2 = file.mimetype || "";
+      const ok2 = [".jpg",".jpeg",".png",".gif",".webp"].includes(ext2) ||
+                  ["image/jpeg","image/png","image/gif","image/webp","image/jpg"].includes(mime2);
+      cb(null, ok2);
     },
     limits: { fileSize: 8 * 1024 * 1024 },
   }).single("image");
