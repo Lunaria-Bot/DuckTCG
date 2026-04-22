@@ -103,16 +103,16 @@ function renderPage(title, content, user = null, activePage = "") {
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Space+Mono:wght@400;700&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet"/>
   <style>
     :root {
-      --bg:        #07070d;
-      --bg2:       #0d0d18;
-      --bg3:       #111120;
-      --bg4:       #161628;
-      --bg5:       #1a1a30;
-      --border:    rgba(139,92,246,0.12);
-      --border2:   rgba(139,92,246,0.25);
+      --bg:        #0e0e16;
+      --bg2:       #13131f;
+      --bg3:       #18182a;
+      --bg4:       #1e1e32;
+      --bg5:       #232338;
+      --border:    rgba(139,92,246,0.18);
+      --border2:   rgba(139,92,246,0.35);
       --text:      #f0f0ff;
-      --text2:     #9090bb;
-      --text3:     #4a4a72;
+      --text2:     #a0a0c0;
+      --text3:     #6060a0;
       --accent:    #8b5cf6;
       --accent2:   #7c3aed;
       --accent3:   #a78bfa;
@@ -123,9 +123,9 @@ function renderPage(title, content, user = null, activePage = "") {
       --red:       #ef4444;
       --yellow:    #f59e0b;
       --gold:      #fbbf24;
-      --sidebar-w: 240px;
-      --radius:    12px;
-      --radius-sm: 8px;
+      --sidebar-w: 220px;
+      --radius:    10px;
+      --radius-sm: 7px;
       --glow:      0 0 20px rgba(139,92,246,0.3);
       --glow-sm:   0 0 10px rgba(139,92,246,0.2);
     }
@@ -140,15 +140,14 @@ function renderPage(title, content, user = null, activePage = "") {
       overflow-x: hidden;
     }
 
-    /* ── Animated background ── */
+    /* ── Subtle background tint ── */
     body::before {
       content: '';
       position: fixed;
       inset: 0;
       background:
-        radial-gradient(ellipse 80% 50% at 20% -10%, rgba(139,92,246,0.08) 0%, transparent 60%),
-        radial-gradient(ellipse 60% 40% at 80% 110%, rgba(236,72,153,0.05) 0%, transparent 60%),
-        radial-gradient(ellipse 40% 30% at 50% 50%, rgba(6,182,212,0.03) 0%, transparent 60%);
+        radial-gradient(ellipse 80% 50% at 10% 0%, rgba(139,92,246,0.12) 0%, transparent 50%),
+        radial-gradient(ellipse 60% 40% at 90% 100%, rgba(236,72,153,0.08) 0%, transparent 50%);
       pointer-events: none;
       z-index: 0;
     }
@@ -219,10 +218,10 @@ function renderPage(title, content, user = null, activePage = "") {
       display: flex;
       align-items: center;
       gap: 10px;
-      padding: 9px 12px;
+      padding: 10px 12px;
       border-radius: var(--radius-sm);
       color: var(--text2);
-      font-size: 13px;
+      font-size: 13.5px;
       font-weight: 500;
       transition: all 0.2s;
       position: relative;
@@ -317,10 +316,10 @@ function renderPage(title, content, user = null, activePage = "") {
     .topbar-sep { color: var(--text3); margin: 0 4px; }
     .topbar-title { font-family: 'Syne', sans-serif; font-size: 16px; font-weight: 700; color: var(--text); }
     .topbar-actions { display: flex; align-items: center; gap: 8px; }
-    .container { padding: 28px; max-width: 1360px; }
+    .container { padding: 24px 28px; max-width: 1400px; }
 
     /* ── Typography ── */
-    h1 { font-family: 'Syne', sans-serif; font-size: 24px; font-weight: 800; color: var(--text); margin-bottom: 20px; letter-spacing: -0.3px; }
+    h1 { font-family: 'Syne', sans-serif; font-size: 26px; font-weight: 800; color: var(--text); margin-bottom: 20px; letter-spacing: -0.5px; }
     h2 { font-family: 'Syne', sans-serif; font-size: 15px; font-weight: 700; color: var(--text); margin-bottom: 14px; }
     h3 { font-size: 11px; font-weight: 700; color: var(--text3); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 10px; }
     code, .mono { font-family: 'Space Mono', monospace; font-size: 0.82em; }
@@ -355,15 +354,15 @@ function renderPage(title, content, user = null, activePage = "") {
     /* ── Stat Grid ── */
     .stats-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-      gap: 12px;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 14px;
       margin-bottom: 24px;
     }
     .stat-card {
       background: var(--bg4);
       border: 1px solid var(--border);
       border-radius: var(--radius);
-      padding: 18px 20px;
+      padding: 20px 22px;
       transition: all 0.2s;
       position: relative;
       overflow: hidden;
@@ -380,7 +379,7 @@ function renderPage(title, content, user = null, activePage = "") {
     .stat-card:hover { border-color: var(--border2); transform: translateY(-1px); }
     .stat-card:hover::after { opacity: 1; }
     .stat-label { font-size: 10px; font-weight: 700; color: var(--text3); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 8px; }
-    .stat-value { font-family: 'Syne', sans-serif; font-size: 30px; font-weight: 800; color: var(--text); line-height: 1; }
+    .stat-value { font-family: 'Syne', sans-serif; font-size: 32px; font-weight: 800; color: var(--text); line-height: 1; letter-spacing: -1px; }
     .stat-sub { font-size: 11px; color: var(--text3); margin-top: 4px; }
     .stat-card.accent { border-color: rgba(139,92,246,0.25); background: rgba(139,92,246,0.06); }
     .stat-card.accent .stat-value { color: var(--accent3); }
@@ -394,7 +393,7 @@ function renderPage(title, content, user = null, activePage = "") {
 
     /* ── Tables ── */
     .table-wrap { overflow-x: auto; }
-    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
     th {
       text-align: left;
       padding: 10px 14px;
@@ -407,7 +406,7 @@ function renderPage(title, content, user = null, activePage = "") {
       white-space: nowrap;
       background: rgba(0,0,0,0.2);
     }
-    td { padding: 11px 14px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+    td { padding: 12px 14px; border-bottom: 1px solid var(--border); vertical-align: middle; }
     tr:last-child td { border-bottom: none; }
     tbody tr { transition: background 0.15s; }
     tbody tr:hover td { background: rgba(139,92,246,0.04); }
@@ -416,11 +415,11 @@ function renderPage(title, content, user = null, activePage = "") {
     .badge {
       display: inline-flex;
       align-items: center;
-      padding: 3px 8px;
+      padding: 3px 9px;
       border-radius: 5px;
-      font-size: 10px;
+      font-size: 11px;
       font-weight: 700;
-      letter-spacing: 0.04em;
+      letter-spacing: 0.03em;
       text-transform: uppercase;
     }
     .badge-purple  { background: rgba(139,92,246,0.15); color: #c4b5fd; border: 1px solid rgba(139,92,246,0.2); }
@@ -2186,9 +2185,9 @@ app.get("/media", auth, editorOrAdmin, async (req, res) => {
           <div style="position:relative;overflow:hidden">
             <img src="${fileThumb(f)}" style="width:100%;height:140px;object-fit:cover;display:block"/>
             <div style="position:absolute;top:6px;right:6px;display:flex;gap:4px">
-              <button onclick="navigator.clipboard.writeText('${url}');this.textContent='✓';setTimeout(()=>this.innerHTML='<svg width=12 height=12 viewBox=\"0 0 24 24\" fill=none stroke=currentColor stroke-width=2><rect x=9 y=9 width=13 height=13 rx=2/><path d=M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1/></svg>',1500)"
-                style="background:rgba(0,0,0,0.7);border:none;color:#fff;border-radius:6px;padding:5px 6px;cursor:pointer;display:flex;align-items:center;backdrop-filter:blur(4px)">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              <button onclick="navigator.clipboard.writeText('${url}');this.textContent='✓';setTimeout(()=>this.textContent='Copy',1400)"
+                style="background:rgba(0,0,0,0.75);border:1px solid rgba(255,255,255,0.15);color:#fff;border-radius:5px;padding:4px 8px;cursor:pointer;font-size:10px;font-weight:600;letter-spacing:.04em;backdrop-filter:blur(4px)">
+                Copy
               </button>
             </div>
           </div>
