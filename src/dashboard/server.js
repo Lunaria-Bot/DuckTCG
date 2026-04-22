@@ -1389,41 +1389,33 @@ app.get("/cards/new", auth, editorOrAdmin, async (req, res) => {
     <a href="/cards" class="back-link">← Back to Cards</a>
     <div class="form-box">
       <form method="POST" action="/cards/new" style="display:flex;flex-direction:column;gap:0">
-        <div class="form-row"><div class="form-group"><label>Card ID</label><input name="cardId" placeholder="naruto_001" required/></div><div class="form-group"><label>Name</label><input name="name" placeholder="Naruto Uzumaki" required/></div></div>
-
-          <div class="form-group">
-            <label>Card Image</label>
-            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-              <input type="text" name="imageUrl" id="imageUrl_new" placeholder="https://..." style="flex:1;min-width:180px"/>
-              <label class="btn btn-gray btn-sm" style="cursor:pointer;margin:0">
-                📁 Upload
-                <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" style="display:none" onchange="uploadCardImage(this, 'imageUrl_new', 'preview_new')"/>
-              </label>
-              <button type="button" class="btn btn-ghost btn-sm" onclick="openImagePicker('imageUrl_new', 'preview_new')">🖼️ Pick</button>
-            </div>
-            <img id="preview_new" id="preview_new" src="" style="display:none;margin-top:8px;max-width:120px;border-radius:6px;object-fit:cover"/>
+        <div class="form-row">
+          <div class="form-group"><label>Card ID</label><input name="cardId" placeholder="naruto_001" required/></div>
+          <div class="form-group"><label>Name</label><input name="name" placeholder="Naruto Uzumaki" required/></div>
+        </div>
+        <div class="form-group">
+          <label>Card Image</label>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <input type="text" name="imageUrl" id="imageUrl_new" placeholder="https://... or use Upload/Pick" style="flex:1;min-width:180px"/>
+            <label class="btn btn-gray btn-sm" style="cursor:pointer;margin:0">
+              📁 Upload
+              <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" style="display:none" onchange="uploadCardImage(this,'imageUrl_new','preview_new')"/>
+            </label>
+            <button type="button" class="btn btn-ghost btn-sm" onclick="openImagePicker('imageUrl_new','preview_new')">🖼️ Pick</button>
           </div>
-
-
-        <script>
-          async function uploadCardImage(input, targetId, previewId) {
-            if (!input.files[0]) return;
-            const fd = new FormData();
-            fd.append("image", input.files[0]);
-            const r = await fetch("/cards/upload-image", { method: "POST", body: fd });
-            const d = await r.json();
-            if (d.url) {
-              document.getElementById(targetId).value = d.url;
-              const p = document.getElementById(previewId);
-              p.src = d.url; p.style.display = "block";
-            }
-          }
-
-
-        <div class="form-row"><div class="form-group"><label>Rarity</label><select name="rarity"><option value="common">Common</option><option value="rare">Rare</option><option value="special">Special</option><option value="exceptional">Exceptional</option></select></div><div class="form-group"><label>Role</label><select name="role"><option value="dps">DPS</option><option value="support">Support</option><option value="tank">Tank</option></select></div></div>
+          <img id="preview_new" src="" style="display:none;margin-top:8px;max-width:120px;border-radius:6px;object-fit:cover"/>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>Rarity</label><select name="rarity"><option value="common">Common</option><option value="rare">Rare</option><option value="special">Special</option><option value="exceptional">Exceptional</option></select></div>
+          <div class="form-group"><label>Role</label><select name="role"><option value="dps">DPS</option><option value="support">Support</option><option value="tank">Tank</option></select></div>
+        </div>
         <div class="form-group"><label>Add to Banner (optional)</label><select name="addToBanner"><option value="">— Don't add —</option>${bannerOptions}</select></div>
         <div class="form-group"><label>Series (optional)</label><select name="seriesId"><option value="">— No series —</option>${seriesOptions}</select></div>
-        <div class="form-row3"><div class="form-group"><label>Base Damage</label><input type="number" name="baseDamage" value="100"/></div><div class="form-group"><label>Base Mana</label><input type="number" name="baseMana" value="100"/></div><div class="form-group"><label>Base HP</label><input type="number" name="baseHp" value="100"/></div></div>
+        <div class="form-row3">
+          <div class="form-group"><label>Base Damage</label><input type="number" name="baseDamage" value="100"/></div>
+          <div class="form-group"><label>Base Mana</label><input type="number" name="baseMana" value="100"/></div>
+          <div class="form-group"><label>Base HP</label><input type="number" name="baseHp" value="100"/></div>
+        </div>
         <div class="form-group"><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" name="isAvailable" value="true" checked style="width:auto"/> Available for rolls</label></div>
         <div class="form-actions"><button type="submit" class="btn">Create Card</button><a href="/cards" class="btn btn-ghost">Cancel</a></div>
       </form>
