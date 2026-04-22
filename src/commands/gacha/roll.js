@@ -16,8 +16,9 @@ const {
   isQiReady, qiCooldownRemaining, formatCooldown, QI_COOLDOWN_MS,
 } = require("../../services/mana");
 
-const RARITY_EMOJI  = { exceptional: "<:Exceptional:1496532355719102656>", special: "<:Special:1496200970042872010>", rare: "<:Rare:1496204151447748811>", common: "<:Common:1495730171301462186>" };
-const RARITY_ORDER  = { exceptional: 0, special: 1, rare: 2, common: 3 };
+const RARITY_EMOJI  = { radiant: "✨", exceptional: "<:Exceptional:1496532355719102656>",
+  radiant:     "✨", special: "<:Special:1496599588902273187>", rare: "<:Rare:1496204151447748811>", common: "<:Common:1495730171301462186>" };
+const RARITY_ORDER  = { radiant: -1, exceptional: 0, special: 1, rare: 2, common: 3 };
 const RARITY_RATES  = { common: 62.5, rare: 30, special: 7.5 }; // exceptional excluded from /roll
 
 function rollRarity() {
@@ -35,7 +36,7 @@ async function drawCard(userId) {
   const rarity = rollRarity();
 
   // Try rolled rarity first, then fallback down to any available rarity
-  const rarityFallback = ["common", "rare", "special"]; // exceptional excluded from /roll
+  const rarityFallback = ["common", "rare", "special"]; // exceptional + radiant excluded from /roll
   let card = null;
   let actualRarity = rarity;
 
@@ -68,8 +69,8 @@ async function drawCard(userId) {
   return { card, pc, rarity: actualRarity };
 }
 
-const RARITY_LABEL = { exceptional: "Exceptional", special: "Special", rare: "Rare", common: "Common" };
-const RARITY_COLOR = { exceptional: 0xFFD700, special: 0xAB47BC, rare: 0x42A5F5, common: 0x78909C };
+const RARITY_LABEL = { radiant: "Radiant", exceptional: "Exceptional", special: "Special", rare: "Rare", common: "Common" };
+const RARITY_COLOR = { radiant: 0xF0F0FF, exceptional: 0xFFD700, special: 0xAB47BC, rare: 0x42A5F5, common: 0x78909C };
 
 function buildRollEmbed(results, username) {
   // ── Single roll — big card display ────────────────────────────────────────

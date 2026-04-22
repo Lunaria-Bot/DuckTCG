@@ -12,7 +12,7 @@ const PICKUP = "<:pickup_ticket:1494344547046523091>";
 const QI     = "<:Qi:1495523502961459200>";
 const DAN    = "<:Dantian:1495528597610303608>";
 const EX     = "<:Exceptional:1496532355719102656>";
-const SP     = "<:Special:1496200970042872010>";
+const SP     = "<:Special:1496599588902273187>";
 const RARE   = "<:Rare:1496204151447748811>";
 const COM    = "<:Common:1495730171301462186>";
 

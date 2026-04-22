@@ -12,9 +12,10 @@ const User = require("../../models/User");
 const PAGE_SIZE = 8;
 
 const RARITY_ORDER = { exceptional: 0, special: 1, rare: 2, common: 3 };
-const RARITY_EMOJI = { exceptional: "<:Exceptional:1496532355719102656>", special: "<:Special:1496200970042872010>", rare: "<:Rare:1496204151447748811>", common: "<:Common:1495730171301462186>" };
-const RARITY_COLOR = { exceptional: 0xFFD700, special: 0xAB47BC, rare: 0x42A5F5, common: 0x78909C };
-const RARITY_LABEL = { exceptional: "Exceptional", special: "Special", rare: "Rare", common: "Common" };
+const RARITY_EMOJI = { exceptional: "<:Exceptional:1496532355719102656>",
+  radiant:     "✨", special: "<:Special:1496599588902273187>", rare: "<:Rare:1496204151447748811>", common: "<:Common:1495730171301462186>" };
+const RARITY_COLOR = { radiant: 0xF0F0FF, exceptional: 0xFFD700, special: 0xAB47BC, rare: 0x42A5F5, common: 0x78909C };
+const RARITY_LABEL = { radiant: "Radiant", exceptional: "Exceptional", special: "Special", rare: "Rare", common: "Common" };
 const ROLE_EMOJI   = { dps: "⚔️", support: "💚", tank: "🛡️" };
 
 function sortCards(pairs, sortBy) {
@@ -134,7 +135,7 @@ function buildRarityDropdown() {
     new StringSelectMenuBuilder().setCustomId("inv_filter_rarity").setPlaceholder("Filter by rarity...").addOptions([
       new StringSelectMenuOptionBuilder().setLabel("All rarities").setValue("all").setEmoji("✨"),
       new StringSelectMenuOptionBuilder().setLabel("Exceptional").setValue("exceptional").setEmoji("<:Exceptional:1496532355719102656>"),
-      new StringSelectMenuOptionBuilder().setLabel("Special").setValue("special").setEmoji("<:Special:1496200970042872010>"),
+      new StringSelectMenuOptionBuilder().setLabel("Special").setValue("special").setEmoji("<:Special:1496599588902273187>"),
       new StringSelectMenuOptionBuilder().setLabel("Rare").setValue("rare").setEmoji("<:Rare:1496204151447748811>"),
       new StringSelectMenuOptionBuilder().setLabel("Common").setValue("common").setEmoji("<:Common:1495730171301462186>"),
     ])

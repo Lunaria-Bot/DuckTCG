@@ -21,6 +21,7 @@ const PERMA   = "<:perma_ticket:1494344593863344258>";
 const PICKUP  = "<:pickup_ticket:1494344547046523091>";
 
 const RARITY_COLOR = {
+  radiant:     0xF0F0FF,
   common:      0x9E9E9E,
   rare:        0x42A5F5,
   special:     0xAB47BC,
@@ -29,11 +30,11 @@ const RARITY_COLOR = {
 const RARITY_LABEL = {
   common:      "<:Common:1495730171301462186> Common",
   rare:        "<:Rare:1496204151447748811> Rare ✦",
-  special:     "<:Special:1496200970042872010> Special ✦✦",
+  special:     "<:Special:1496599588902273187> Special ✦✦",
   exceptional: "<:Exceptional:1496532355719102656> Exceptional ✦✦✦",
 };
 const RARITY_STAR = {
-  common: "★", rare: "★★", special: "★★★", exceptional: "★★★★★",
+  radiant: "✦✦✦✦✦✦", common: "★", rare: "★★", special: "★★★", exceptional: "★★★★★",
 };
 
 // Jade cost per pull
@@ -92,7 +93,7 @@ function buildBannerEmbed(banner, user) {
         name: "Drop Rates",
         value: [
           `<:Exceptional:1496532355719102656> Exceptional ✦✦✦  **${banner.rates.exceptional}%**`,
-          `<:Special:1496200970042872010> Special ✦✦  **${banner.rates.special}%**`,
+          `<:Special:1496599588902273187> Special ✦✦  **${banner.rates.special}%**`,
           `<:Rare:1496204151447748811> Rare ✦  **${banner.rates.rare}%**`,
           `<:Common:1495730171301462186> Common  **${banner.rates.common}%**`,
         ].join("\n"),
@@ -129,7 +130,7 @@ function buildInfoEmbed(banner) {
         name: "Drop Rates",
         value: [
           `<:Exceptional:1496532355719102656> **Exceptional** ✦✦✦ — **${banner.rates.exceptional}%**`,
-          `<:Special:1496200970042872010> **Special** ✦✦ — **${banner.rates.special}%**`,
+          `<:Special:1496599588902273187> **Special** ✦✦ — **${banner.rates.special}%**`,
           `<:Rare:1496204151447748811> **Rare** ✦ — **${banner.rates.rare}%**`,
           `<:Common:1495730171301462186> **Common** — **${banner.rates.common}%**`,
         ].join("\n"),
@@ -156,7 +157,7 @@ function buildRatesEmbed(banner) {
     .setDescription("Rates apply equally to ×1 and ×10 pulls.")
     .addFields(
       { name: "<:Exceptional:1496532355719102656> Exceptional ✦✦✦", value: `**${banner.rates.exceptional}%**\nSoft pity starts at **${banner.pity?.softPityStart ?? 75}**, guaranteed at **${banner.pity?.hardPity ?? 90}**`, inline: true },
-      { name: "<:Special:1496200970042872010> Special ✦✦",      value: `**${banner.rates.special}%**`, inline: true },
+      { name: "<:Special:1496599588902273187> Special ✦✦",      value: `**${banner.rates.special}%**`, inline: true },
       { name: "<:Rare:1496204151447748811> Rare ✦",          value: `**${banner.rates.rare}%**`, inline: true },
       { name: "<:Common:1495730171301462186> Common",           value: `**${banner.rates.common}%**`, inline: true },
       { name: "Jade Cost",           value: `×1: **${JADE_SINGLE}** ${JADE}\n×10: **${JADE_MULTI}** ${JADE}`, inline: true },

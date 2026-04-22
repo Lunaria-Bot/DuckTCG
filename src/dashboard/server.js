@@ -1288,7 +1288,7 @@ app.get("/banners", auth, editorOrAdmin, async (req, res) => {
       <div class="table-wrap"><table>
         <thead><tr><th>Banner</th><th>Type</th><th>Status</th><th>Ends</th><th>Pool</th><th>Actions</th></tr></thead>
         <tbody>${banners.map(b => {
-          const poolTotal = (b.pool.common?.length||0)+(b.pool.rare?.length||0)+(b.pool.special?.length||0)+(b.pool.exceptional?.length||0);
+          const poolTotal = (b.pool.common?.length||0)+(b.pool.rare?.length||0)+(b.pool.special?.length||0)+(b.pool.exceptional?.length||0)+(b.pool.radiant?.length||0);
           return `<tr>
             <td><div style="font-weight:600">${b.name}</div><div class="mono-sm">${b.bannerId}</div></td>
             <td>${b.type==="pickup"?`<span class="badge badge-purple">Pick Up</span>`:`<span class="badge badge-blue">Regular</span>`}</td>
@@ -1389,7 +1389,7 @@ app.get("/banners/:id/pool", auth, editorOrAdmin, async (req, res) => {
   const allCards = await Card.find().sort({ anime: 1, rarity: 1, name: 1 });
   const poolIds = new Set([...banner.pool.common,...banner.pool.rare,...banner.pool.special,...banner.pool.exceptional]);
   const featuredIds = new Set(banner.featuredCards);
-  const rarityBadge = { common:"badge-gray",rare:"badge-blue",special:"badge-purple",exceptional:"badge-yellow" };
+  const rarityBadge = { radiant:"badge-cyan",common:"badge-gray",rare:"badge-blue",special:"badge-purple",exceptional:"badge-yellow",radiant:"badge-cyan" };
   res.send(renderPage(`Pool — ${banner.name}`, `
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
       <a href="/banners" class="back-link" style="margin-bottom:0">← Back</a>
@@ -1451,7 +1451,7 @@ app.get("/banners/:id/stats", auth, editorOrAdmin, async (req, res) => {
   ]);
   const rarityCount = { common:0,rare:0,special:0,exceptional:0 };
   for (const d of cardDist) rarityCount[d._id.rarity] = (rarityCount[d._id.rarity]||0)+d.count;
-  const rarityBadge = { common:"badge-gray",rare:"badge-blue",special:"badge-purple",exceptional:"badge-yellow" };
+  const rarityBadge = { radiant:"badge-cyan",common:"badge-gray",rare:"badge-blue",special:"badge-purple",exceptional:"badge-yellow",radiant:"badge-cyan" };
   const theoreticalRates = banner.rates||{};
   res.send(renderPage(`Stats — ${banner.name}`, `
     <a href="/banners" class="back-link">← Back to Banners</a>
@@ -1606,7 +1606,7 @@ app.get("/series/:id/cards", auth, editorOrAdmin, async (req, res) => {
   if (!series) return res.redirect("/series");
   const cards = await Card.find({ seriesId: series.seriesId.toString() }).sort({ rarity: 1, name: 1 });
   const allCards = await Card.find({ seriesId: { $ne: series.seriesId } }).sort({ anime: 1, name: 1 });
-  const rarityBadge = { common:"badge-gray",rare:"badge-blue",special:"badge-purple",exceptional:"badge-yellow" };
+  const rarityBadge = { radiant:"badge-cyan",common:"badge-gray",rare:"badge-blue",special:"badge-purple",exceptional:"badge-yellow",radiant:"badge-cyan" };
   res.send(renderPage(`Cards — ${series.name}`, `
     <a href="/series" class="back-link">← Back to Series</a>
     <div style="margin-bottom:12px;display:flex;gap:8px;align-items:center">
@@ -1742,7 +1742,7 @@ app.get("/cards", auth, editorOrAdmin, async (req, res) => {
   if (filterRarity) query.rarity = filterRarity;
   if (filterAvailable !== "") query.isAvailable = filterAvailable === "1";
   const cards = await Card.find(query).sort({ anime: 1, rarity: 1, name: 1 });
-  const rarityBadge = { common:"badge-gray",rare:"badge-blue",special:"badge-purple",exceptional:"badge-yellow" };
+  const rarityBadge = { radiant:"badge-cyan",common:"badge-gray",rare:"badge-blue",special:"badge-purple",exceptional:"badge-yellow",radiant:"badge-cyan" };
   const roleBadge = { dps:"badge-red",support:"badge-green",tank:"badge-blue" };
   res.send(renderPage("Cards", `
     <div style="display:flex;align-items:flex-end;gap:10px;margin-bottom:20px;flex-wrap:wrap">
@@ -1805,7 +1805,7 @@ app.get("/cards/new", auth, editorOrAdmin, async (req, res) => {
           </div>
         </div>
         <div class="form-row">
-          <div class="form-group"><label>Rarity</label><select name="rarity"><option value="common">Common</option><option value="rare">Rare</option><option value="special">Special</option><option value="exceptional">Exceptional</option></select></div>
+          <div class="form-group"><label>Rarity</label><select name="rarity"><option value="common">Common</option><option value="rare">Rare</option><option value="special">Special</option><option value="exceptional">Exceptional</option><option value="radiant">✨ Radiant</option></select></div>
           <div class="form-group"><label>Role</label><select name="role"><option value="dps">DPS</option><option value="support">Support</option><option value="tank">Tank</option></select></div>
         </div>
         <div class="form-group"><label>Add to Banner (optional)</label><select name="addToBanner"><option value="">— Don't add —</option>${bannerOptions}</select></div>
@@ -1863,7 +1863,7 @@ app.get("/cards/:id/edit", auth, editorOrAdmin, async (req, res) => {
               <img id="preview_edit" class="img-preview ${`${card.imageUrl ? 'visible' : ''}`}" src="${card.imageUrl||''}" data-preview-for="imageUrl_edit"/>
             </div>
           </div>
-          <div class="form-row"><div class="form-group"><label>Rarity</label><select name="rarity">${["common","rare","special","exceptional"].map(r=>`<option value="${r}"${card.rarity===r?" selected":""}>${r}</option>`).join("")}</select></div><div class="form-group"><label>Role</label><select name="role">${["dps","support","tank"].map(r=>`<option value="${r}"${card.role===r?" selected":""}>${r}</option>`).join("")}</select></div></div>
+          <div class="form-row"><div class="form-group"><label>Rarity</label><select name="rarity">${["common","rare","special","exceptional","radiant"].map(r=>`<option value="${r}"${card.rarity===r?" selected":""}>` + (r==="radiant"?"✨ Radiant":r.charAt(0).toUpperCase()+r.slice(1)) + `</option>`).join("")}</select></div><div class="form-group"><label>Role</label><select name="role">${["dps","support","tank"].map(r=>`<option value="${r}"${card.role===r?" selected":""}>${r}</option>`).join("")}</select></div></div>
           <div class="form-group"><label>Series</label><select name="seriesId">${seriesOpts}</select></div>
           <div class="form-row3"><div class="form-group"><label>Base Damage</label><input type="number" name="baseDamage" value="${card.baseStats?.damage??100}"/></div><div class="form-group"><label>Base Mana</label><input type="number" name="baseMana" value="${card.baseStats?.mana??100}"/></div><div class="form-group"><label>Base HP</label><input type="number" name="baseHp" value="${card.baseStats?.hp??100}"/></div></div>
           <div class="form-group"><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" name="isAvailable" value="true" ${card.isAvailable?"checked":""} style="width:auto"/> Available for rolls</label></div>
@@ -1904,7 +1904,7 @@ app.get("/cards/:id/detail", auth, editorOrAdmin, async (req, res) => {
     PlayerCard.aggregate([{ $match: { cardId: card.cardId, isBurned: false } },{ $group: { _id: "$userId" } },{ $count: "total" }])
   ]);
   const totalOwners = ownerAgg[0]?.total??0;
-  const rarityBadge = { common:"badge-gray",rare:"badge-blue",special:"badge-purple",exceptional:"badge-yellow" };
+  const rarityBadge = { radiant:"badge-cyan",common:"badge-gray",rare:"badge-blue",special:"badge-purple",exceptional:"badge-yellow",radiant:"badge-cyan" };
   const roleBadge = { dps:"badge-red",support:"badge-green",tank:"badge-blue" };
   res.send(renderPage(`Card — ${card.name}`, `
     <a href="/cards" class="back-link">← Back to Cards</a>
@@ -2069,7 +2069,7 @@ app.get("/players/:id/give-card", auth, adminOnly, async (req, res) => {
   const player = await User.findOne({ userId: req.params.id });
   if (!player) return res.redirect("/players");
   const cards = await Card.find({ isAvailable: true }).sort({ anime: 1, rarity: 1, name: 1 });
-  const rarityBadge = { common:"badge-gray",rare:"badge-blue",special:"badge-purple",exceptional:"badge-yellow" };
+  const rarityBadge = { radiant:"badge-cyan",common:"badge-gray",rare:"badge-blue",special:"badge-purple",exceptional:"badge-yellow",radiant:"badge-cyan" };
   res.send(renderPage(`Give Card — ${player.username}`, `
     <a href="/players" class="back-link">← Back to Players</a>
     <div class="form-box">

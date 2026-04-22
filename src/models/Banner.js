@@ -19,6 +19,7 @@ const BannerSchema = new Schema({
     rare: [{ type: String }],
     special: [{ type: String }],
     exceptional: [{ type: String }],
+    radiant:     [{ type: String }],
   },
 
   rates: {

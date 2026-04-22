@@ -4,7 +4,7 @@ const User        = require("../models/User");
 const { getRedis } = require("./redis");
 const { calculateStats } = require("./cardStats");
 
-const RARITY_ORDER = { exceptional: 0, special: 1, rare: 2, common: 3 };
+const RARITY_ORDER = { radiant: -1, exceptional: 0, special: 1, rare: 2, common: 3 };
 
 // ─── Pity helpers ─────────────────────────────────────────────────────────────
 async function getPity(redis, userId, bannerType) {
@@ -53,7 +53,7 @@ function pickCard(pool, rarity) {
   const rarityPool = pool[rarity];
   if (!rarityPool?.length) {
     // fallback down rarity
-    for (const r of ["exceptional","special","rare","common"]) {
+    for (const r of ["radiant","exceptional","special","rare","common"]) {
       if (pool[r]?.length) return { cardId: pool[r][Math.floor(Math.random() * pool[r].length)], rarity: r };
     }
     return null;

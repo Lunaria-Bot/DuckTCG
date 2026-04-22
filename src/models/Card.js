@@ -8,7 +8,7 @@ const CardSchema = new Schema({
 
   rarity: {
     type: String,
-    enum: ["common", "rare", "special", "exceptional"],
+    enum: ["common", "rare", "special", "exceptional", "radiant"],
     required: true,
   },
 
