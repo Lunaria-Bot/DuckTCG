@@ -63,15 +63,10 @@ function buildCardSelectMenu(cards, page) {
       .setCustomId("card_view_select")
       .setPlaceholder("🖼️ View card image...")
       .addOptions(slice.map(card => {
-        const rawEmoji = RARITY_EMOJI[card.rarity] ?? "";
-        // Parse <:name:id> correctly — match last number group as id
-        const emojiMatch = rawEmoji.match(/^<a?:([^:]+):(\d+)>$/);
-        const opt = new StringSelectMenuOptionBuilder()
+        return new StringSelectMenuOptionBuilder()
           .setLabel(card.name.slice(0, 100))
           .setDescription(`${card.anime} · ${card.rarity}`.slice(0, 100))
           .setValue(card.cardId);
-        if (emojiMatch) opt.setEmoji({ id: emojiMatch[2], name: emojiMatch[1] });
-        return opt;
       }))
   );
 }
