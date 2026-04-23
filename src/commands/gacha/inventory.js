@@ -86,7 +86,7 @@ function buildCardEmbed(pairs, index, username, totalCopiesMap) {
   const ownedLine = `Owned: ${ownedCopies} cop${ownedCopies > 1 ? "ies" : "y"}  ·  In Game: ${totalCopies} total`;
 
   const embed = new EmbedBuilder()
-    .setTitle(`${RARITY_EMOJI[card.rarity] ?? "<:Common:1495730171301462186>"} ${RARITY_LABEL[card.rarity] ?? card.rarity} — ${card.name}`)
+    .setTitle(`${RARITY_EMOJI[card.rarity] ?? "<:Common:1495730171301462186>"}  ${RARITY_LABEL[card.rarity] ?? card.rarity} — ${card.name}`)
     .setDescription(`*${card.anime}*\nLevel **${pc.level}** / ${pc.isAscended ? 125 : 100}\n${ROLE_EMOJI[card.role] ?? ""} **${card.role.toUpperCase()}**  ·  CP **${(pc.cachedStats?.combatPower ?? 0).toLocaleString()}**`)
     .setColor(RARITY_COLOR[card.rarity] ?? 0x5B21B6)
     .setFooter({ text: `${ownedLine}` });
