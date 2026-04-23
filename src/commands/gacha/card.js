@@ -116,10 +116,10 @@ function buildRarityDropdown() {
       .addOptions([
         new StringSelectMenuOptionBuilder().setLabel("All rarities").setValue("all"),
         new StringSelectMenuOptionBuilder().setLabel("Radiant ✨").setValue("radiant"),
-        new StringSelectMenuOptionBuilder().setLabel("Exceptional").setValue("exceptional").setEmoji({ id: "1496532355719102656", name: "Exceptional" }),
-        new StringSelectMenuOptionBuilder().setLabel("Special").setValue("special").setEmoji({ id: "1496599588902273187", name: "Special" }),
-        new StringSelectMenuOptionBuilder().setLabel("Rare").setValue("rare").setEmoji({ id: "1496204151447748811", name: "Rare" }),
-        new StringSelectMenuOptionBuilder().setLabel("Common").setValue("common").setEmoji({ id: "1495730171301462186", name: "Common" }),
+        new StringSelectMenuOptionBuilder().setLabel("Exceptional").setValue("exceptional"),
+        new StringSelectMenuOptionBuilder().setLabel("Special").setValue("special"),
+        new StringSelectMenuOptionBuilder().setLabel("Rare").setValue("rare"),
+        new StringSelectMenuOptionBuilder().setLabel("Common").setValue("common"),
       ])
   );
 }
