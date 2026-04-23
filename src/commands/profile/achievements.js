@@ -33,7 +33,7 @@ module.exports = {
       "Event": ["pioneer", "anniversary_1", "anniversary_2", "christmas", "halloween"],
       "Collector": ["collector_1", "collector_2", "collector_3"],
       "Wealth": ["gold_small_lord", "gold_lord", "gold_king", "gold_emperor", "gold_god"],
-      "Combat Power": ["duck_glock", "duck_kalash", "duck_nuclear"],
+      "Power Score": ["duck_glock", "duck_kalash", "duck_nuclear"],
     };
 
     const ownedIds = new Set(user.badges.map(b => b.badgeId));

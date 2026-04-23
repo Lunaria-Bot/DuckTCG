@@ -50,10 +50,10 @@ function buildListEmbed(pairs, page, username, sortBy, filterRarity, filterRole)
     const qty  = (pc.quantity ?? 1) > 1 ? ` ×${pc.quantity}` : "";
     const cp   = pc.cachedStats?.combatPower ?? 0;
     // Line 1: rarity emoji + name + quantity
-    // Line 2: series · role · level · CP
+    // Line 2: series · role · level · PS
     return [
       `${rar} **${card.name}**${qty}`,
-      `${rol} ${card.anime}  ·  Lv.**${pc.level}**  ·  CP **${cp.toLocaleString()}**`,
+      `${rol} ${card.anime}  ·  Lv.**${pc.level}**  ·  PS **${cp.toLocaleString()}**`,
     ].join("\n");
   });
 
@@ -87,7 +87,7 @@ function buildCardEmbed(pairs, index, username, totalCopiesMap) {
 
   const embed = new EmbedBuilder()
     .setTitle(`${RARITY_EMOJI[card.rarity] ?? "<:Common:1495730171301462186>"}  ${RARITY_LABEL[card.rarity] ?? card.rarity} — ${card.name}`)
-    .setDescription(`*${card.anime}*\nLevel **${pc.level}** / ${pc.isAscended ? 125 : 100}\n${ROLE_EMOJI[card.role] ?? ""} **${card.role.toUpperCase()}**  ·  CP **${(pc.cachedStats?.combatPower ?? 0).toLocaleString()}**`)
+    .setDescription(`*${card.anime}*\nLevel **${pc.level}** / ${pc.isAscended ? 125 : 100}\n${ROLE_EMOJI[card.role] ?? ""} **${card.role.toUpperCase()}**  ·  PS **${(pc.cachedStats?.combatPower ?? 0).toLocaleString()}**`)
     .setColor(RARITY_COLOR[card.rarity] ?? 0x5B21B6)
     .setFooter({ text: `${ownedLine}` });
 

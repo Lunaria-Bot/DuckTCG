@@ -24,10 +24,10 @@ const BADGE_META = {
   gold_emperor:    { label: "Emperor",        emoji: "👑", description: "Earn 10M Nyang total" },
   gold_god:        { label: "God of Wealth",  emoji: "🌕", description: "Earn 100M Nyang total" },
 
-  // Duck CP
-  duck_glock:   { label: "Glock Duck",   emoji: "🦆", description: "Combat Power below 1,000" },
-  duck_kalash:  { label: "Kalash Duck",  emoji: "🦆", description: "Combat Power 1K–100K" },
-  duck_nuclear: { label: "Nuclear Duck", emoji: "🦆", description: "Combat Power above 100K" },
+  // Duck PS
+  duck_glock:   { label: "Glock Duck",   emoji: "🦆", description: "Power Score below 1,000" },
+  duck_kalash:  { label: "Kalash Duck",  emoji: "🦆", description: "Power Score 1K–100K" },
+  duck_nuclear: { label: "Nuclear Duck", emoji: "🦆", description: "Power Score above 100K" },
 };
 
 // ─── Check logic ──────────────────────────────────────────────────────────────
@@ -111,7 +111,7 @@ async function checkBadges(user, trigger = "all") {
     }
   }
 
-  // ── Duck CP (realtime) ────────────────────────────────────────────────
+  // ── Duck PS (realtime) ────────────────────────────────────────────────
   if (trigger !== "daily") {
     const cp = user.combatPower;
     const currentDuck = user.badges.find(b => b.badgeId.startsWith("duck_"));

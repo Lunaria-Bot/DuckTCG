@@ -10,7 +10,7 @@ const JADE   = "<:Jade:1495038405866688703>";
 const EXP    = "<:exp:1495018483233067078>";
 
 const CATEGORIES = {
-  cp:    { label: "Combat Power", icon: "⚔",  field: "combatPower",                  format: v => v.toLocaleString(),  unit: "CP",     color: 0xE53935 },
+  cp:    { label: "Power Score", icon: "⚔",  field: "combatPower",                  format: v => v.toLocaleString(),  unit: "PS",     color: 0xE53935 },
   gold:  { label: "Nyang",        icon: NYAN,  field: "currency.gold",                format: v => v.toLocaleString(),  unit: "Nyang",  color: 0xf59e0b },
   level: { label: "Level",        icon: EXP,   field: "accountLevel",                  format: v => `Lv. ${v}`,         unit: "",       color: 0x8b5cf6 },
   cards: { label: "Cards",        icon: "📦",  field: "stats.totalCardsEverObtained",  format: v => v.toLocaleString(),  unit: "cards",  color: 0x3b82f6 },
@@ -72,7 +72,7 @@ module.exports = {
     const self = await requireProfile(interaction);
     if (!self) return;
 
-    let category = "cp";
+    let category = "ps";
 
     async function getData() {
       const cat     = CATEGORIES[category];

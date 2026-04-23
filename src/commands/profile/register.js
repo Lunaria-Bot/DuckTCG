@@ -197,7 +197,7 @@ const TUTORIAL = [
       },
       {
         name: "Leveling Cards",
-        value: "Cards gain XP through `/adventure` and `/raid`.\nMax level is **100** (125 after Ascension at Lv100).\nHigher level = higher Combat Power.",
+        value: "Cards gain XP through `/adventure` and `/raid`.\nMax level is **100** (125 after Ascension at Lv100).\nHigher level = higher Power Score.",
         inline: false,
       },
       {

@@ -78,11 +78,11 @@ function buildCardSelectMenu(cards, page) {
 
 function buildNavRow(page, totalPages) {
   return new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId("card_first").setStyle(ButtonStyle.Secondary).setDisabled(page === 0),
-    new ButtonBuilder().setCustomId("card_prev").setStyle(ButtonStyle.Primary).setDisabled(page === 0),
+    new ButtonBuilder().setCustomId("card_first").setLabel("⏮").setStyle(ButtonStyle.Secondary).setDisabled(page === 0),
+    new ButtonBuilder().setCustomId("card_prev").setLabel("◀").setStyle(ButtonStyle.Primary).setDisabled(page === 0),
     new ButtonBuilder().setCustomId("card_page").setLabel(`${page + 1} / ${totalPages}`).setStyle(ButtonStyle.Secondary).setDisabled(true),
-    new ButtonBuilder().setCustomId("card_next").setStyle(ButtonStyle.Primary).setDisabled(page >= totalPages - 1),
-    new ButtonBuilder().setCustomId("card_last").setStyle(ButtonStyle.Secondary).setDisabled(page >= totalPages - 1),
+    new ButtonBuilder().setCustomId("card_next").setLabel("▶").setStyle(ButtonStyle.Primary).setDisabled(page >= totalPages - 1),
+    new ButtonBuilder().setCustomId("card_last").setLabel("⏭").setStyle(ButtonStyle.Secondary).setDisabled(page >= totalPages - 1),
   );
 }
 
@@ -91,11 +91,11 @@ function buildFilterRow(f) {
   return new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId("card_open_rarity")
-      .setLabel(f.rarity ? `${RARITY_EMOJI[f.rarity]} ${f.rarity}` : "Rarity")
+      .setLabel(f.rarity ? (`${RARITY_EMOJI[f.rarity] ?? ""} ${f.rarity}`).trim() || f.rarity : "Rarity")
       .setStyle(f.rarity ? ButtonStyle.Primary : ButtonStyle.Secondary),
     new ButtonBuilder()
       .setCustomId("card_open_role")
-      .setLabel(f.role ? `${ROLE_EMOJI[f.role] ?? ""} ${f.role}` : "Role")
+      .setLabel(f.role ? (`${ROLE_EMOJI[f.role] ?? ""} ${f.role}`).trim() || f.role : "Role")
       .setStyle(f.role ? ButtonStyle.Primary : ButtonStyle.Secondary),
     new ButtonBuilder()
       .setCustomId("card_open_series")
@@ -121,10 +121,10 @@ function buildRarityDropdown() {
       .addOptions([
         new StringSelectMenuOptionBuilder().setLabel("All rarities").setValue("all"),
         new StringSelectMenuOptionBuilder().setLabel("Radiant ✨").setValue("radiant"),
-        new StringSelectMenuOptionBuilder().setLabel("Exceptional").setValue("exceptional").setEmoji("<:Exceptional:1496532355719102656>"),
-        new StringSelectMenuOptionBuilder().setLabel("Special").setValue("special").setEmoji("<:Special:1496599588902273187>"),
-        new StringSelectMenuOptionBuilder().setLabel("Rare").setValue("rare").setEmoji("<:Rare:1496204151447748811>"),
-        new StringSelectMenuOptionBuilder().setLabel("Common").setValue("common").setEmoji("<:Common:1495730171301462186>"),
+        new StringSelectMenuOptionBuilder().setLabel("Exceptional").setValue("exceptional").setEmoji({ id: "1496532355719102656", name: "Exceptional" }),
+        new StringSelectMenuOptionBuilder().setLabel("Special").setValue("special").setEmoji({ id: "1496599588902273187", name: "Special" }),
+        new StringSelectMenuOptionBuilder().setLabel("Rare").setValue("rare").setEmoji({ id: "1496204151447748811", name: "Rare" }),
+        new StringSelectMenuOptionBuilder().setLabel("Common").setValue("common").setEmoji({ id: "1495730171301462186", name: "Common" }),
       ])
   );
 }

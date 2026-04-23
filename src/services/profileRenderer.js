@@ -7,7 +7,7 @@ function buildProfileHTML({ username, level, expPct, expCurrent, expNeeded, star
     <div class="section">
       <div class="section-label">Selected Card</div>
       <div class="fav-name">${favoriteCard.name}</div>
-      <div class="fav-sub">${favoriteCard.anime} · ${favoriteCard.rarity.toUpperCase()} · Lv.${favoriteCard.level} · CP ${favoriteCard.cp.toLocaleString()}</div>
+      <div class="fav-sub">${favoriteCard.anime} · ${favoriteCard.rarity.toUpperCase()} · Lv.${favoriteCard.level} · PS ${favoriteCard.cp.toLocaleString()}</div>
       ${favoriteCard.imageUrl ? `<div class="fav-img-wrap"><img class="fav-img" src="${favoriteCard.imageUrl}" /></div>` : ""}
     </div>
   ` : `
@@ -158,7 +158,7 @@ function buildProfileHTML({ username, level, expPct, expCurrent, expNeeded, star
   <div class="section">
     <div class="section-label">Stats</div>
     <div class="stat-line">📦 Cards Obtained: <strong>${stats.cards}</strong></div>
-    <div class="stat-line">⚔️ Combat Power: <strong>${stats.cp}</strong></div>
+    <div class="stat-line">⚔️ Power Score: <strong>${stats.cp}</strong></div>
     <div class="stat-line">💀 Raids Attacked: <strong>${stats.raids}</strong></div>
     <div class="stat-line">🗺️ Adventures Completed: <strong>${stats.adventures}</strong></div>
     <div class="stat-line">🎰 Total Pulls: <strong>${stats.pulls}</strong></div>

@@ -2011,7 +2011,7 @@ app.get("/players", auth, adminOnly, async (req, res) => {
           <th>Jade</th>
           <th>Tickets (R/P)</th>
           <th>${sortLink("level","Level")}</th>
-          <th>${sortLink("cp","CP")}</th>
+          <th>${sortLink("ps","PS")}</th>
           <th>Premium</th>
           <th>Actions</th>
         </tr></thead>

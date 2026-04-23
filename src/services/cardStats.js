@@ -55,7 +55,7 @@ function calculateRaidDamage(teamStats) {
 }
 
 /**
- * Calculate total Combat Power for a team of 3 cards
+ * Calculate total Power Score for a team of 3 cards
  */
 function calculateTeamCP(cardsStats) {
   return cardsStats.reduce((sum, s) => sum + s.combatPower, 0);

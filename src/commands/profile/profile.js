@@ -57,7 +57,7 @@ module.exports = {
       ``,
       `**__Stats__**`,
       `📦 Cards Collected: **${user.stats.totalCardsEverObtained}**`,
-      `⚔️ Combat Power: **${user.combatPower.toLocaleString()}**`,
+      `⚔️ Power Score: **${user.combatPower.toLocaleString()}**`,
       `💀 Raids Attacked: **${user.stats.raidDamageTotal > 0 ? user.stats.raidDamageTotal.toLocaleString() : "0"}**`,
       `🔥 Login Streak: **${user.loginStreak}** day${user.loginStreak !== 1 ? "s" : ""}`,
     ].join("\n");

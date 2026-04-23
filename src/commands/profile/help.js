@@ -39,7 +39,7 @@ const CATEGORIES = [
       { name: "/quests",       desc: "View and claim your daily and weekly quests." },
       { name: "/bank",         desc: `Check your wallet — ${NYAN} Nyang, ${JADE} Jade, tickets and more.` },
       { name: "/achievements", desc: "View your earned badges and achievements." },
-      { name: "/leaderboard",  desc: "Top 10 players by Combat Power, Nyang, Level or Cards." },
+      { name: "/leaderboard",  desc: "Top 10 players by Power Score, Nyang, Level or Cards." },
       { name: "/settings",     desc: "Toggle DM notifications for Qi full, Dantian full and quests." },
     ],
   },

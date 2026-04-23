@@ -129,7 +129,7 @@ module.exports = {
       user.adventure.endsAt = null;
       await user.save();
 
-      // Check gold + CP badges
+      // Check gold + PS badges
       await processBadges(user, interaction, "daily");
       const _redis = getRedis();
       await incrementProgress(_redis, interaction.user.id, "daily", "adventure", 1);

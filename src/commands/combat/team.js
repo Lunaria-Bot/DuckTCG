@@ -115,13 +115,13 @@ async function showTeam(interaction, user) {
       value: [
         `Lv. **${pc.level}**`,
         `⚔️ ${pc.cachedStats.damage}  💚 ${pc.cachedStats.mana}  🛡️ ${pc.cachedStats.hp}`,
-        `CP: **${pc.cachedStats.combatPower}**`,
+        `PS: **${pc.cachedStats.combatPower}**`,
       ].join("\n"),
       inline: true,
     });
   }
 
-  embed.setFooter({ text: `Total Combat Power: ${totalCP.toLocaleString()}` });
+  embed.setFooter({ text: `Total Power Score: ${totalCP.toLocaleString()}` });
   return interaction.editReply({ embeds: [embed] });
 }
 
