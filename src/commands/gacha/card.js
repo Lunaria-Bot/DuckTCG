@@ -78,11 +78,11 @@ function buildCardSelectMenu(cards, page) {
 
 function buildNavRow(page, totalPages) {
   return new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId("card_first").setEmoji("⏮").setStyle(ButtonStyle.Secondary).setDisabled(page === 0),
-    new ButtonBuilder().setCustomId("card_prev").setEmoji("◀").setStyle(ButtonStyle.Primary).setDisabled(page === 0),
+    new ButtonBuilder().setCustomId("card_first").setStyle(ButtonStyle.Secondary).setDisabled(page === 0),
+    new ButtonBuilder().setCustomId("card_prev").setStyle(ButtonStyle.Primary).setDisabled(page === 0),
     new ButtonBuilder().setCustomId("card_page").setLabel(`${page + 1} / ${totalPages}`).setStyle(ButtonStyle.Secondary).setDisabled(true),
-    new ButtonBuilder().setCustomId("card_next").setEmoji("▶").setStyle(ButtonStyle.Primary).setDisabled(page >= totalPages - 1),
-    new ButtonBuilder().setCustomId("card_last").setEmoji("⏭").setStyle(ButtonStyle.Secondary).setDisabled(page >= totalPages - 1),
+    new ButtonBuilder().setCustomId("card_next").setStyle(ButtonStyle.Primary).setDisabled(page >= totalPages - 1),
+    new ButtonBuilder().setCustomId("card_last").setStyle(ButtonStyle.Secondary).setDisabled(page >= totalPages - 1),
   );
 }
 
@@ -136,9 +136,9 @@ function buildRoleDropdown() {
       .setPlaceholder("Select role")
       .addOptions([
         new StringSelectMenuOptionBuilder().setLabel("All roles").setValue("all"),
-        new StringSelectMenuOptionBuilder().setLabel("DPS").setValue("dps").setEmoji("⚔️"),
-        new StringSelectMenuOptionBuilder().setLabel("Support").setValue("support").setEmoji("💚"),
-        new StringSelectMenuOptionBuilder().setLabel("Tank").setValue("tank").setEmoji("🛡️"),
+        new StringSelectMenuOptionBuilder().setLabel("DPS").setValue("dps"),
+        new StringSelectMenuOptionBuilder().setLabel("Support").setValue("support"),
+        new StringSelectMenuOptionBuilder().setLabel("Tank").setValue("tank"),
       ])
   );
 }
@@ -168,8 +168,8 @@ function buildAnimeDropdown(animes, page = 0) {
   const slice = animes.slice(page * PAGE, (page + 1) * PAGE);
   const hasMore = animes.length > (page + 1) * PAGE;
   const options = [];
-  if (page > 0) options.push(new StringSelectMenuOptionBuilder().setLabel("← Previous").setValue(`anime_prev_${page}`).setEmoji("⬅️"));
-  if (hasMore) options.push(new StringSelectMenuOptionBuilder().setLabel("Next →").setValue(`anime_next_${page}`).setEmoji("➡️"));
+  if (page > 0) options.push(new StringSelectMenuOptionBuilder().setLabel("← Previous").setValue(`anime_prev_${page}`));
+  if (hasMore) options.push(new StringSelectMenuOptionBuilder().setLabel("Next →").setValue(`anime_next_${page}`));
   options.push(new StringSelectMenuOptionBuilder().setLabel("All anime").setValue("all"));
   for (const anime of slice) {
     options.push(new StringSelectMenuOptionBuilder()
