@@ -2086,7 +2086,7 @@ app.post("/players/:id/set-faction", auth, adminOnly, async (req, res) => {
   };
   if (resetPoints === "true") update.factionPoints = 0;
   await User.findOneAndUpdate({ userId: req.params.id }, update);
-  await AuditLog.create({ action: "SET_FACTION", target: req.params.id, performedBy: req.user.username, details: `Faction set to: ${faction || "none"}${resetPoints==="true"?" (points reset)":""}` });
+  await AuditLog.create({ performedBy: req.user.username, role: req.user.role, action: "update", resource: "player", resourceId: req.params.id, description: `Faction set to: ${faction || "none"}${resetPoints==="true"?" (points reset)":""}` });
   res.redirect("/players");
 });
 
