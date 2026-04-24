@@ -2045,8 +2045,8 @@ app.get("/players/:id/set-faction", auth, adminOnly, async (req, res) => {
   const player = await User.findOne({ userId: req.params.id });
   if (!player) return res.redirect("/players");
   const factionLabel = {
-    heavenly_demon: "🔴 Heavenly Demon Cult",
-    orthodox:       "🔵 Orthodox Sect",
+    heavenly_demon: "<:DemonicSect:1497265894550671372> Heavenly Demon Cult",
+    orthodox:       "<:OrthodoxSect:1497266218749530132> Orthodox Sect",
     null:           "No Faction",
   }[player.faction] ?? "No Faction";
   res.send(renderPage("Set Faction", `
@@ -2059,8 +2059,8 @@ app.get("/players/:id/set-faction", auth, adminOnly, async (req, res) => {
           <label>Faction</label>
           <select name="faction">
             <option value="">— No Faction —</option>
-            <option value="heavenly_demon"${player.faction==="heavenly_demon"?" selected":""}>🔴 Heavenly Demon Cult</option>
-            <option value="orthodox"${player.faction==="orthodox"?" selected":""}>🔵 Orthodox Sect</option>
+            <option value="heavenly_demon"${player.faction==="heavenly_demon"?" selected":""}><:DemonicSect:1497265894550671372> Heavenly Demon Cult</option>
+            <option value="orthodox"${player.faction==="orthodox"?" selected":""}><:OrthodoxSect:1497266218749530132> Orthodox Sect</option>
           </select>
         </div>
         <div class="form-group">

@@ -77,9 +77,10 @@ function buildEmbed(user, target, favoriteCard, favPc) {
     xpBar,
     `XP: **${user.accountExp.toLocaleString()} / ${expNeeded.toLocaleString()}**`,
     ``,
-    `**Status:** ${user.isPremium ? "💎 Premium" : "Free"}  ·  ${
-      user.faction === "heavenly_demon" ? "🔴 Heavenly Demon Cult" :
-      user.faction === "orthodox"       ? "🔵 Orthodox Sect" :
+    `**Status:** ${user.isPremium ? "💎 Premium" : "Free"}`,
+    `**Faction:** ${
+      user.faction === "heavenly_demon" ? "<:DemonicSect:1497265894550671372> Heavenly Demon Cult" :
+      user.faction === "orthodox"       ? "<:OrthodoxSect:1497266218749530132> Orthodox Sect" :
       "⚔️ No Faction"
     }`,
     ``,

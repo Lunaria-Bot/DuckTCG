@@ -289,13 +289,19 @@ Use \`/refill\` to restore your Qi.`);
       const newQi2     = freshQi2 - actualAmt2;
       const cooldownAt2 = newQi2 <= 0 ? new Date(Date.now() + QI_COOLDOWN_MS) : null;
 
+      const FACTION_PTS2 = { common: 1, rare: 2, special: 5, exceptional: 8, radiant: 10 };
+      const earnedFactionPts2 = results2.reduce((sum, r) => sum + (FACTION_PTS2[r.rarity] ?? 0), 0);
+
       await User.findOneAndUpdate({ userId: interaction.user.id }, {
         "mana.qi":              newQi2,
         "mana.lastQiUpdate":    new Date(),
         "mana.dantian":         freshDantian2,
         "mana.lastDantianUpdate": new Date(),
         "mana.qiCooldownUntil": null,
-        $inc: { "stats.totalPullsDone": actualAmt2 },
+        $inc: {
+          "stats.totalPullsDone": actualAmt2,
+          ...(earnedFactionPts2 > 0 ? { factionPoints: earnedFactionPts2 } : {}),
+        },
       });
 
       // Quest tracking

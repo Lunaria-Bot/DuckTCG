@@ -9,8 +9,8 @@ const JADE = "<:Jade:1496624534139179009>";
 const NYAN = "<:Nyan:1495048966528831508>";
 
 const FACTIONS = {
-  heavenly_demon: { label: "Heavenly Demon Cult", emoji: "🔴", color: 0xef4444 },
-  orthodox:       { label: "Orthodox Sect",        emoji: "🔵", color: 0x3b82f6 },
+  heavenly_demon: { label: "Heavenly Demon Cult", emoji: "<:DemonicSect:1497265894550671372>", color: 0xef4444 },
+  orthodox:       { label: "Orthodox Sect",        emoji: "<:OrthodoxSect:1497266218749530132>", color: 0x3b82f6 },
 };
 
 function opponentKey(faction) {

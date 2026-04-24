@@ -324,8 +324,8 @@ module.exports = {
           .setFooter({ text: "This choice cannot be undone without a Faction Pass" });
 
         const factionRow = new ActionRowBuilder().addComponents(
-          new ButtonBuilder().setCustomId("faction_demonic").setLabel("🔴 Heavenly Demon Cult").setStyle(ButtonStyle.Danger),
-          new ButtonBuilder().setCustomId("faction_orthodox").setLabel("🔵 Orthodox Sect").setStyle(ButtonStyle.Primary),
+          new ButtonBuilder().setCustomId("faction_demonic").setLabel("<:DemonicSect:1497265894550671372> Heavenly Demon Cult").setStyle(ButtonStyle.Danger),
+          new ButtonBuilder().setCustomId("faction_orthodox").setLabel("<:OrthodoxSect:1497266218749530132> Orthodox Sect").setStyle(ButtonStyle.Primary),
         );
 
         await modalInteraction.editReply({ embeds: [factionEmbed], components: [factionRow] });
