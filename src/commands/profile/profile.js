@@ -59,10 +59,10 @@ function buildBadgeSection(badges) {
     .map(b => {
       const meta = BADGE_META[b.badgeId];
       if (!meta) return null;
-      return `${meta.emoji} **${meta.label}**`;
+      return meta.emoji;
     })
     .filter(Boolean)
-    .join("  ·  ");
+    .join("  ");
 
   return badgeStr || null;
 }
