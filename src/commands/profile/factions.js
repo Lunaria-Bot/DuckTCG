@@ -160,8 +160,8 @@ module.exports = {
 
       // Row 1 — main nav
       const row1 = new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId("fac_own").setLabel(`${f.emoji} ${f.label}`).setStyle(view === "own" ? ButtonStyle.Success : ButtonStyle.Secondary),
-        new ButtonBuilder().setCustomId("fac_opp").setLabel(`${opp.emoji} ${opp.label}`).setStyle(view === "opponent" ? opp.color === 0xef4444 ? ButtonStyle.Danger : ButtonStyle.Primary : ButtonStyle.Secondary),
+        new ButtonBuilder().setCustomId("fac_own").setLabel("My Faction").setStyle(view === "own" ? ButtonStyle.Success : ButtonStyle.Secondary),
+        new ButtonBuilder().setCustomId("fac_opp").setLabel("Enemy Faction").setStyle(view === "opponent" ? ButtonStyle.Danger : ButtonStyle.Secondary),
         new ButtonBuilder().setCustomId("fac_overall").setLabel("⚔️ Overall").setStyle(view === "overall" ? ButtonStyle.Success : ButtonStyle.Secondary),
         new ButtonBuilder().setCustomId("fac_rewards").setLabel("🏆 Rewards").setStyle(view === "rewards" ? ButtonStyle.Success : ButtonStyle.Secondary),
       );
