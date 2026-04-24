@@ -366,8 +366,7 @@ module.exports = {
     });
 
     const collector = msg.createMessageComponentCollector({
-      componentType: ComponentType.Button,
-      filter: i => i.user.id === interaction.user.id && (i.isButton() || i.isStringSelectMenu()),
+      filter: i => i.user.id === interaction.user.id,
       time: 5 * 60 * 1000,
     });
 
