@@ -271,10 +271,12 @@ async function runRollSession(interaction, userId, username) {
           .setColor(0x6b7280);
 
         const qiNow = regenQi(await User.findOne({ userId }));
-        await interaction.editReply({ embeds: [fleeEmbed], components: [buildRollAgainRow(qiNow)] });
+        // Keep reveal embed, show result below + roll again button
+        await interaction.editReply({ components: [] });
+        const resultMsg = await interaction.followUp({ embeds: [fleeEmbed], components: [buildRollAgainRow(qiNow)] });
 
         // Handle roll again
-        await awaitRollAgain(interaction, msg, userId, username);
+        await awaitRollAgain(interaction, resultMsg, userId, username);
         return;
       }
 
@@ -304,10 +306,12 @@ async function runRollSession(interaction, userId, username) {
 
       const resultEmbed = buildResultEmbed(card, rarity, captured, talTier, captureRate, nyangEarned, factionPts);
       const qiNow = regenQi(await User.findOne({ userId }));
-      await interaction.editReply({ embeds: [resultEmbed], components: [buildRollAgainRow(qiNow)] });
+      // Keep reveal embed, show result below + roll again button
+      await interaction.editReply({ components: [] });
+      const resultMsg = await interaction.followUp({ embeds: [resultEmbed], components: [buildRollAgainRow(qiNow)] });
 
       // Handle roll again
-      await awaitRollAgain(interaction, msg, userId, username);
+      await awaitRollAgain(interaction, resultMsg, userId, username);
 
     } catch (err) {
       console.error("[roll] collector:", err);
@@ -333,9 +337,11 @@ async function awaitRollAgain(interaction, msg, userId, username) {
       time: 30_000,
     });
     await again.deferUpdate();
+    // Remove roll again button from result, then start new roll as followUp
+    await msg.edit({ components: [] }).catch(() => {});
     await runRollSession(interaction, userId, username);
   } catch {
-    // Timed out — just remove button
-    await interaction.editReply({ components: [] }).catch(() => {});
+    // Timed out — remove button
+    await msg.edit({ components: [] }).catch(() => {});
   }
 }
