@@ -1,22 +1,21 @@
 const {
   SlashCommandBuilder, EmbedBuilder,
-  ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType,
+  ActionRowBuilder, ButtonBuilder, ButtonStyle,
   StringSelectMenuBuilder, StringSelectMenuOptionBuilder,
 } = require("discord.js");
-const { requireProfile }    = require("../../utils/requireProfile");
-const { applyExp }           = require("../../services/levels");
-const { incrementProgress }  = require("../../services/quests");
-const { getRedis }           = require("../../services/redis");
-const User                   = require("../../models/User");
-const Card                   = require("../../models/Card");
-const PlayerCard              = require("../../models/PlayerCard");
-const { calculateStats }     = require("../../services/cardStats");
+const { requireProfile }   = require("../../utils/requireProfile");
+const { applyExp }          = require("../../services/levels");
+const { incrementProgress } = require("../../services/quests");
+const { getRedis }          = require("../../services/redis");
+const User                  = require("../../models/User");
+const Card                  = require("../../models/Card");
+const PlayerCard             = require("../../models/PlayerCard");
+const { calculateStats }    = require("../../services/cardStats");
 const {
   qiMax, dantianMax, regenDantian, regenQi,
   qiRegenRemaining, formatCooldown, QI_PER_ROLL,
 } = require("../../services/mana");
 
-// ─── Constants ────────────────────────────────────────────────────────────────
 const RARITY_EMOJI = {
   radiant: "✨", exceptional: "<:Exceptional:1496532355719102656>",
   special: "<:Special:1496599588902273187>", rare: "<:Rare:1496204151447748811>",
@@ -26,9 +25,9 @@ const RARITY_COLOR = { radiant: 0xE0F0FF, exceptional: 0xFFD700, special: 0xAB47
 const RARITY_LABEL = { radiant: "Radiant ✨", exceptional: "Exceptional", special: "Special", rare: "Rare", common: "Common" };
 const RARITY_RATES = { common: 62.5, rare: 30, special: 7.5 };
 
-const QI_EMOJI    = "<:Qi:1496984846566818022>";
-const DANTIAN_EMO = "<:Dantian:1495528597610303608>";
-const NYAN_EMO    = "<:Nyan:1495048966528831508>";
+const QI_EMO   = "<:Qi:1496984846566818022>";
+const DAN_EMO  = "<:Dantian:1495528597610303608>";
+const NYAN_EMO = "<:Nyan:1495048966528831508>";
 
 const CAPTURE_RATES = {
   common:      { common: 70, rare: 50, special: 40, exceptional: 0,   radiant: 0   },
@@ -36,9 +35,8 @@ const CAPTURE_RATES = {
   divine:      { common: 95, rare: 90, special: 80, exceptional: 0,   radiant: 0   },
   exceptional: { common: 100,rare: 100,special: 100,exceptional: 100, radiant: 100 },
 };
-
-const TALISMAN_LABEL = { common: "Common Talisman", uncommon: "Uncommon Talisman", divine: "Divine Talisman", exceptional: "Exceptional Talisman" };
-const TALISMAN_EMOJI = { common: "📜", uncommon: "📋", divine: "✴️", exceptional: "🌟" };
+const TALISMAN_LABEL    = { common: "Common Talisman", uncommon: "Uncommon Talisman", divine: "Divine Talisman", exceptional: "Exceptional Talisman" };
+const TALISMAN_EMOJI    = { common: "📜", uncommon: "📋", divine: "✴️", exceptional: "🌟" };
 const TALISMAN_ITEM_KEY = { common: "items.talismanCommon", uncommon: "items.talismanUncommon", divine: "items.talismanDivine", exceptional: "items.talismanExceptional" };
 const TALISMAN_USER_KEY = { common: "talismanCommon", uncommon: "talismanUncommon", divine: "talismanDivine", exceptional: "talismanExceptional" };
 
@@ -60,7 +58,7 @@ async function peekCard() {
   const rarity = rollRarity();
   const pool   = await Card.find({ rarity, isAvailable: true });
   if (pool.length) return { card: pool[Math.floor(Math.random() * pool.length)], rarity };
-  for (const r of ["common", "rare", "special"]) {
+  for (const r of ["common","rare","special"]) {
     const fb = await Card.find({ rarity: r, isAvailable: true });
     if (fb.length) return { card: fb[Math.floor(Math.random() * fb.length)], rarity: r };
   }
@@ -79,55 +77,21 @@ async function captureCard(userId, cardId) {
   return pc;
 }
 
-function buildRevealEmbed(card, rarity, currentQi, maxQi) {
-  const embed = new EmbedBuilder()
-    .setTitle(`${RARITY_EMOJI[rarity] ?? ""} A wild **${RARITY_LABEL[rarity]}** appeared!`)
-    .setDescription(
-      `**${card.name}** — *${card.anime}*\n\n` +
-      `Choose a talisman to capture!\n` +
-      `${QI_EMOJI} **${currentQi}** / ${maxQi} Qi remaining`
-    )
-    .setColor(RARITY_COLOR[rarity] ?? 0x78909C);
-  if (card.imageUrl) embed.setImage(card.imageUrl);
-  return embed;
-}
-
-function buildResultEmbed(card, rarity, captured, talTier, captureRate, nyangEarned, factionPts) {
-  if (captured) {
-    return new EmbedBuilder()
-      .setTitle(`${TALISMAN_EMOJI[talTier]} Captured! ${RARITY_EMOJI[rarity] ?? ""} **${card.name}**`)
-      .setDescription(
-        `*${card.anime}* — **${RARITY_LABEL[rarity]}**\n` +
-        `Capture: **${captureRate}%** · Added to collection!\n\n` +
-        `${NYAN_EMO} **+${nyangEarned.toLocaleString()} Nyang**  ·  ⚔️ **+${factionPts} faction pt${factionPts !== 1 ? "s" : ""}**`
-      )
-      .setColor(0x22c55e)
-      .setThumbnail(card.imageUrl || null);
-  }
-  return new EmbedBuilder()
-    .setTitle(`💨 **${card.name}** escaped!`)
-    .setDescription(
-      `*${card.anime}* — **${RARITY_LABEL[rarity]}**\n` +
-      `Capture was **${captureRate}%** — the card vanished.`
-    )
-    .setColor(0xef4444);
-}
-
 function buildTalismanRow(user, rarity) {
   const options = [];
-  for (const tier of ["common", "uncommon", "divine", "exceptional"]) {
+  for (const tier of ["common","uncommon","divine","exceptional"]) {
     const count = user.items?.[TALISMAN_USER_KEY[tier]] ?? 0;
     if (count <= 0) continue;
     const rate = CAPTURE_RATES[tier]?.[rarity] ?? 0;
     options.push(
       new StringSelectMenuOptionBuilder()
         .setLabel(`${TALISMAN_LABEL[tier]} (×${count})`)
-        .setDescription(`${rate}% capture · ${RARITY_LABEL[rarity]} card`)
+        .setDescription(`${rate}% capture · ${RARITY_LABEL[rarity]}`)
         .setValue(tier)
     );
   }
   if (!options.length) {
-    for (const tier of ["common", "uncommon", "divine", "exceptional"]) {
+    for (const tier of ["common","uncommon","divine","exceptional"]) {
       const rate = CAPTURE_RATES[tier]?.[rarity] ?? 0;
       options.push(
         new StringSelectMenuOptionBuilder()
@@ -138,44 +102,57 @@ function buildTalismanRow(user, rarity) {
     }
   }
   return new ActionRowBuilder().addComponents(
-    new StringSelectMenuBuilder().setCustomId("roll_talisman").setPlaceholder("🎯 Select talisman to capture...").addOptions(options)
+    new StringSelectMenuBuilder().setCustomId("roll_talisman").setPlaceholder("🎯 Select talisman...").addOptions(options)
   );
 }
 
 function buildRollAgainRow(currentQi) {
   return new ActionRowBuilder().addComponents(
     new ButtonBuilder()
-      .setCustomId("roll_again_btn")
+      .setCustomId("roll_chain")
       .setLabel(`Roll Again  (${QI_PER_ROLL} Qi)`)
-      .setEmoji(QI_EMOJI)
+      .setEmoji(QI_EMO)
       .setStyle(ButtonStyle.Primary)
-      .setDisabled(currentQi < QI_PER_ROLL),
+      .setDisabled(currentQi < QI_PER_ROLL)
   );
 }
 
-// ─── Core roll logic (reusable for initial roll + roll again) ──────────────────
-async function doRoll(interaction, userId, username) {
-  const user = await User.findOne({ userId });
-  if (!user) return;
+// ─── Command ──────────────────────────────────────────────────────────────────
+module.exports = {
+  data: new SlashCommandBuilder()
+    .setName("roll")
+    .setDescription("Spend 25 Qi to reveal a card — then capture it with a talisman"),
 
+  async execute(interaction) {
+    await interaction.deferReply();
+    await rollLoop(interaction, interaction.user.id);
+  },
+};
+
+async function rollLoop(interaction, userId) {
+  const user           = await User.findOne({ userId });
   const currentQi      = regenQi(user);
   const maxQi          = qiMax(user.accountLevel);
   const currentDantian = regenDantian(user);
 
   if (currentQi < QI_PER_ROLL) {
     const secs = qiRegenRemaining(user);
-    return {
-      type: "no_qi",
-      content: [
-        `${QI_EMOJI} **Not enough Qi!** Need **${QI_PER_ROLL}** Qi (you have **${currentQi}**).`,
-        secs > 0 ? `⏳ Full in **${formatCooldown(secs)}**` : "",
-        `Use \`/refill\` to restore from Dantian (${DANTIAN_EMO} **${currentDantian}** / ${dantianMax()})`,
-      ].filter(Boolean).join("\n"),
-    };
+    return interaction.editReply({
+      embeds: [new EmbedBuilder()
+        .setTitle(`${QI_EMO} Not enough Qi`)
+        .setDescription([
+          `Need **${QI_PER_ROLL}** Qi to roll (you have **${currentQi}**).`,
+          secs > 0 ? `⏳ Full in **${formatCooldown(secs)}**` : "",
+          `Use \`/refill\` to restore from Dantian (${DAN_EMO} **${currentDantian}** / ${dantianMax()})`,
+        ].filter(Boolean).join("\n"))
+        .setColor(0xef4444)
+      ],
+      components: [],
+    });
   }
 
   const peeked = await peekCard();
-  if (!peeked) return { type: "no_cards" };
+  if (!peeked) return interaction.editReply({ content: "No cards available right now.", components: [] });
   const { card, rarity } = peeked;
 
   // Deduct Qi
@@ -194,64 +171,35 @@ async function doRoll(interaction, userId, username) {
     await incrementProgress(redis, userId, "daily", "roll_rare", 1);
     await incrementProgress(redis, userId, "weekly", "roll_rare", 1);
   }
-  if (["special","exceptional"].includes(rarity)) {
-    await incrementProgress(redis, userId, "daily", "roll_special", 1);
-    await incrementProgress(redis, userId, "weekly", "roll_special", 1);
-  }
-
   const freshUser = await User.findOne({ userId });
   const lvResult  = applyExp(freshUser.accountLevel, freshUser.accountExp, 5);
   await User.findOneAndUpdate({ userId }, { accountLevel: lvResult.newLevel, accountExp: lvResult.newExp });
 
-  const freshUser2  = await User.findOne({ userId });
-  const revealEmbed = buildRevealEmbed(card, rarity, newQi, maxQi);
-  if (lvResult.leveledUp) revealEmbed.addFields({ name: "🎉 Level Up!", value: `You reached **Level ${lvResult.newLevel}**!` });
+  // Build reveal embed
+  const freshUser2 = await User.findOne({ userId });
+  const revealEmbed = new EmbedBuilder()
+    .setTitle(`${RARITY_EMOJI[rarity] ?? ""} **${RARITY_LABEL[rarity]}** appeared!`)
+    .setDescription(
+      `**${card.name}** — *${card.anime}*\n\n` +
+      `🎯 Pick a talisman to capture!\n` +
+      `${QI_EMO} **${newQi}** / ${maxQi} Qi`
+    )
+    .setColor(RARITY_COLOR[rarity] ?? 0x78909C);
+  if (card.imageUrl) revealEmbed.setImage(card.imageUrl);
+  if (lvResult.leveledUp) revealEmbed.addFields({ name: "🎉 Level Up!", value: `**Level ${lvResult.newLevel}**!` });
 
   const hasAnyTalisman = ["common","uncommon","divine","exceptional"].some(
     t => (freshUser2.items?.[TALISMAN_USER_KEY[t]] ?? 0) > 0
   );
-
   const skipRow = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId("roll_skip").setLabel("Flee — Skip this card").setStyle(ButtonStyle.Secondary)
+    new ButtonBuilder().setCustomId("roll_skip").setLabel("Flee").setStyle(ButtonStyle.Secondary)
   );
 
-  return {
-    type: "reveal",
-    card, rarity, newQi, maxQi,
-    components: hasAnyTalisman
-      ? [buildTalismanRow(freshUser2, rarity), skipRow]
-      : [skipRow],
-    embeds: [revealEmbed],
-    user: freshUser2,
-  };
-}
+  const components = hasAnyTalisman
+    ? [buildTalismanRow(freshUser2, rarity), skipRow]
+    : [skipRow];
 
-// ─── Command ──────────────────────────────────────────────────────────────────
-module.exports = {
-  data: new SlashCommandBuilder()
-    .setName("roll")
-    .setDescription("Spend 25 Qi to reveal a card — then capture it with a talisman"),
-
-  async execute(interaction) {
-    await interaction.deferReply();
-    await runRollSession(interaction, interaction.user.id, interaction.user.username);
-  },
-};
-
-async function runRollSession(interaction, userId, username) {
-  const result = await doRoll(interaction, userId, username);
-  if (!result) return;
-
-  if (result.type === "no_qi") {
-    return interaction.editReply({ content: result.content, components: [] });
-  }
-  if (result.type === "no_cards") {
-    return interaction.editReply({ content: "No cards available right now.", components: [] });
-  }
-
-  const { card, rarity, newQi, maxQi, components, embeds } = result;
-
-  const msg = await interaction.editReply({ embeds, components });
+  const msg = await interaction.editReply({ embeds: [revealEmbed], components });
 
   const collector = msg.createMessageComponentCollector({
     filter: i => i.user.id === userId,
@@ -263,24 +211,31 @@ async function runRollSession(interaction, userId, username) {
     try {
       await i.deferUpdate();
 
-      // ── Flee ────────────────────────────────────────────────────────────
+      // ── Flee ─────────────────────────────────────────────────────────────
       if (i.customId === "roll_skip") {
-        const fleeEmbed = new EmbedBuilder()
-          .setTitle(`💨 You fled from **${card.name}**`)
-          .setDescription(`*${card.anime}* — **${RARITY_LABEL[rarity]}** · The card vanished.`)
-          .setColor(0x6b7280);
-
         const qiNow = regenQi(await User.findOne({ userId }));
-        // Keep reveal embed, show result below + roll again button
-        await interaction.editReply({ components: [] });
-        const resultMsg = await interaction.followUp({ embeds: [fleeEmbed], components: [buildRollAgainRow(qiNow)] });
+        // Edit embed to show fled — keep image
+        const fled = EmbedBuilder.from(revealEmbed)
+          .setTitle(`💨 ${RARITY_EMOJI[rarity] ?? ""} **${card.name}** — Fled`)
+          .setDescription(
+            `**${card.name}** — *${card.anime}* — **${RARITY_LABEL[rarity]}**\n\n` +
+            `You fled — the card vanished.\n` +
+            `${QI_EMO} **${qiNow}** / ${maxQi} Qi`
+          )
+          .setColor(0x6b7280)
+          .spliceFields(0, 25); // remove level up field if present
+        await interaction.editReply({ embeds: [fled], components: [buildRollAgainRow(qiNow)] });
 
-        // Handle roll again
-        await awaitRollAgain(interaction, resultMsg, userId, username);
+        // Await chain roll
+        try {
+          const again = await msg.awaitMessageComponent({ filter: ii => ii.user.id === userId && ii.customId === "roll_chain", time: 30_000 });
+          await again.deferUpdate();
+          await rollLoop(interaction, userId);
+        } catch { await interaction.editReply({ components: [] }).catch(() => {}); }
         return;
       }
 
-      // ── Talisman chosen ──────────────────────────────────────────────────
+      // ── Talisman ──────────────────────────────────────────────────────────
       const talTier  = i.values[0];
       const userNow  = await User.findOne({ userId });
       const owned    = userNow.items?.[TALISMAN_USER_KEY[talTier]] ?? 0;
@@ -294,54 +249,73 @@ async function runRollSession(interaction, userId, username) {
 
       const captureRate = CAPTURE_RATES[talTier]?.[rarity] ?? 0;
       const captured    = Math.random() * 100 < captureRate;
-      const nyangEarned = captured ? (NYANG_REWARD[rarity] ?? 50) : 0;
-      const factionPts  = captured ? (FACTION_PTS[rarity] ?? 0) : 0;
+      const qiNow       = regenQi(await User.findOne({ userId }));
 
       if (captured) {
+        // ── Success — keep image, add capture info ───────────────────────
+        const nyang = NYANG_REWARD[rarity] ?? 50;
+        const pts   = FACTION_PTS[rarity] ?? 0;
         await captureCard(userId, card.cardId);
-        const inc = { "currency.gold": nyangEarned };
-        if (factionPts > 0) inc.factionPoints = factionPts;
+        const inc = { "currency.gold": nyang };
+        if (pts > 0) inc.factionPoints = pts;
         await User.findOneAndUpdate({ userId }, { $inc: inc });
+
+        const capturedEmbed = EmbedBuilder.from(revealEmbed)
+          .setTitle(`${TALISMAN_EMOJI[talTier]} Captured! ${RARITY_EMOJI[rarity] ?? ""} **${card.name}**`)
+          .setDescription(
+            `**${card.name}** — *${card.anime}* — **${RARITY_LABEL[rarity]}**\n\n` +
+            `✅ Added to your collection!\n` +
+            `${NYAN_EMO} **+${nyang.toLocaleString()} Nyang**  ·  ⚔️ **+${pts} faction pt${pts !== 1 ? "s" : ""}**\n\n` +
+            `${QI_EMO} **${qiNow}** / ${maxQi} Qi`
+          )
+          .setColor(0x22c55e)
+          .spliceFields(0, 25);
+
+        await interaction.editReply({ embeds: [capturedEmbed], components: [buildRollAgainRow(qiNow)] });
+
+        try {
+          const again = await msg.awaitMessageComponent({ filter: ii => ii.user.id === userId && ii.customId === "roll_chain", time: 30_000 });
+          await again.deferUpdate();
+          await rollLoop(interaction, userId);
+        } catch { await interaction.editReply({ components: [] }).catch(() => {}); }
+
+      } else {
+        // ── Failed — keep image, show escape. No chain roll. ─────────────
+        const escapedEmbed = EmbedBuilder.from(revealEmbed)
+          .setTitle(`💨 ${RARITY_EMOJI[rarity] ?? ""} **${card.name}** — Escaped!`)
+          .setDescription(
+            `**${card.name}** — *${card.anime}* — **${RARITY_LABEL[rarity]}**\n\n` +
+            `❌ Capture failed (${captureRate}%) — the card vanished.\n` +
+            `${QI_EMO} **${qiNow}** / ${maxQi} Qi`
+          )
+          .setColor(0xef4444)
+          .spliceFields(0, 25);
+
+        await interaction.editReply({ embeds: [escapedEmbed], components: [buildRollAgainRow(qiNow)] });
+
+        try {
+          const again = await msg.awaitMessageComponent({ filter: ii => ii.user.id === userId && ii.customId === "roll_chain", time: 30_000 });
+          await again.deferUpdate();
+          await rollLoop(interaction, userId);
+        } catch { await interaction.editReply({ components: [] }).catch(() => {}); }
       }
 
-      const resultEmbed = buildResultEmbed(card, rarity, captured, talTier, captureRate, nyangEarned, factionPts);
-      const qiNow = regenQi(await User.findOne({ userId }));
-      // Keep reveal embed, show result below + roll again button
-      await interaction.editReply({ components: [] });
-      const resultMsg = await interaction.followUp({ embeds: [resultEmbed], components: [buildRollAgainRow(qiNow)] });
-
-      // Handle roll again
-      await awaitRollAgain(interaction, resultMsg, userId, username);
-
-    } catch (err) {
-      console.error("[roll] collector:", err);
-    }
+    } catch (err) { console.error("[roll]", err); }
   });
 
   collector.on("end", async (_, reason) => {
     if (reason === "time") {
-      const embed = new EmbedBuilder()
-        .setTitle(`⏰ **${card.name}** escaped!`)
-        .setDescription(`*${card.anime}* — **${RARITY_LABEL[rarity]}** · Took too long, the card vanished.`)
-        .setColor(0xef4444);
-      const qiNow = regenQi(await User.findOne({ userId })).catch?.() ?? newQi;
-      await interaction.editReply({ embeds: [embed], components: [] }).catch(() => {});
+      const qiNow = regenQi(await User.findOne({ userId })) ?? newQi;
+      const timedOut = EmbedBuilder.from(revealEmbed)
+        .setTitle(`⏰ ${RARITY_EMOJI[rarity] ?? ""} **${card.name}** — Timed out`)
+        .setDescription(
+          `**${card.name}** — *${card.anime}* — **${RARITY_LABEL[rarity]}**\n\n` +
+          `Took too long — the card vanished.\n` +
+          `${QI_EMO} **${qiNow}** / ${maxQi} Qi`
+        )
+        .setColor(0x6b7280)
+        .spliceFields(0, 25);
+      await interaction.editReply({ embeds: [timedOut], components: [] }).catch(() => {});
     }
   });
-}
-
-async function awaitRollAgain(interaction, msg, userId, username) {
-  try {
-    const again = await msg.awaitMessageComponent({
-      filter: ii => ii.user.id === userId && ii.customId === "roll_again_btn",
-      time: 30_000,
-    });
-    await again.deferUpdate();
-    // Remove roll again button from result, then start new roll as followUp
-    await msg.edit({ components: [] }).catch(() => {});
-    await runRollSession(interaction, userId, username);
-  } catch {
-    // Timed out — remove button
-    await msg.edit({ components: [] }).catch(() => {});
-  }
 }
