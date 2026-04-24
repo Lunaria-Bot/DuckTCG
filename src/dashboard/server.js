@@ -2023,16 +2023,71 @@ app.get("/players", auth, adminOnly, async (req, res) => {
           <td>Lv.${p.accountLevel}</td>
           <td>${p.combatPower.toLocaleString()}</td>
           <td>${p.isPremium?`<span class="badge badge-yellow">💎 Premium</span>`:`<span class="text-dim text-sm">—</span>`}</td>
+          <td>${
+            p.faction==="heavenly_demon"?`<span class="badge badge-red">🔴 Demonic</span>`:
+            p.faction==="orthodox"?`<span class="badge badge-blue">🔵 Orthodox</span>`:
+            `<span class="badge badge-gray">No Faction</span>`
+          }</td>
           <td style="display:flex;gap:5px;flex-wrap:wrap">
             <a href="/players/${p.userId}/give" class="btn btn-green btn-sm">Give</a>
             <a href="/players/${p.userId}/give-card" class="btn btn-gray btn-sm">Card</a>
             <a href="/players/${p.userId}/toggle-premium" class="btn ${p.isPremium?"btn-red":"btn-ghost"} btn-sm">${p.isPremium?"Remove 💎":"Set 💎"}</a>
+            <a href="/players/${p.userId}/set-faction" class="btn btn-ghost btn-sm">⚔️ Faction</a>
           </td>
         </tr>`).join("")||`<tr><td colspan="8" class="empty-state">No players found</td></tr>`}
         </tbody>
       </table></div>
     </div>
   `, req.user, "/players"));
+});
+
+app.get("/players/:id/set-faction", auth, adminOnly, async (req, res) => {
+  const player = await User.findOne({ userId: req.params.id });
+  if (!player) return res.redirect("/players");
+  const factionLabel = {
+    heavenly_demon: "🔴 Heavenly Demon Cult",
+    orthodox:       "🔵 Orthodox Sect",
+    null:           "No Faction",
+  }[player.faction] ?? "No Faction";
+  res.send(renderPage("Set Faction", `
+    <a href="/players" class="back-link">Back to Players</a>
+    <div class="form-box">
+      <h2 style="margin-bottom:4px">⚔️ Set Faction</h2>
+      <p class="text-muted text-sm" style="margin-bottom:20px">Player: <strong>${player.username}</strong> · Current: <strong>${factionLabel}</strong></p>
+      <form method="POST" action="/players/${player.userId}/set-faction" style="display:flex;flex-direction:column;gap:0">
+        <div class="form-group">
+          <label>Faction</label>
+          <select name="faction">
+            <option value="">— No Faction —</option>
+            <option value="heavenly_demon"${player.faction==="heavenly_demon"?" selected":""}>🔴 Heavenly Demon Cult</option>
+            <option value="orthodox"${player.faction==="orthodox"?" selected":""}>🔵 Orthodox Sect</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+            <input type="checkbox" name="resetPoints" value="true" style="width:auto"/>
+            Reset faction points to 0
+          </label>
+        </div>
+        <div class="form-actions">
+          <button type="submit" class="btn">Save</button>
+          <a href="/players" class="btn btn-ghost">Cancel</a>
+        </div>
+      </form>
+    </div>
+  `, req.user, "/players"));
+});
+
+app.post("/players/:id/set-faction", auth, adminOnly, async (req, res) => {
+  const { faction, resetPoints } = req.body;
+  const update = {
+    faction: faction || null,
+    factionJoinedAt: faction ? new Date() : null,
+  };
+  if (resetPoints === "true") update.factionPoints = 0;
+  await User.findOneAndUpdate({ userId: req.params.id }, update);
+  await AuditLog.create({ action: "SET_FACTION", target: req.params.id, performedBy: req.user.username, details: `Faction set to: ${faction || "none"}${resetPoints==="true"?" (points reset)":""}` });
+  res.redirect("/players");
 });
 
 app.get("/players/:id/give", auth, adminOnly, async (req, res) => {
