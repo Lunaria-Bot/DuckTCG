@@ -251,8 +251,8 @@ function buildShopEmbed(tab, user) {
 
 function buildTabRow(tab) {
   return new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId("shop_nyang").setLabel("Nyang Shop").setEmoji(NYAN).setStyle(tab === "nyang" ? ButtonStyle.Primary : ButtonStyle.Secondary),
-    new ButtonBuilder().setCustomId("shop_jade").setLabel("Jade Shop").setEmoji(JADE).setStyle(tab === "jade" ? ButtonStyle.Primary : ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId("shop_nyang").setLabel("🪙 Nyang Shop").setStyle(tab === "nyang" ? ButtonStyle.Primary : ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId("shop_jade").setLabel("💎 Jade Shop").setStyle(tab === "jade" ? ButtonStyle.Primary : ButtonStyle.Secondary),
   );
 }
 
@@ -272,7 +272,7 @@ function buildBuyDropdown(tab, user) {
           .setDescription(`${priceStr} · ${item.limit}`)
           .setValue(item.id);
         // Only set emoji for standard Unicode, not custom Discord emojis
-        if (item.emoji && !item.emoji.startsWith("<")) opt.setEmoji(item.emoji);
+        // emoji removed from select options (Discord rejects unicode emoji IDs)
         return opt;
       }))
   );
