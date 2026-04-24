@@ -77,7 +77,11 @@ function buildEmbed(user, target, favoriteCard, favPc) {
     xpBar,
     `XP: **${user.accountExp.toLocaleString()} / ${expNeeded.toLocaleString()}**`,
     ``,
-    `**Status:** ${user.isPremium ? "💎 Premium" : "Free"}`,
+    `**Status:** ${user.isPremium ? "💎 Premium" : "Free"}  ·  ${
+      user.faction === "heavenly_demon" ? "🔴 Heavenly Demon Cult" :
+      user.faction === "orthodox"       ? "🔵 Orthodox Sect" :
+      "⚔️ No Faction"
+    }`,
     ``,
     `**__About__**`,
     user.bio || `*Nothing set yet.*`,

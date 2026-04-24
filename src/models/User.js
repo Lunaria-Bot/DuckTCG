@@ -61,6 +61,11 @@ const UserSchema = new Schema({
     lesserQiPillWeekReset: { type: Date, default: null },  // week reset date
   },
 
+  // ── Faction ───────────────────────────────────────────────────────────────
+  faction: { type: String, enum: ["heavenly_demon", "orthodox", null], default: null },
+  factionPoints: { type: Number, default: 0 },         // resets on faction change
+  factionJoinedAt: { type: Date, default: null },       // when they joined current faction
+
   // ── Notification settings ─────────────────────────────────────────────────
   notifications: {
     qiFull:      { type: Boolean, default: false },

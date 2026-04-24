@@ -301,18 +301,67 @@ module.exports = {
       if      (i.customId === "tuto_prev") page = Math.max(0, page - 1);
       else if (i.customId === "tuto_next") page = Math.min(TUTORIAL.length - 1, page + 1);
       else if (i.customId === "tuto_done") {
-        await modalInteraction.editReply({
-          embeds: [new EmbedBuilder()
-            .setTitle("🎉 You're all set!")
-            .setDescription(`Welcome, **${username}**! Your adventure begins now.\n\nStart with \`/daily\` to claim your first reward, then \`/roll\` to get your first cards!`)
-            .setColor(0x22c55e)
-            .setThumbnail(interaction.user.displayAvatarURL())
-            .addFields({ name: "Your Rewards", value: `${PERMA} **${WELCOME_TICKETS} Regular Tickets**\n${NYAN} **${WELCOME_GOLD.toLocaleString()} Nyang**` })
-            .setFooter({ text: "Use /help anytime to see all commands" })
-          ],
-          components: [],
-        });
+        // Show faction choice
+        const factionEmbed = new EmbedBuilder()
+          .setTitle("⚔️ Choose Your Faction")
+          .setDescription([
+            "Before you begin, you must choose a faction.",
+            "Your faction shapes your identity in SeorinTCG.",
+            "",
+            "🔴 **Heavenly Demon Cult**",
+            "*Walk the path of demons. Power through destruction.*",
+            "",
+            "🔵 **Orthodox Sect**",
+            "*Follow the righteous path. Strength through discipline.*",
+            "",
+            "━━━━━━━━━━━━━━━━━━━━━━━━",
+            "⚠️ **Your choice can be changed once per month** via the `/shop` (Faction Pass — 15,000 Nyang).",
+            "🏆 **Every 3 months**, the top 10 of each faction receive exclusive rewards.",
+            "📊 **Points are earned by rolling** — earn points for your faction with every pull.",
+            "❗ Changing faction **resets your faction points**.",
+          ].join("\n"))
+          .setColor(0x5B21B6)
+          .setFooter({ text: "This choice cannot be undone without a Faction Pass" });
+
+        const factionRow = new ActionRowBuilder().addComponents(
+          new ButtonBuilder().setCustomId("faction_demonic").setLabel("🔴 Heavenly Demon Cult").setStyle(ButtonStyle.Danger),
+          new ButtonBuilder().setCustomId("faction_orthodox").setLabel("🔵 Orthodox Sect").setStyle(ButtonStyle.Primary),
+        );
+
+        await modalInteraction.editReply({ embeds: [factionEmbed], components: [factionRow] });
         collector.stop();
+
+        // Wait for faction choice
+        try {
+          const factionI = await msg.awaitMessageComponent({
+            filter: fi => fi.user.id === interaction.user.id && ["faction_demonic","faction_orthodox"].includes(fi.customId),
+            time: 5 * 60 * 1000,
+          });
+          await factionI.deferUpdate();
+
+          const chosenFaction = factionI.customId === "faction_demonic" ? "heavenly_demon" : "orthodox";
+          const factionLabel  = chosenFaction === "heavenly_demon" ? "Heavenly Demon Cult 🔴" : "Orthodox Sect 🔵";
+
+          await User.findOneAndUpdate({ userId: interaction.user.id }, {
+            faction: chosenFaction,
+            factionJoinedAt: new Date(),
+            factionPoints: 0,
+          });
+
+          await modalInteraction.editReply({
+            embeds: [new EmbedBuilder()
+              .setTitle("🎉 You're all set!")
+              .setDescription(`Welcome, **${username}**!\n\nYou have joined the **${factionLabel}**.\nFight for glory and climb the faction leaderboard!\n\nStart with \`/daily\` then \`/roll\` to get your first cards!`)
+              .setColor(chosenFaction === "heavenly_demon" ? 0xef4444 : 0x3b82f6)
+              .setThumbnail(interaction.user.displayAvatarURL())
+              .addFields({ name: "Your Rewards", value: `${PERMA} **${WELCOME_TICKETS} Regular Tickets**\n${NYAN} **${WELCOME_GOLD.toLocaleString()} Nyang**` })
+              .setFooter({ text: "Use /help anytime to see all commands" })
+            ],
+            components: [],
+          });
+        } catch {
+          await modalInteraction.editReply({ components: [] }).catch(() => {});
+        }
         return;
       }
 

@@ -168,14 +168,21 @@ module.exports = {
     const newQi      = currentQi - actualAmount;
     const cooldownAt = newQi <= 0 ? new Date(Date.now() + QI_COOLDOWN_MS) : null;
 
+    // Faction points: common=1, rare=2, special=5
+    const FACTION_PTS = { common: 1, rare: 2, special: 5, exceptional: 8, radiant: 10 };
+    const earnedFactionPts = results.reduce((sum, r) => sum + (FACTION_PTS[r.rarity] ?? 0), 0);
+
     await User.findOneAndUpdate({ userId: interaction.user.id }, {
       "mana.qi":              newQi,
-      "mana.lastQiUpdate":    new Date(), // always reset so regen starts from newQi at this moment
+      "mana.lastQiUpdate":    new Date(),
       "mana.dantian":         currentDantian,
       "mana.lastDantianUpdate": new Date(),
       "mana.qiCooldownUntil": null,
-      "notifiedFull.qi":      false, // spent Qi → allow notif again when full
-      $inc: { "stats.totalPullsDone": actualAmount },
+      "notifiedFull.qi":      false,
+      $inc: {
+        "stats.totalPullsDone": actualAmount,
+        ...(earnedFactionPts > 0 ? { factionPoints: earnedFactionPts } : {}),
+      },
     });
 
     // Grant XP for rolls + handle level up
