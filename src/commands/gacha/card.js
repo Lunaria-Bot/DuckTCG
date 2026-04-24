@@ -17,7 +17,7 @@ const RARITY_EMOJI = {
   common:      "<:Common:1496973383143788716>",
 };
 const RARITY_COLOR = { radiant: 0xE0F0FF, exceptional: 0xFFD700, special: 0xAB47BC, rare: 0x42A5F5, common: 0x78909C };
-const RARITY_LABEL = { radiant: "Radiant ✨", exceptional: "Exceptional ✦✦✦", special: "Special ✦✦", rare: "Rare ✦", common: "Common" };
+const RARITY_LABEL = { radiant: "Radiant ✨", exceptional: "Exceptional", special: "Special", rare: "Rare", common: "Common" };
 const ROLE_EMOJI   = { dps: "⚔️", support: "💚", tank: "🛡️" };
 
 function sortCards(cards, sortBy) {
