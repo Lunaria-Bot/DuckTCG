@@ -4,7 +4,7 @@
  */
 
 const NYAN = "<:Nyan:1495048966528831508>";
-const JADE = "<:Jade:1495038405866688703>";
+const JADE = "<:Jade:1496624534139179009>";
 
 const DAILY_POOL = [
   { id: "daily_roll_1",      label: "Roll once",               type: "roll",       target: 1,  reward: { gold: 300,  regularTickets: 0, pickupTickets: 0, jade: 0, accountExp: 50  } },

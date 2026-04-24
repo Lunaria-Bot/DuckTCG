@@ -10,7 +10,7 @@ const SETTINGS = [
     key:   "notifications.qiFull",
     label: "Qi Full Notification",
     desc:  "Receive a DM when your Qi is fully recharged",
-    emoji: "<:Qi:1495523502961459200>",
+    emoji: "<:Qi:1496984846566818022>",
   },
   {
     key:   "notifications.dantianFull",

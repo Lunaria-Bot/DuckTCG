@@ -12,11 +12,11 @@ const User = require("../../models/User");
 const { applyExp } = require("../../services/levels");
 
 const NYAN   = "<:Nyan:1495048966528831508>";
-const JADE   = "<:Jade:1495038405866688703>";
+const JADE   = "<:Jade:1496624534139179009>";
 const PERMA  = "<:perma_ticket:1494344593863344258>";
 const PICKUP = "<:pickup_ticket:1494344547046523091>";
 const XP_FULL  = "<:xp_full:1494696138396270592>";
-const XP_EMPTY = "<:xp_empty:1494696186525909002>";
+const XP_EMPTY = "<:xp_empty:1496991575887315004>";
 
 function fmtReward(r) {
   const parts = [];

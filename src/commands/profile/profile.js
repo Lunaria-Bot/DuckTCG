@@ -4,7 +4,7 @@ const { xpToNextLevel } = require("../../services/levels");
 const User = require("../../models/User");
 
 const XP_FULL  = "<:xp_full:1494696138396270592>";
-const XP_EMPTY = "<:xp_empty:1494696186525909002>";
+const XP_EMPTY = "<:xp_empty:1496991575887315004>";
 
 function buildXpBar(current, needed) {
   const pct    = Math.min(current / needed, 1);

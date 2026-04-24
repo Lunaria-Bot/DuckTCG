@@ -6,7 +6,7 @@ const { incrementProgress } = require("../../services/quests");
 const { getRedis } = require("../../services/redis");
 
 const NYAN   = "<:Nyan:1495048966528831508>";
-const JADE   = "<:Jade:1495038405866688703>";
+const JADE   = "<:Jade:1496624534139179009>";
 const PERMA  = "<:perma_ticket:1494344593863344258>";
 const PICKUP = "<:pickup_ticket:1494344547046523091>";
 

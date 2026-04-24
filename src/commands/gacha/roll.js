@@ -17,7 +17,7 @@ const {
 } = require("../../services/mana");
 
 const RARITY_EMOJI  = { radiant: "✨", exceptional: "<:Exceptional:1496532355719102656>",
-  radiant:     "✨", special: "<:Special:1496599588902273187>", rare: "<:Rare:1496204151447748811>", common: "<:Common:1495730171301462186>" };
+  radiant:     "✨", special: "<:Special:1496599588902273187>", rare: "<:Rare:1496204151447748811>", common: "<:Common:1496973383143788716>" };
 const RARITY_ORDER  = { radiant: -1, exceptional: 0, special: 1, rare: 2, common: 3 };
 const RARITY_RATES  = { common: 62.5, rare: 30, special: 7.5 }; // exceptional excluded from /roll
 
@@ -96,7 +96,7 @@ function buildRollEmbed(results, username) {
   const color = RARITY_COLOR[best.rarity] ?? 0x78909C;
 
   const lines = results.map(({ card, rarity }) =>
-    `${RARITY_EMOJI[rarity] ?? "<:Common:1495730171301462186>"} **${card.name}** — *${card.anime}*`
+    `${RARITY_EMOJI[rarity] ?? "<:Common:1496973383143788716>"} **${card.name}** — *${card.anime}*`
   );
 
   const embed = new EmbedBuilder()
@@ -146,7 +146,7 @@ module.exports = {
     // Check Qi available
     if (currentQi <= 0) {
       return interaction.editReply({
-        content: `<:Qi:1495523502961459200> Your Qi is empty! Use \`/refill\` to restore it from your Dantian.\nDantian: **${Math.floor(currentDantian)}** / ${maxDantian}`,
+        content: `<:Qi:1496984846566818022> Your Qi is empty! Use \`/refill\` to restore it from your Dantian.\nDantian: **${Math.floor(currentDantian)}** / ${maxDantian}`,
       });
     }
 
@@ -211,7 +211,7 @@ module.exports = {
     // Warn if fewer rolls than requested
     if (qiShortfall > 0) {
       embed.setDescription((embed.data.description ? embed.data.description + "\n\n" : "") +
-        `<:Qi:1495523502961459200> **Not enough Qi** — only rolled **${actualAmount}** / ${amount} (missing ${qiShortfall} Qi).
+        `<:Qi:1496984846566818022> **Not enough Qi** — only rolled **${actualAmount}** / ${amount} (missing ${qiShortfall} Qi).
 Use \`/refill\` to restore your Qi.`);
     }
 
@@ -233,13 +233,13 @@ Use \`/refill\` to restore your Qi.`);
       new ButtonBuilder()
         .setCustomId("roll_again_1")
         .setLabel("Roll ×1")
-        .setEmoji("<:Qi:1495523502961459200>")
+        .setEmoji("<:Qi:1496984846566818022>")
         .setStyle(ButtonStyle.Secondary)
         .setDisabled(freshQi < 1),
       new ButtonBuilder()
         .setCustomId("roll_again_5")
         .setLabel("Roll ×5")
-        .setEmoji("<:Qi:1495523502961459200>")
+        .setEmoji("<:Qi:1496984846566818022>")
         .setStyle(ButtonStyle.Primary)
         .setDisabled(freshQi < 5),
     );
@@ -321,7 +321,7 @@ Use \`/refill\` to restore your Qi.`);
       const embed2 = buildRollEmbed(results2, interaction.user.username);
       if (shortfall2 > 0) {
         embed2.setDescription((embed2.data.description ? embed2.data.description + "\n\n" : "") +
-          `<:Qi:1495523502961459200> **Not enough Qi** — only rolled **${actualAmt2}** / ${rollAmt} (missing ${shortfall2} Qi).\nUse \`/refill\` to restore your Qi.`);
+          `<:Qi:1496984846566818022> **Not enough Qi** — only rolled **${actualAmt2}** / ${rollAmt} (missing ${shortfall2} Qi).\nUse \`/refill\` to restore your Qi.`);
       }
       if (lvResult2.leveledUp) {
         embed2.addFields({ name: "🎉 Level Up!", value: `You reached **Level ${lvResult2.newLevel}**!`, inline: false });
@@ -332,8 +332,8 @@ Use \`/refill\` to restore your Qi.`);
 
       const newQiAfter = regenQi(await User.findOne({ userId: interaction.user.id }));
       const rollRow2 = new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId("roll_again_1").setLabel("Roll ×1").setEmoji("<:Qi:1495523502961459200>").setStyle(ButtonStyle.Secondary).setDisabled(newQiAfter < 1),
-        new ButtonBuilder().setCustomId("roll_again_5").setLabel("Roll ×5").setEmoji("<:Qi:1495523502961459200>").setStyle(ButtonStyle.Primary).setDisabled(newQiAfter < 5),
+        new ButtonBuilder().setCustomId("roll_again_1").setLabel("Roll ×1").setEmoji("<:Qi:1496984846566818022>").setStyle(ButtonStyle.Secondary).setDisabled(newQiAfter < 1),
+        new ButtonBuilder().setCustomId("roll_again_5").setLabel("Roll ×5").setEmoji("<:Qi:1496984846566818022>").setStyle(ButtonStyle.Primary).setDisabled(newQiAfter < 5),
       );
 
       await interaction.editReply({ embeds: [embed2], components: [rollRow2] });

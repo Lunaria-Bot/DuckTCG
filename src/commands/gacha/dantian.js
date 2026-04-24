@@ -11,7 +11,7 @@ const {
 } = require("../../services/mana");
 
 const QI_FULL  = "<:xp_full:1494696138396270592>";
-const QI_EMPTY = "<:xp_empty:1494696186525909002>";
+const QI_EMPTY = "<:xp_empty:1496991575887315004>";
 
 function buildBar(current, max, length = 10) {
   const pct    = Math.min(current / max, 1);
@@ -38,7 +38,7 @@ function buildEmbed(user, qi, dantian) {
   } else if (qi >= maxQi) {
     qiStatus = `✅ Full — ready to roll!`;
   } else {
-    qiStatus = `<:Qi:1495523502961459200> ${qi} / ${maxQi}`;
+    qiStatus = `<:Qi:1496984846566818022> ${qi} / ${maxQi}`;
   }
 
   const dantianPct    = Math.round((dantian / maxDantian) * 100);
@@ -56,7 +56,7 @@ function buildEmbed(user, qi, dantian) {
     )
     .addFields(
       {
-        name: "<:Qi:1495523502961459200> Qi",
+        name: "<:Qi:1496984846566818022> Qi",
         value: [
           buildBar(qi, maxQi),
           `**${qi} / ${maxQi}** *(${qiPct}%)*`,
@@ -80,7 +80,7 @@ function buildRow(canRefill) {
     new ButtonBuilder()
       .setCustomId("dantian_refill")
       .setLabel("Refill Qi")
-      .setEmoji("<:Qi:1495523502961459200>")
+      .setEmoji("<:Qi:1496984846566818022>")
       .setStyle(ButtonStyle.Primary)
       .setDisabled(!canRefill),
   );

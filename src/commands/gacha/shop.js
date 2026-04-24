@@ -11,8 +11,8 @@ const { drawCard } = require("../../services/gacha");
 const { dantianMax } = require("../../services/mana");
 
 const NYAN   = "<:Nyan:1495048966528831508>";
-const JADE   = "<:Jade:1495038405866688703>";
-const QI     = "<:Qi:1495523502961459200>";
+const JADE   = "<:Jade:1496624534139179009>";
+const QI     = "<:Qi:1496984846566818022>";
 const DANTIAN = "<:Dantian:1495528597610303608>";
 const PERMA  = "<:perma_ticket:1494344593863344258>";
 

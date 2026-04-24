@@ -172,7 +172,7 @@ function startManaNotificationChecker() {
           if (qiIsNowFull && !qiWasFull && user.notifications?.qiFull) {
             try {
               const du = await client.users.fetch(user.userId);
-              await du.send(`<:Qi:1495523502961459200> **Your Qi is full!** (${maxQi}/${maxQi})\nUse \`/roll\` to spend it.`);
+              await du.send(`<:Qi:1496984846566818022> **Your Qi is full!** (${maxQi}/${maxQi})\nUse \`/roll\` to spend it.`);
             } catch {}
           }
 

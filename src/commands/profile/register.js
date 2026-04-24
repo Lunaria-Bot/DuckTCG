@@ -6,15 +6,15 @@ const User = require("../../models/User");
 const { qiMax, dantianMax } = require("../../services/mana");
 
 const NYAN   = "<:Nyan:1495048966528831508>";
-const JADE   = "<:Jade:1495038405866688703>";
+const JADE   = "<:Jade:1496624534139179009>";
 const PERMA  = "<:perma_ticket:1494344593863344258>";
 const PICKUP = "<:pickup_ticket:1494344547046523091>";
-const QI     = "<:Qi:1495523502961459200>";
+const QI     = "<:Qi:1496984846566818022>";
 const DAN    = "<:Dantian:1495528597610303608>";
 const EX     = "<:Exceptional:1496532355719102656>";
 const SP     = "<:Special:1496599588902273187>";
 const RARE   = "<:Rare:1496204151447748811>";
-const COM    = "<:Common:1495730171301462186>";
+const COM    = "<:Common:1496973383143788716>";
 
 const WELCOME_GOLD    = 1000;
 const WELCOME_TICKETS = 10;

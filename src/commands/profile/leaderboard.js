@@ -6,7 +6,7 @@ const { requireProfile } = require("../../utils/requireProfile");
 const User = require("../../models/User");
 
 const NYAN   = "<:Nyan:1495048966528831508>";
-const JADE   = "<:Jade:1495038405866688703>";
+const JADE   = "<:Jade:1496624534139179009>";
 const EXP    = "<:exp:1495018483233067078>";
 
 const CATEGORIES = {

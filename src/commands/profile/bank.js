@@ -37,7 +37,7 @@ module.exports = {
           name: "Currency",
           value: [
             `${NYAN} **${user.currency.gold.toLocaleString()}** Nyang`,
-            `<:Jade:1495038405866688703> **${user.currency.premiumCurrency.toLocaleString()}** Jade`,
+            `<:Jade:1496624534139179009> **${user.currency.premiumCurrency.toLocaleString()}** Jade`,
           ].join("\n"),
           inline: true,
         },
