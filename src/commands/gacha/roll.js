@@ -218,7 +218,7 @@ async function rollLoop(interaction, userId, useFollowUp = false) {
         // Edit embed to show fled — keep image
         const fled = EmbedBuilder.from(revealEmbed)
           .setTitle(`💨 ${RARITY_EMOJI[rarity] ?? ""} **${card.name}** — Fled`)
-          .setDescription(`**${card.name}** — *${card.anime}* — **${RARITY_LABEL[rarity]}**\n\nYou fled — the card vanished.`)
+          .setDescription(`**${card.name}** — *${card.anime}*\n\nYou fled — the card vanished.`)
           .setColor(0x6b7280)
           .setFooter({ text: `Qi: ${qiNow} / ${maxQi}` })
           .spliceFields(0, 25); // remove level up field if present
@@ -262,9 +262,9 @@ async function rollLoop(interaction, userId, useFollowUp = false) {
         const capturedEmbed = EmbedBuilder.from(revealEmbed)
           .setTitle(`${TALISMAN_EMOJI[talTier]} Captured! ${RARITY_EMOJI[rarity] ?? ""} **${card.name}**`)
           .setDescription(
-            `**${card.name}** — *${card.anime}* — **${RARITY_LABEL[rarity]}**\n\n` +
+            `**${card.name}** — *${card.anime}*\n\n` +
             `✅ Added to your collection!\n` +
-            `${NYAN_EMO} **+${nyang.toLocaleString()} Nyang**  ·  ⚔️ **+${pts} faction pt${pts !== 1 ? "s" : ""}**`
+            `${NYAN_EMO} **+${nyang.toLocaleString()} Nyang**  ·  **+${pts} pts**`
           )
           .setColor(0x22c55e)
           .setFooter({ text: `Qi: ${qiNow} / ${maxQi}` })
@@ -284,7 +284,7 @@ async function rollLoop(interaction, userId, useFollowUp = false) {
         const escapedEmbed = EmbedBuilder.from(revealEmbed)
           .setTitle(`💨 ${RARITY_EMOJI[rarity] ?? ""} **${card.name}** — Escaped!`)
           .setDescription(
-            `**${card.name}** — *${card.anime}* — **${RARITY_LABEL[rarity]}**\n\n` +
+            `**${card.name}** — *${card.anime}*\n\n` +
             `❌ Capture failed — the card vanished.`
           )
           .setColor(0xef4444)
@@ -309,7 +309,7 @@ async function rollLoop(interaction, userId, useFollowUp = false) {
       const qiNow = regenQi(await User.findOne({ userId })) ?? newQi;
       const timedOut = EmbedBuilder.from(revealEmbed)
         .setTitle(`⏰ ${RARITY_EMOJI[rarity] ?? ""} **${card.name}** — Timed out`)
-        .setDescription(`**${card.name}** — *${card.anime}* — **${RARITY_LABEL[rarity]}**\n\nTook too long — the card vanished.`)
+        .setDescription(`**${card.name}** — *${card.anime}*\n\nTook too long — the card vanished.`)
         .setColor(0x6b7280)
         .setFooter({ text: `Qi: ${qiNow} / ${maxQi}` })
         .spliceFields(0, 25);

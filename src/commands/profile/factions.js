@@ -151,7 +151,7 @@ module.exports = {
           (embed.data.description || "")
         );
       } else if (view === "opponent") {
-        embed = await buildLeaderboardEmbed(opponentKey(user.faction), `${opp.emoji} ${opp.label}`);
+        embed = await buildLeaderboardEmbed(opponentKey(user.faction), `${opp.label}`);
       } else if (view === "overall") {
         embed = await buildOverallEmbed();
       } else if (view === "rewards") {
