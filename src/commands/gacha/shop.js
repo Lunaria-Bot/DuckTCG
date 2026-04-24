@@ -56,6 +56,74 @@ const NYANG_ITEMS = [
     },
   },
   {
+    id: "talisman_common",
+    name: "Common Talisman ×5",
+    desc: "70% on Common · 50% on Rare · 40% on Special",
+    price: 2000,
+    currency: "gold",
+    emoji: "📜",
+    limit: "unlimited",
+    buy: async (user) => {
+      const cost = applyDiscount(2000, user.isPremium);
+      if ((user.currency?.gold ?? 0) < cost) return { error: `Not enough Nyang.` };
+      await User.findOneAndUpdate({ userId: user.userId }, {
+        $inc: { "currency.gold": -cost, "items.talismanCommon": 5 },
+      });
+      return { msg: `📜 You received **5× Common Talisman**!` };
+    },
+  },
+  {
+    id: "talisman_uncommon",
+    name: "Uncommon Talisman ×3",
+    desc: "80% on Common · 60% on Rare · 60% on Special",
+    price: 6000,
+    currency: "gold",
+    emoji: "📋",
+    limit: "unlimited",
+    buy: async (user) => {
+      const cost = applyDiscount(6000, user.isPremium);
+      if ((user.currency?.gold ?? 0) < cost) return { error: `Not enough Nyang.` };
+      await User.findOneAndUpdate({ userId: user.userId }, {
+        $inc: { "currency.gold": -cost, "items.talismanUncommon": 3 },
+      });
+      return { msg: `📋 You received **3× Uncommon Talisman**!` };
+    },
+  },
+  {
+    id: "talisman_divine",
+    name: "Divine Talisman ×1",
+    desc: "95% on Common · 90% on Rare · 80% on Special",
+    price: 20000,
+    currency: "gold",
+    emoji: "✴️",
+    limit: "unlimited",
+    buy: async (user) => {
+      const cost = applyDiscount(20000, user.isPremium);
+      if ((user.currency?.gold ?? 0) < cost) return { error: `Not enough Nyang.` };
+      await User.findOneAndUpdate({ userId: user.userId }, {
+        $inc: { "currency.gold": -cost, "items.talismanDivine": 1 },
+      });
+      return { msg: `✴️ You received **1× Divine Talisman**!` };
+    },
+  },
+  {
+    id: "talisman_exceptional",
+    name: "Exceptional Talisman x1",
+    desc: "100% capture on ANY rarity card",
+    price: 200000,
+    currency: "gold",
+    emoji: "🌟",
+    limit: "unlimited",
+    buy: async (user) => {
+      const cost = applyDiscount(200000, user.isPremium);
+      if ((user.currency?.gold ?? 0) < cost) return { error: `Not enough Nyang. You need ${cost.toLocaleString()} Nyang.` };
+      await User.findOneAndUpdate({ userId: user.userId }, {
+        $inc: { "currency.gold": -cost, "items.talismanExceptional": 1 },
+      });
+      return { msg: "🌟 You received **1x Exceptional Talisman**! 100% capture guaranteed." };
+    },
+  },
+  {
     id: "faction_pass",
     name: "Faction Pass",
     desc: "Monthly pass allowing you to change your Faction (feature coming soon). One per month.",

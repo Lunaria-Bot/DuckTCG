@@ -1,31 +1,43 @@
 /**
  * Mana system — Qi (inner) + Dantian (stored)
  *
- * Qi:      Lv1=10, +1.25/level, cap at Lv25=40
- *          Passive regen: fills completely in 1h30 (QI_REGEN_MS)
- *          Regen starts immediately when not full — no waiting needed
- * Dantian: Lv1=40, Lv25=100 (linear scale), always 8h to full
+ * Qi:      Lv1=250, scales to Lv25=3500 max (never scales beyond Lv25)
+ *          Each roll costs 25 Qi
+ *          Passive regen: fills completely in 2h from 0
+ *          Regen starts immediately when not full
+ * Dantian: Fixed 3500 — stores Qi overflow, never scales
+ *          Always 8h to fill from 0 to full
  * /refill: instant transfer Dantian → Qi (bypass passive regen)
  */
 
-const QI_BASE         = 10;
-const QI_PER_LEVEL    = 1.25;
+const QI_LV1          = 250;
+const QI_LV25         = 3500;
 const QI_MAX_LEVEL    = 25;
+const QI_PER_ROLL     = 25;
 
-const DANTIAN_LV1     = 40;
-const DANTIAN_LV25    = 100;
-const DANTIAN_FILL_MS = 8 * 60 * 60 * 1000;   // 8h
-const QI_REGEN_MS     = 90 * 60 * 1000;        // 1h30 to fill from 0 to max
+const DANTIAN_MAX     = 3500;          // fixed, never scales
+const DANTIAN_FILL_MS = 8 * 60 * 60 * 1000;   // 8h to full
+
+const QI_REGEN_MS     = 2 * 60 * 60 * 1000;   // 2h to fill from 0 to max
 const QI_COOLDOWN_MS  = QI_REGEN_MS;           // kept for compatibility
 
 function qiMax(level) {
-  const lv = Math.min(level, QI_MAX_LEVEL);
-  return Math.round(QI_BASE + (lv - 1) * QI_PER_LEVEL);
+  const lv = Math.min(Math.max(level, 1), QI_MAX_LEVEL);
+  if (lv >= QI_MAX_LEVEL) return QI_LV25;
+  // Linear scale: Lv1=250, Lv25=3500
+  const t = (lv - 1) / (QI_MAX_LEVEL - 1);
+  return Math.round(QI_LV1 + t * (QI_LV25 - QI_LV1));
 }
 
 function dantianMax(level) {
-  const t = (Math.min(level, QI_MAX_LEVEL) - 1) / (QI_MAX_LEVEL - 1);
-  return Math.round(DANTIAN_LV1 + t * (DANTIAN_LV25 - DANTIAN_LV1));
+  return DANTIAN_MAX; // always fixed
+}
+
+/**
+ * How many rolls can the player afford right now.
+ */
+function rollsAvailable(currentQi) {
+  return Math.floor(currentQi / QI_PER_ROLL);
 }
 
 /**
@@ -37,55 +49,47 @@ function regenDantian(user) {
     ? new Date(user.mana.lastDantianUpdate).getTime()
     : now;
   const elapsed    = now - lastUpdate;
-  const maxDantian = dantianMax(user.accountLevel);
-  const regenRate  = maxDantian / DANTIAN_FILL_MS;
+  const regenRate  = DANTIAN_MAX / DANTIAN_FILL_MS;
   const gained     = elapsed * regenRate;
-  const current    = Math.min((user.mana?.dantian ?? maxDantian) + gained, maxDantian);
+  const current    = Math.min((user.mana?.dantian ?? DANTIAN_MAX) + gained, DANTIAN_MAX);
   return Math.floor(current);
 }
 
 /**
  * Apply passive Qi regen since last update.
- * Qi regenerates from lastQiUpdate at a rate of qiMax / QI_REGEN_MS.
+ * Qi regenerates at qiMax / QI_REGEN_MS per ms.
  */
 function regenQi(user) {
-  const now        = Date.now();
-  const maxQi      = qiMax(user.accountLevel);
-  const storedQi   = user.mana?.qi ?? maxQi;
+  const now     = Date.now();
+  const maxQi   = qiMax(user.accountLevel);
+  const stored  = user.mana?.qi ?? maxQi;
 
-  // If already full, skip
-  if (storedQi >= maxQi) return maxQi;
+  if (stored >= maxQi) return maxQi;
 
   const lastUpdate = user.mana?.lastQiUpdate
     ? new Date(user.mana.lastQiUpdate).getTime()
     : now;
 
-  const elapsed  = now - lastUpdate;
-  const regenRate = maxQi / QI_REGEN_MS; // units per ms
-  const gained   = elapsed * regenRate;
-  return Math.min(Math.floor(storedQi + gained), maxQi);
+  const elapsed   = now - lastUpdate;
+  const regenRate = maxQi / QI_REGEN_MS;
+  return Math.min(Math.floor(stored + elapsed * regenRate), maxQi);
 }
 
 /**
- * Returns seconds until Qi is full based on passive regen.
+ * Returns seconds until Qi is full.
  */
 function qiRegenRemaining(user) {
-  const maxQi    = qiMax(user.accountLevel);
-  const current  = regenQi(user);
+  const maxQi   = qiMax(user.accountLevel);
+  const current = regenQi(user);
   if (current >= maxQi) return 0;
-  const missing  = maxQi - current;
+  const missing   = maxQi - current;
   const regenRate = maxQi / QI_REGEN_MS;
   return Math.ceil(missing / regenRate / 1000);
 }
 
-// Legacy helpers kept for compatibility
-function isQiReady(user) {
-  return regenQi(user) >= qiMax(user.accountLevel);
-}
-
-function qiCooldownRemaining(user) {
-  return qiRegenRemaining(user);
-}
+// Legacy helpers
+function isQiReady(user) { return regenQi(user) >= qiMax(user.accountLevel); }
+function qiCooldownRemaining(user) { return qiRegenRemaining(user); }
 
 function formatCooldown(seconds) {
   if (seconds <= 0) return "Ready";
@@ -98,15 +102,8 @@ function formatCooldown(seconds) {
 }
 
 module.exports = {
-  qiMax,
-  dantianMax,
-  regenDantian,
-  regenQi,
-  qiRegenRemaining,
-  isQiReady,
-  qiCooldownRemaining,
-  formatCooldown,
-  QI_COOLDOWN_MS,
-  QI_REGEN_MS,
-  DANTIAN_FILL_MS,
+  qiMax, dantianMax, rollsAvailable,
+  regenDantian, regenQi, qiRegenRemaining,
+  isQiReady, qiCooldownRemaining, formatCooldown,
+  QI_PER_ROLL, QI_COOLDOWN_MS, QI_REGEN_MS, DANTIAN_FILL_MS,
 };

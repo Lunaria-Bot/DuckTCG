@@ -47,10 +47,26 @@ const UserSchema = new Schema({
 
   // ── Items inventory ───────────────────────────────────────────────────────
   items: {
-    lesserQiPill:  { type: Number, default: 0 },    // recharges Dantian to full
-    gearBox:       { type: Number, default: 0 },    // random gear reward
-    petTreatBox:   { type: Number, default: 0 },    // pet treat reward
-    specialCardBox:{ type: Number, default: 0 },    // roll special-rarity card
+    // Talismans (used to capture rolled cards)
+    talismanCommon:    { type: Number, default: 0 },  // Common talisman
+    talismanUncommon:  { type: Number, default: 0 },  // Uncommon talisman
+    talismanDivine:    { type: Number, default: 0 },  // Divine talisman
+    talismanExceptional: { type: Number, default: 0 },// Exceptional talisman
+    lesserQiPill:    { type: Number, default: 0 },  // recharges Dantian to full
+    qiPill:          { type: Number, default: 0 },  // restores 600 Qi (can overflow)
+    greaterQiPill:   { type: Number, default: 0 },  // restores 3000 Qi (can overflow)
+    divineQiPill:    { type: Number, default: 0 },  // 10min free rolls, no multi-roll
+    demonicQiPill:   { type: Number, default: 0 },  // 10min free rolls + SP boost + rip chance
+    fenghuangBlessing: { type: Number, default: 0 },// refreshes Dantian cooldown once
+    gearBox:         { type: Number, default: 0 },  // random gear reward
+    petTreatBox:     { type: Number, default: 0 },  // pet treat reward
+    specialCardBox:  { type: Number, default: 0 },  // roll special-rarity card
+  },
+
+  // ── Active effects ────────────────────────────────────────────────────────
+  activeEffect: {
+    type:      { type: String, enum: ["divine_qi", "demonic_qi", null], default: null },
+    expiresAt: { type: Date, default: null },
   },
 
   // ── Shop limits ───────────────────────────────────────────────────────────
