@@ -129,15 +129,19 @@ module.exports = {
   },
 };
 
-async function rollLoop(interaction, userId) {
+async function rollLoop(interaction, userId, useFollowUp = false) {
   const user           = await User.findOne({ userId });
   const currentQi      = regenQi(user);
   const maxQi          = qiMax(user.accountLevel);
   const currentDantian = regenDantian(user);
 
+  const reply = useFollowUp
+    ? (data) => interaction.followUp(data)
+    : (data) => interaction.editReply(data);
+
   if (currentQi < QI_PER_ROLL) {
     const secs = qiRegenRemaining(user);
-    return interaction.editReply({
+    return reply({
       embeds: [new EmbedBuilder()
         .setTitle(`${QI_EMO} Not enough Qi`)
         .setDescription([
@@ -152,7 +156,7 @@ async function rollLoop(interaction, userId) {
   }
 
   const peeked = await peekCard();
-  if (!peeked) return interaction.editReply({ content: "No cards available right now.", components: [] });
+  if (!peeked) return reply({ content: "No cards available right now.", components: [] });
   const { card, rarity } = peeked;
 
   // Deduct Qi
@@ -199,7 +203,7 @@ async function rollLoop(interaction, userId) {
     ? [buildTalismanRow(freshUser2, rarity), skipRow]
     : [skipRow];
 
-  const msg = await interaction.editReply({ embeds: [revealEmbed], components });
+  const msg = await reply({ embeds: [revealEmbed], components });
 
   const collector = msg.createMessageComponentCollector({
     filter: i => i.user.id === userId,
@@ -224,14 +228,15 @@ async function rollLoop(interaction, userId) {
           )
           .setColor(0x6b7280)
           .spliceFields(0, 25); // remove level up field if present
-        await interaction.editReply({ embeds: [fled], components: [buildRollAgainRow(qiNow)] });
+        await msg.edit({ embeds: [fled], components: [buildRollAgainRow(qiNow)] });
 
         // Await chain roll
         try {
           const again = await msg.awaitMessageComponent({ filter: ii => ii.user.id === userId && ii.customId === "roll_chain", time: 30_000 });
           await again.deferUpdate();
-          await rollLoop(interaction, userId);
-        } catch { await interaction.editReply({ components: [] }).catch(() => {}); }
+          await msg.edit({ components: [] }).catch(() => {});
+          await rollLoop(interaction, userId, true);
+        } catch { await msg.edit({ components: [] }).catch(() => {}); }
         return;
       }
 
@@ -271,13 +276,14 @@ async function rollLoop(interaction, userId) {
           .setColor(0x22c55e)
           .spliceFields(0, 25);
 
-        await interaction.editReply({ embeds: [capturedEmbed], components: [buildRollAgainRow(qiNow)] });
+        await msg.edit({ embeds: [capturedEmbed], components: [buildRollAgainRow(qiNow)] });
 
         try {
           const again = await msg.awaitMessageComponent({ filter: ii => ii.user.id === userId && ii.customId === "roll_chain", time: 30_000 });
           await again.deferUpdate();
-          await rollLoop(interaction, userId);
-        } catch { await interaction.editReply({ components: [] }).catch(() => {}); }
+          await msg.edit({ components: [] }).catch(() => {});
+          await rollLoop(interaction, userId, true);
+        } catch { await msg.edit({ components: [] }).catch(() => {}); }
 
       } else {
         // ── Failed — keep image, show escape. No chain roll. ─────────────
@@ -291,13 +297,14 @@ async function rollLoop(interaction, userId) {
           .setColor(0xef4444)
           .spliceFields(0, 25);
 
-        await interaction.editReply({ embeds: [escapedEmbed], components: [buildRollAgainRow(qiNow)] });
+        await msg.edit({ embeds: [escapedEmbed], components: [buildRollAgainRow(qiNow)] });
 
         try {
           const again = await msg.awaitMessageComponent({ filter: ii => ii.user.id === userId && ii.customId === "roll_chain", time: 30_000 });
           await again.deferUpdate();
-          await rollLoop(interaction, userId);
-        } catch { await interaction.editReply({ components: [] }).catch(() => {}); }
+          await msg.edit({ components: [] }).catch(() => {});
+          await rollLoop(interaction, userId, true);
+        } catch { await msg.edit({ components: [] }).catch(() => {}); }
       }
 
     } catch (err) { console.error("[roll]", err); }
@@ -315,7 +322,7 @@ async function rollLoop(interaction, userId) {
         )
         .setColor(0x6b7280)
         .spliceFields(0, 25);
-      await interaction.editReply({ embeds: [timedOut], components: [] }).catch(() => {});
+      await msg.edit({ embeds: [timedOut], components: [] }).catch(() => {});
     }
   });
 }

@@ -72,7 +72,7 @@ module.exports = {
     const self = await requireProfile(interaction);
     if (!self) return;
 
-    let category = "ps";
+    let category = "cp";
 
     async function getData() {
       const cat     = CATEGORIES[category];
