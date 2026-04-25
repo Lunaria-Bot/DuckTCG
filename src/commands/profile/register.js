@@ -16,200 +16,186 @@ const SP     = "<:Special:1496599588902273187>";
 const RARE   = "<:Rare:1496204151447748811>";
 const COM    = "<:Common:1496973383143788716>";
 
-const WELCOME_GOLD    = 1000;
-const WELCOME_TICKETS = 10;
+const WELCOME_GOLD    = 200000;
+const WELCOME_TICKETS = 0;
 
 // ─── Tutorial pages ───────────────────────────────────────────────────────────
 const TUTORIAL = [
+  // ── Page 1 — Welcome ───────────────────────────────────────────────────────
   {
-    title: "👋 Welcome to Seorin TCG!",
-    color: 0x7c3aed,
-    description: "You've just joined an **Anime Gacha RPG** experience.\nHere's a quick guide to get you started — use the buttons below to navigate.",
+    title: "🌸 Welcome to SeorinTCG!",
+    color: 0x8b5cf6,
+    description: "An **anime card collecting RPG** — roll for cards, build your collection, and compete for the top of the leaderboard!",
     fields: [
       {
-        name: "Your Welcome Rewards",
+        name: "🎁 Your Starter Pack",
         value: [
-          `${PERMA} **${WELCOME_TICKETS} Regular Tickets** — for your first pulls`,
-          `${NYAN} **${WELCOME_GOLD.toLocaleString()} Nyang** — the main currency`,
+          `${NYAN} **200,000 Nyang** — the main currency`,
+          `📜 **50× Common Talisman** — to capture cards`,
+          `📋 **20× Uncommon Talisman** — better capture rates`,
+          `🌟 **1× Exceptional Talisman** — 100% capture guaranteed`,
         ].join("\n"),
       },
       {
         name: "What you'll learn",
-        value: "① Mana System  ·  ② Rolling  ·  ③ Banners  ·  ④ Daily & Quests  ·  ⑤ Shop  ·  ⑥ Inventory",
+        value: "① Qi & Dantian  ·  ② Rolling & Capture  ·  ③ Talismans  ·  ④ Factions  ·  ⑤ Daily & Quests  ·  ⑥ Shop & Bag",
       },
     ],
-    footer: "Page 1 / 7  ·  Use ▶ to continue",
+    footer: "Page 1 / 6  ·  Use ▶ to continue",
   },
+  // ── Page 2 — Qi & Dantian ──────────────────────────────────────────────────
   {
-    title: `${QI} Mana System — Qi & Dantian`,
+    title: `${QI} Energy System — Qi & Dantian`,
     color: 0x6d28d9,
-    description: "Your energy system works in two layers:",
+    description: "Your energy powers every roll. Manage it wisely.",
     fields: [
       {
-        name: `${QI} Qi — Inner Energy`,
-        value: "Used directly for `/roll`. Starts at **10** and scales with your level up to **40** at Lv25.\nRegenerates passively in **1h30** from 0 to full.",
+        name: `${QI} Qi — Roll Energy`,
+        value: [
+          "Each **`/roll`** costs **25 Qi**.",
+          "Starts at **250 Qi** at Level 1, scales to **3,500 Qi** at Level 25.",
+          "Regenerates fully in **2 hours** from 0.",
+        ].join("\n"),
         inline: false,
       },
       {
-        name: `${DAN} Dantian — Stored Energy`,
-        value: "A reservoir that refills over **8 hours**. Use `/refill` to instantly transfer Dantian → Qi.\nBuy **Lesser Qi Pills** in the shop to restore 1/4 Dantian on demand.",
+        name: `${DAN} Dantian — Energy Reserve`,
+        value: [
+          "Fixed reserve of **3,500** — never scales.",
+          "Fills passively in **8 hours**.",
+          "Use **`/refill`** to instantly pour Dantian into Qi.",
+          "Buy **Lesser Qi Pills** in the shop to restore Dantian on demand.",
+        ].join("\n"),
         inline: false,
       },
       {
         name: "Commands",
-        value: "`/dantian` — check your Qi & Dantian\n`/refill` — transfer Dantian to Qi\n`/settings` — enable notifications when full",
+        value: "`/dantian` — check Qi & Dantian  ·  `/refill` — transfer Dantian → Qi  ·  `/settings` — notifications",
         inline: false,
       },
     ],
-    footer: "Page 2 / 7",
+    footer: "Page 2 / 6",
   },
+  // ── Page 3 — Rolling & Capture ─────────────────────────────────────────────
   {
-    title: `${COM} Rolling Cards`,
+    title: `${COM} Rolling & Capture System`,
     color: 0x2563eb,
-    description: "Spend Qi to roll for random cards from the card pool.",
+    description: "Roll to reveal a card — then capture it with a Talisman!",
     fields: [
       {
-        name: "How to Roll",
+        name: "How It Works",
         value: [
-          "`/roll` — roll 1 to 5 cards (costs 1 Qi each)",
-          "After each roll, **Roll ×1** and **Roll ×5** buttons appear for quick re-rolls",
+          "**1.** `/roll` costs **25 Qi** — a card is revealed with its image.",
+          "**2.** Select a **Talisman** to attempt capture.",
+          "**3.** ✅ Captured → card + Nyang earned  |  ❌ Escaped → card vanishes.",
+          "After each result, a **Roll Again** button lets you keep rolling.",
         ].join("\n"),
         inline: false,
       },
       {
-        name: "Rarity Chances",
-        value: [
-          `${EX} Exceptional — **0.5%**`,
-          `${SP} Special — **2.5%**`,
-          `${RARE} Rare — **2%**`,
-          `${COM} Common — **95%**`,
-        ].join("\n"),
-        inline: true,
+        name: "Drop Rates",
+        value: `${COM} Common **62.5%**  ·  ${RARE} Rare **30%**  ·  ${SP} Special **7.5%**`,
+        inline: false,
       },
       {
-        name: "Roll Limit Upgrade",
-        value: `Buy **Roll Limit Upgrade** in the ${NYAN} shop to increase your max from **5 → 7** per command.`,
+        name: `${NYAN} Nyang on Capture`,
+        value: "Common **+50**  ·  Rare **+150**  ·  Special **+500**  ·  Exceptional **+1,500**",
         inline: false,
       },
     ],
-    footer: "Page 3 / 7",
+    footer: "Page 3 / 6",
   },
+  // ── Page 4 — Talismans ─────────────────────────────────────────────────────
   {
-    title: `${PERMA} Banners`,
-    color: 0x9c59b6,
-    description: "Banners offer **higher rates** and **featured cards** using tickets or Jade.",
-    fields: [
-      {
-        name: "Banner Types",
-        value: [
-          `${PERMA} **Regular Banner** — use Regular Tickets or ${JADE} 160 Jade per pull`,
-          `${PICKUP} **Pick Up Banner** — limited time, use Pick Up Tickets or ${JADE} 160 Jade`,
-        ].join("\n"),
-        inline: false,
-      },
-      {
-        name: "Pity System",
-        value: "Soft pity starts at **75 pulls** — rates increase progressively.\nHard pity at **90 pulls** guarantees an Exceptional card.",
-        inline: false,
-      },
-      {
-        name: "Commands",
-        value: "`/banners` — browse active banners, pull ×1 or ×10",
-        inline: false,
-      },
-    ],
-    footer: "Page 4 / 7",
-  },
-  {
-    title: "📅 Daily Rewards & Quests",
+    title: "🎯 Talismans — Capture Tool",
     color: 0xf59e0b,
-    description: "Log in every day and complete quests to earn rewards.",
+    description: "You **need a Talisman** to capture a card. Buy them in `/shop`.",
     fields: [
       {
-        name: "Daily Reward",
+        name: "Capture Rates by Talisman",
         value: [
-          "`/daily` — claim your daily reward (Nyang, tickets, Jade)",
-          "Rewards scale over a **28-day cycle** — milestones on Day 7, 14, 21, 28",
-          "Don't miss a day — your streak resets if you skip!",
+          `📜 **Common** (400 ${NYAN}) — Common **70%** · Rare **50%** · Special **40%**`,
+          `📋 **Uncommon** (2,000 ${NYAN}) — Common **80%** · Rare **60%** · Special **60%**`,
+          `✴️ **Divine** (20,000 ${NYAN}) — Common **95%** · Rare **90%** · Special **80%**`,
+          `🌟 **Exceptional** (200,000 ${NYAN}) — **100%** on everything`,
         ].join("\n"),
         inline: false,
       },
       {
-        name: "Quests",
+        name: "💡 Important",
         value: [
-          "`/quests` — view and claim your daily & weekly quests",
-          "**3 daily** quests reset every day at midnight UTC",
-          "**3 weekly** quests reset every Monday",
-          "Complete them for bonus Nyang, tickets and XP",
+          "Fleeing is **free** — no talisman wasted.",
+          "A **failed** capture consumes the talisman.",
+          "You can chain rolls — a **Roll Again** button appears after every result.",
         ].join("\n"),
         inline: false,
       },
     ],
-    footer: "Page 5 / 7",
+    footer: "Page 4 / 6",
   },
+  // ── Page 5 — Factions, Daily & Quests ─────────────────────────────────────
   {
-    title: `${NYAN} Shop`,
-    color: 0xf59e0b,
-    description: "Spend your Nyang and Jade on useful items.",
+    title: "⚔️ Factions · Daily · Quests",
+    color: 0xef4444,
+    description: "Join a faction, earn daily rewards, and complete missions.",
     fields: [
       {
-        name: `${NYAN} Nyang Items`,
+        name: "⚔️ Factions",
         value: [
-          `**Roll Limit Upgrade** — 50,000 ${NYAN} · permanent +2 max rolls`,
-          `**10× Regular Ticket** — 30,000 ${NYAN}`,
-          `**Faction Pass** — 15,000 ${NYAN} · monthly`,
-          `**Lesser Qi Pill** — 8,000 ${NYAN} · restores 1/4 Dantian · 2×/week`,
+          "<:DemonicSect:1497265894550671372> **Heavenly Demon Cult** vs <:OrthodoxSect:1497266218749530132> **Orthodox Sect**",
+          "Every capture earns **faction points** — fight for the leaderboard!",
+          "Top 10 players of each faction earn rewards every **3 months**.",
+          "Switch faction with a **Faction Pass** (15,000 Nyang/month). Switching **resets your points**.",
         ].join("\n"),
         inline: false,
       },
       {
-        name: `${JADE} Jade Items`,
+        name: "📅 Daily & Quests",
         value: [
-          `**Premium** — 200 ${JADE} · 30 days of perks`,
-          `**Special Card Box** — 150 ${JADE} · guaranteed Special card`,
-          `**Gear Box** — 50 ${JADE}`,
-          `**Pet Treat Box** — 30 ${JADE}`,
+          "`/daily` — claim daily rewards on a **28-day cycle** (Nyang, Jade, tickets)",
+          "`/quests` — **3 daily** + **3 weekly** missions for bonus rewards",
+          "Missing a day resets your streak!",
         ].join("\n"),
-        inline: false,
-      },
-      {
-        name: "Commands",
-        value: "`/shop` — open the shop\n`/use pill` — use a Lesser Qi Pill",
         inline: false,
       },
     ],
-    footer: "Page 6 / 7",
+    footer: "Page 5 / 6",
   },
+  // ── Page 6 — Shop, Bag & Collection ───────────────────────────────────────
   {
-    title: "🃏 Your Card Collection",
+    title: `${NYAN} Shop · Bag · Collection`,
     color: 0x059669,
-    description: "Manage and explore your cards.",
+    description: "Spend wisely, track your items, and grow your collection.",
     fields: [
       {
-        name: "Key Commands",
+        name: `${NYAN} Shop`,
         value: [
-          "`/inventory` — browse your owned cards, sort by rarity/level/anime",
-          "`/collection` — visual album showing owned vs missing cards",
-          "`/card` — browse all available cards with filters",
-          "`/burn` — destroy duplicate cards for Nyang",
+          `📜 Talismans  ·  ⬆️ Roll Upgrade (50k${NYAN})  ·  🎫 Faction Pass (15k${NYAN})  ·  ${DAN} Qi Pills`,
+          `${JADE} Jade: 💎 Premium · Special Card Box · Gear Box`,
+          "Select any item → type quantity → done!",
         ].join("\n"),
         inline: false,
       },
       {
-        name: "Leveling Cards",
-        value: "Cards gain XP through `/adventure` and `/raid`.\nMax level is **100** (125 after Ascension at Lv100).\nHigher level = higher Power Score.",
+        name: "🎒 Your Bag & Cards",
+        value: [
+          "`/bag` — view all items, talismans and currency",
+          "`/inventory` — browse your cards with filters",
+          "`/collection` — visual album: owned vs missing",
+          "`/card` — browse all cards in the game",
+          "`/burn` — destroy duplicates for Nyang",
+        ].join("\n"),
         inline: false,
       },
       {
-        name: "You're ready! 🎉",
-        value: `Start with \`/daily\` then \`/roll\` to get your first cards!\nUse \`/help\` anytime to see all commands.`,
+        name: "📊 More Commands",
+        value: "`/profile` — view & edit your profile  ·  `/factions` — faction rankings  ·  `/leaderboard` — top players",
         inline: false,
       },
     ],
-    footer: "Page 7 / 7  ·  Good luck, Summoner!",
+    footer: "Page 6 / 6  ·  Press ✅ Done to finish and choose your Faction!",
   },
 ];
-
 function buildPage(page) {
   const t = TUTORIAL[page];
   const embed = new EmbedBuilder()
@@ -276,7 +262,8 @@ module.exports = {
       userId: interaction.user.id,
       username,
       mana: { qi: qiMax(1), dantian: dantianMax(1), qiCooldownUntil: null, lastDantianUpdate: new Date(), lastQiUpdate: new Date() },
-      currency: { gold: WELCOME_GOLD, premiumCurrency: 0, pickupTickets: 0, regularTickets: WELCOME_TICKETS },
+      currency: { gold: WELCOME_GOLD, premiumCurrency: 0, pickupTickets: 0, regularTickets: 0 },
+      items: { talismanCommon: 50, talismanUncommon: 20, talismanExceptional: 1 },
       stats: { totalGoldEverEarned: WELCOME_GOLD },
       firstJoinDate: new Date(),
       lastLoginDate: new Date(),
@@ -354,7 +341,7 @@ module.exports = {
               .setDescription(`Welcome, **${username}**!\n\nYou have joined the **${factionLabel}**.\nFight for glory and climb the faction leaderboard!\n\nStart with \`/daily\` then \`/roll\` to get your first cards!`)
               .setColor(chosenFaction === "heavenly_demon" ? 0xef4444 : 0x3b82f6)
               .setThumbnail(interaction.user.displayAvatarURL())
-              .addFields({ name: "Your Rewards", value: `${PERMA} **${WELCOME_TICKETS} Regular Tickets**\n${NYAN} **${WELCOME_GOLD.toLocaleString()} Nyang**` })
+              .addFields({ name: "Your Rewards", value: `${NYAN} **${WELCOME_GOLD.toLocaleString()} Nyang**\n📜 **50× Common Talisman**\n📋 **20× Uncommon Talisman**\n🌟 **1× Exceptional Talisman**` })
               .setFooter({ text: "Use /help anytime to see all commands" })
             ],
             components: [],
