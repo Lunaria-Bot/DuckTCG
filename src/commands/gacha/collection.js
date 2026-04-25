@@ -64,7 +64,7 @@ function buildCollectionHTML(cards, ownedSet, title, subtitle, pageInfo) {
   <!-- Header -->
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid #1e1e2e">
     <div>
-      <div style="font-size:14px;font-weight:700;color:#e0e0f0">📖 ${title}</div>
+      <div style="font-size:14px;font-weight:700;color:#e0e0f0">${title}</div>
       <div style="font-size:10px;color:#6b6b8a;margin-top:2px">${subtitle}</div>
     </div>
     <div style="font-size:10px;color:#6b6b8a;text-align:right">
