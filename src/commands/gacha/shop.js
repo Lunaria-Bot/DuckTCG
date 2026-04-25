@@ -315,10 +315,12 @@ module.exports = {
           user = await User.findOne({ userId: interaction.user.id });
           const result = await item.buy(user, 1);
           user = await User.findOne({ userId: interaction.user.id });
-          const embed = buildShopEmbed(tab, user);
-          if (result.error) embed.setFooter({ text: `❌ ${result.error}` });
-          else embed.setFooter({ text: `✅ ${result.msg.replace(/\*\*/g, "")}` });
-          return interaction.editReply({ embeds: [embed], components: [buildTabRow(tab), buildDropdown(tab)] });
+          if (result.error) {
+            await interaction.followUp({ content: `❌ ${result.error}`, ephemeral: true });
+          } else {
+            await interaction.followUp({ content: `✅ ${result.msg}`, ephemeral: true });
+          }
+          return interaction.editReply({ embeds: [buildShopEmbed(tab, user)], components: [buildTabRow(tab), buildDropdown(tab)] });
         }
 
         // Show quantity modal
@@ -358,10 +360,12 @@ module.exports = {
           user = await User.findOne({ userId: interaction.user.id });
           const result = await item.buy(user, qty);
           user = await User.findOne({ userId: interaction.user.id });
-          const embed = buildShopEmbed(tab, user);
-          if (result.error) embed.setFooter({ text: `❌ ${result.error}` });
-          else embed.setFooter({ text: `✅ ${result.msg.replace(/\*\*/g, "")}` });
-          return interaction.editReply({ embeds: [embed], components: [buildTabRow(tab), buildDropdown(tab)] });
+          if (result.error) {
+            await interaction.followUp({ content: `❌ ${result.error}`, ephemeral: true });
+          } else {
+            await interaction.followUp({ content: `✅ ${result.msg}`, ephemeral: true });
+          }
+          return interaction.editReply({ embeds: [buildShopEmbed(tab, user)], components: [buildTabRow(tab), buildDropdown(tab)] });
 
         } catch {
           // Modal timed out — do nothing
