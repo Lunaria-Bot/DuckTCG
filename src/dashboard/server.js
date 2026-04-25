@@ -2033,6 +2033,7 @@ app.get("/players", auth, adminOnly, async (req, res) => {
             <a href="/players/${p.userId}/give-card" class="btn btn-gray btn-sm">Card</a>
             <a href="/players/${p.userId}/toggle-premium" class="btn ${p.isPremium?"btn-red":"btn-ghost"} btn-sm">${p.isPremium?"Remove 💎":"Set 💎"}</a>
             <a href="/players/${p.userId}/set-faction" class="btn btn-ghost btn-sm">⚔️ Faction</a>
+            <a href="/players/${p.userId}/reset" class="btn btn-red btn-sm">🗑️ Reset</a>
           </td>
         </tr>`).join("")||`<tr><td colspan="8" class="empty-state">No players found</td></tr>`}
         </tbody>
@@ -2087,6 +2088,149 @@ app.post("/players/:id/set-faction", auth, adminOnly, async (req, res) => {
   if (resetPoints === "true") update.factionPoints = 0;
   await User.findOneAndUpdate({ userId: req.params.id }, update);
   await AuditLog.create({ performedBy: req.user.username, role: req.user.role, action: "update", resource: "player", resourceId: req.params.id, description: `Faction set to: ${faction || "none"}${resetPoints==="true"?" (points reset)":""}` });
+  res.redirect("/players");
+});
+
+
+app.get("/players/:id/reset", auth, adminOnly, async (req, res) => {
+  const player = await User.findOne({ userId: req.params.id });
+  if (!player) return res.redirect("/players");
+  res.send(renderPage("Reset Profile", `
+    <a href="/players" class="back-link">Back to Players</a>
+    <div class="form-box" style="max-width:500px;border-color:rgba(239,68,68,0.3)">
+      <h2 style="margin-bottom:4px;color:#fca5a5">⚠️ Reset Player Profile</h2>
+      <p class="text-muted text-sm" style="margin-bottom:20px">Player: <strong>${player.username}</strong> (${player.userId})</p>
+      <div class="alert alert-red" style="margin-bottom:20px">
+        This action is <strong>irreversible</strong>. Choose what to reset below.
+      </div>
+      <form method="POST" action="/players/${player.userId}/reset" style="display:flex;flex-direction:column;gap:0">
+        <div class="form-group">
+          <label style="font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;display:block">Reset Options</label>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <label style="display:flex;align-items:center;gap:10px;cursor:pointer;text-transform:none;font-size:13px;font-weight:400;letter-spacing:0;color:var(--text)">
+              <input type="checkbox" name="currency" value="true" style="width:auto"/> Reset currency (Nyang, Jade, tickets) to 0
+            </label>
+            <label style="display:flex;align-items:center;gap:10px;cursor:pointer;text-transform:none;font-size:13px;font-weight:400;letter-spacing:0;color:var(--text)">
+              <input type="checkbox" name="items" value="true" style="width:auto"/> Reset all items and talismans to 0
+            </label>
+            <label style="display:flex;align-items:center;gap:10px;cursor:pointer;text-transform:none;font-size:13px;font-weight:400;letter-spacing:0;color:var(--text)">
+              <input type="checkbox" name="cards" value="true" style="width:auto"/> Delete all owned cards (PlayerCards)
+            </label>
+            <label style="display:flex;align-items:center;gap:10px;cursor:pointer;text-transform:none;font-size:13px;font-weight:400;letter-spacing:0;color:var(--text)">
+              <input type="checkbox" name="stats" value="true" style="width:auto"/> Reset stats (pulls, raids, XP, level)
+            </label>
+            <label style="display:flex;align-items:center;gap:10px;cursor:pointer;text-transform:none;font-size:13px;font-weight:400;letter-spacing:0;color:var(--text)">
+              <input type="checkbox" name="faction" value="true" style="width:auto"/> Reset faction and faction points
+            </label>
+            <label style="display:flex;align-items:center;gap:10px;cursor:pointer;text-transform:none;font-size:13px;font-weight:400;letter-spacing:0;color:var(--text)">
+              <input type="checkbox" name="fullReset" value="true" style="width:auto"/> <span style="color:#fca5a5;font-weight:700">⚠️ Full reset — delete profile entirely (will need to /register again)</span>
+            </label>
+          </div>
+        </div>
+        <div class="form-group" style="margin-top:8px">
+          <label>Type the player's username to confirm</label>
+          <input name="confirm" placeholder="${player.username}" required/>
+        </div>
+        <div class="form-actions">
+          <button type="submit" class="btn btn-red">Reset</button>
+          <a href="/players" class="btn btn-ghost">Cancel</a>
+        </div>
+      </form>
+    </div>
+  `, req.user, "/players"));
+});
+
+app.post("/players/:id/reset", auth, adminOnly, async (req, res) => {
+  const { confirm, currency, items, cards, stats, faction, fullReset } = req.body;
+  const player = await User.findOne({ userId: req.params.id });
+  if (!player) return res.redirect("/players");
+
+  // Confirmation check
+  if (confirm?.trim() !== player.username) {
+    return res.redirect(`/players/${req.params.id}/reset?error=username_mismatch`);
+  }
+
+  const actions = [];
+
+  if (fullReset === "true") {
+    // Delete all player cards and the user entirely
+    const PlayerCard = require("../models/PlayerCard");
+    await PlayerCard.deleteMany({ userId: req.params.id });
+    await User.deleteOne({ userId: req.params.id });
+    actions.push("full profile deleted");
+    await AuditLog.create({
+      performedBy: req.user.username, role: req.user.role,
+      action: "delete", resource: "player", resourceId: req.params.id,
+      description: `Full profile reset for ${player.username}`,
+    });
+    return res.redirect("/players");
+  }
+
+  const update = {};
+
+  if (currency === "true") {
+    update["currency.gold"] = 0;
+    update["currency.premiumCurrency"] = 0;
+    update["currency.regularTickets"] = 0;
+    update["currency.pickupTickets"] = 0;
+    actions.push("currency");
+  }
+
+  if (items === "true") {
+    update["items.talismanCommon"] = 0;
+    update["items.talismanUncommon"] = 0;
+    update["items.talismanDivine"] = 0;
+    update["items.talismanExceptional"] = 0;
+    update["items.lesserQiPill"] = 0;
+    update["items.qiPill"] = 0;
+    update["items.greaterQiPill"] = 0;
+    update["items.divineQiPill"] = 0;
+    update["items.demonicQiPill"] = 0;
+    update["items.fenghuangBlessing"] = 0;
+    update["items.gearBox"] = 0;
+    update["items.petTreatBox"] = 0;
+    update["items.specialCardBox"] = 0;
+    actions.push("items");
+  }
+
+  if (cards === "true") {
+    const PlayerCard = require("../models/PlayerCard");
+    await PlayerCard.deleteMany({ userId: req.params.id });
+    actions.push("cards deleted");
+  }
+
+  if (stats === "true") {
+    update["accountLevel"] = 1;
+    update["accountExp"] = 0;
+    update["combatPower"] = 0;
+    update["loginStreak"] = 0;
+    update["stats.totalPullsDone"] = 0;
+    update["stats.totalCardsEverObtained"] = 0;
+    update["stats.raidDamageTotal"] = 0;
+    update["mana.qi"] = 250;
+    update["mana.dantian"] = 3500;
+    update["mana.lastQiUpdate"] = new Date();
+    update["mana.lastDantianUpdate"] = new Date();
+    actions.push("stats");
+  }
+
+  if (faction === "true") {
+    update["faction"] = null;
+    update["factionPoints"] = 0;
+    update["factionJoinedAt"] = null;
+    actions.push("faction");
+  }
+
+  if (Object.keys(update).length > 0) {
+    await User.findOneAndUpdate({ userId: req.params.id }, { $set: update });
+  }
+
+  await AuditLog.create({
+    performedBy: req.user.username, role: req.user.role,
+    action: "update", resource: "player", resourceId: req.params.id,
+    description: `Reset for ${player.username}: ${actions.join(", ")}`,
+  });
+
   res.redirect("/players");
 });
 
