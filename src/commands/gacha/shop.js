@@ -1,177 +1,145 @@
 const {
   SlashCommandBuilder, EmbedBuilder,
-  ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType,
+  ActionRowBuilder, ButtonBuilder, ButtonStyle,
   StringSelectMenuBuilder, StringSelectMenuOptionBuilder,
+  ModalBuilder, TextInputBuilder, TextInputStyle,
 } = require("discord.js");
 const { requireProfile } = require("../../utils/requireProfile");
-const User = require("../../models/User");
-const Card = require("../../models/Card");
+const User       = require("../../models/User");
+const Card       = require("../../models/Card");
 const PlayerCard = require("../../models/PlayerCard");
-const { drawCard } = require("../../services/gacha");
-const { dantianMax } = require("../../services/mana");
 
-const NYAN   = "<:Nyan:1495048966528831508>";
-const JADE   = "<:Jade:1496624534139179009>";
-const QI     = "<:Qi:1496984846566818022>";
+const NYAN    = "<:Nyan:1495048966528831508>";
+const JADE    = "<:Jade:1496624534139179009>";
+const QI      = "<:Qi:1496984846566818022>";
 const DANTIAN = "<:Dantian:1495528597610303608>";
-const PERMA  = "<:perma_ticket:1494344593863344258>";
+const PERMA   = "<:perma_ticket:1494344593863344258>";
 
-// ─── Shop items ───────────────────────────────────────────────────────────────
+const PREMIUM_DISCOUNT = 0.075;
+function applyDiscount(price, isPremium) {
+  return isPremium ? Math.floor(price * (1 - PREMIUM_DISCOUNT)) : price;
+}
+
+// ─── Items (unit price × qty, bought per 1) ───────────────────────────────────
 const NYANG_ITEMS = [
   {
     id: "roll_upgrade",
     name: "Roll Limit Upgrade",
-    desc: "Permanently increase your max rolls per command from 5 → 7.",
-    price: 50000,
-    currency: "gold",
-    emoji: QI,
-    limit: "once",
-    buy: async (user) => {
-      if (user.shopLimits?.rollUpgradeBought) return { error: "You already purchased this upgrade." };
-      const cost_ru = applyDiscount(50000, user.isPremium);
-      if ((user.currency?.gold ?? 0) < cost_ru) return { error: `Not enough ${NYAN} Nyang.` };
-      await User.findOneAndUpdate({ userId: user.userId }, {
-        rollLimit: 7,
-        "shopLimits.rollUpgradeBought": true,
-        $inc: { "currency.gold": -cost_ru },
-      });
-      return { msg: `${QI} Your roll limit has been permanently upgraded to **7**!` };
+    desc: "Permanently increases your max rolls from 5 → 7.",
+    price: 50000, currency: "gold", emoji: "⬆️", limit: "once",
+    maxQty: 1,
+    buy: async (user, qty) => {
+      if (user.shopLimits?.rollUpgradeBought) return { error: "Already purchased." };
+      const cost = applyDiscount(50000, user.isPremium);
+      if ((user.currency?.gold ?? 0) < cost) return { error: `Not enough ${NYAN} Nyang.` };
+      await User.findOneAndUpdate({ userId: user.userId }, { rollLimit: 7, "shopLimits.rollUpgradeBought": true, $inc: { "currency.gold": -cost } });
+      return { msg: `⬆️ Roll limit upgraded to **7**!` };
     },
   },
   {
-    id: "perm_ticket_10",
-    name: "10× Regular Ticket",
-    desc: `Receive 10 Regular Tickets for banner pulls.`,
-    price: 30000,
-    currency: "gold",
-    emoji: PERMA,
-    limit: "unlimited",
-    buy: async (user) => {
-      const cost_pt = applyDiscount(30000, user.isPremium);
-      if ((user.currency?.gold ?? 0) < cost_pt) return { error: `Not enough ${NYAN} Nyang.` };
-      await User.findOneAndUpdate({ userId: user.userId }, {
-        $inc: { "currency.gold": -cost_pt, "currency.regularTickets": 10 },
-      });
-      return { msg: `${PERMA} You received **10 Regular Tickets**!` };
+    id: "perm_ticket",
+    name: "Regular Ticket",
+    desc: "Used for banner pulls.",
+    price: 3000, currency: "gold", emoji: PERMA, limit: "unlimited",
+    maxQty: 100,
+    buy: async (user, qty) => {
+      const cost = applyDiscount(3000, user.isPremium) * qty;
+      if ((user.currency?.gold ?? 0) < cost) return { error: `Not enough ${NYAN} Nyang.` };
+      await User.findOneAndUpdate({ userId: user.userId }, { $inc: { "currency.gold": -cost, "currency.regularTickets": qty } });
+      return { msg: `${PERMA} You received **${qty}× Regular Ticket**!` };
     },
   },
   {
     id: "talisman_common",
-    name: "Common Talisman ×5",
-    desc: "70% on Common · 50% on Rare · 40% on Special",
-    price: 2000,
-    currency: "gold",
-    emoji: "📜",
-    limit: "unlimited",
-    buy: async (user) => {
-      const cost = applyDiscount(2000, user.isPremium);
-      if ((user.currency?.gold ?? 0) < cost) return { error: `Not enough Nyang.` };
-      await User.findOneAndUpdate({ userId: user.userId }, {
-        $inc: { "currency.gold": -cost, "items.talismanCommon": 5 },
-      });
-      return { msg: `📜 You received **5× Common Talisman**!` };
+    name: "Common Talisman",
+    desc: "70% Common · 50% Rare · 40% Special",
+    price: 400, currency: "gold", emoji: "📜", limit: "unlimited",
+    maxQty: 99,
+    buy: async (user, qty) => {
+      const cost = applyDiscount(400, user.isPremium) * qty;
+      if ((user.currency?.gold ?? 0) < cost) return { error: `Not enough ${NYAN} Nyang.` };
+      await User.findOneAndUpdate({ userId: user.userId }, { $inc: { "currency.gold": -cost, "items.talismanCommon": qty } });
+      return { msg: `📜 You received **${qty}× Common Talisman**!` };
     },
   },
   {
     id: "talisman_uncommon",
-    name: "Uncommon Talisman ×3",
-    desc: "80% on Common · 60% on Rare · 60% on Special",
-    price: 6000,
-    currency: "gold",
-    emoji: "📋",
-    limit: "unlimited",
-    buy: async (user) => {
-      const cost = applyDiscount(6000, user.isPremium);
-      if ((user.currency?.gold ?? 0) < cost) return { error: `Not enough Nyang.` };
-      await User.findOneAndUpdate({ userId: user.userId }, {
-        $inc: { "currency.gold": -cost, "items.talismanUncommon": 3 },
-      });
-      return { msg: `📋 You received **3× Uncommon Talisman**!` };
+    name: "Uncommon Talisman",
+    desc: "80% Common · 60% Rare · 60% Special",
+    price: 2000, currency: "gold", emoji: "📋", limit: "unlimited",
+    maxQty: 99,
+    buy: async (user, qty) => {
+      const cost = applyDiscount(2000, user.isPremium) * qty;
+      if ((user.currency?.gold ?? 0) < cost) return { error: `Not enough ${NYAN} Nyang.` };
+      await User.findOneAndUpdate({ userId: user.userId }, { $inc: { "currency.gold": -cost, "items.talismanUncommon": qty } });
+      return { msg: `📋 You received **${qty}× Uncommon Talisman**!` };
     },
   },
   {
     id: "talisman_divine",
-    name: "Divine Talisman ×1",
-    desc: "95% on Common · 90% on Rare · 80% on Special",
-    price: 20000,
-    currency: "gold",
-    emoji: "✴️",
-    limit: "unlimited",
-    buy: async (user) => {
-      const cost = applyDiscount(20000, user.isPremium);
-      if ((user.currency?.gold ?? 0) < cost) return { error: `Not enough Nyang.` };
-      await User.findOneAndUpdate({ userId: user.userId }, {
-        $inc: { "currency.gold": -cost, "items.talismanDivine": 1 },
-      });
-      return { msg: `✴️ You received **1× Divine Talisman**!` };
+    name: "Divine Talisman",
+    desc: "95% Common · 90% Rare · 80% Special",
+    price: 20000, currency: "gold", emoji: "✴️", limit: "unlimited",
+    maxQty: 99,
+    buy: async (user, qty) => {
+      const cost = applyDiscount(20000, user.isPremium) * qty;
+      if ((user.currency?.gold ?? 0) < cost) return { error: `Not enough ${NYAN} Nyang.` };
+      await User.findOneAndUpdate({ userId: user.userId }, { $inc: { "currency.gold": -cost, "items.talismanDivine": qty } });
+      return { msg: `✴️ You received **${qty}× Divine Talisman**!` };
     },
   },
   {
     id: "talisman_exceptional",
-    name: "Exceptional Talisman x1",
-    desc: "100% capture on ANY rarity card",
-    price: 200000,
-    currency: "gold",
-    emoji: "🌟",
-    limit: "unlimited",
-    buy: async (user) => {
-      const cost = applyDiscount(200000, user.isPremium);
-      if ((user.currency?.gold ?? 0) < cost) return { error: `Not enough Nyang. You need ${cost.toLocaleString()} Nyang.` };
-      await User.findOneAndUpdate({ userId: user.userId }, {
-        $inc: { "currency.gold": -cost, "items.talismanExceptional": 1 },
-      });
-      return { msg: "🌟 You received **1x Exceptional Talisman**! 100% capture guaranteed." };
+    name: "Exceptional Talisman",
+    desc: "100% capture on ANY rarity",
+    price: 200000, currency: "gold", emoji: "🌟", limit: "unlimited",
+    maxQty: 99,
+    buy: async (user, qty) => {
+      const cost = applyDiscount(200000, user.isPremium) * qty;
+      if ((user.currency?.gold ?? 0) < cost) return { error: `Not enough ${NYAN} Nyang. Need ${cost.toLocaleString()}.` };
+      await User.findOneAndUpdate({ userId: user.userId }, { $inc: { "currency.gold": -cost, "items.talismanExceptional": qty } });
+      return { msg: `🌟 You received **${qty}× Exceptional Talisman**!` };
     },
   },
   {
     id: "faction_pass",
     name: "Faction Pass",
-    desc: "Monthly pass allowing you to change your Faction (feature coming soon). One per month.",
-    price: 15000,
-    currency: "gold",
-    emoji: "🎫",
-    limit: "monthly",
-    buy: async (user) => {
-      const cost_fp = applyDiscount(15000, user.isPremium);
-      if ((user.currency?.gold ?? 0) < cost_fp) return { error: `Not enough ${NYAN} Nyang.` };
+    desc: "Change your faction once this month.",
+    price: 15000, currency: "gold", emoji: "🎫", limit: "monthly",
+    maxQty: 1,
+    buy: async (user, qty) => {
+      const cost = applyDiscount(15000, user.isPremium);
+      if ((user.currency?.gold ?? 0) < cost) return { error: `Not enough ${NYAN} Nyang.` };
       const now = new Date();
       const last = user.shopLimits?.factionPassLastBought ? new Date(user.shopLimits.factionPassLastBought) : null;
       if (last) {
         const sameMonth = last.getUTCMonth() === now.getUTCMonth() && last.getUTCFullYear() === now.getUTCFullYear();
-        if (sameMonth) return { error: "You already bought the Faction Pass this month." };
+        if (sameMonth) return { error: "Already bought the Faction Pass this month." };
       }
-      await User.findOneAndUpdate({ userId: user.userId }, {
-        $inc: { "currency.gold": -cost_fp },
-        "shopLimits.factionPassLastBought": now,
-      });
-      return { msg: "🎫 **Faction Pass** purchased! Your access has been granted for this month." };
+      await User.findOneAndUpdate({ userId: user.userId }, { $inc: { "currency.gold": -cost }, "shopLimits.factionPassLastBought": now });
+      return { msg: "🎫 **Faction Pass** purchased!" };
     },
   },
   {
     id: "lesser_qi_pill",
     name: "Lesser Qi Pill",
-    desc: `A pill that restores **1/4** of your ${DANTIAN} Dantian capacity. Max 2 per week.`,
-    price: 8000,
-    currency: "gold",
-    emoji: DANTIAN,
-    limit: "2/week",
-    buy: async (user) => {
-      const cost_pill = applyDiscount(8000, user.isPremium);
-      if ((user.currency?.gold ?? 0) < cost_pill) return { error: `Not enough ${NYAN} Nyang.` };
+    desc: `Restores 1/4 of your ${DANTIAN} Dantian. Max 2/week.`,
+    price: 8000, currency: "gold", emoji: DANTIAN, limit: "2/week",
+    maxQty: 2,
+    buy: async (user, qty) => {
+      const cost = applyDiscount(8000, user.isPremium) * qty;
+      if ((user.currency?.gold ?? 0) < cost) return { error: `Not enough ${NYAN} Nyang.` };
       const now = new Date();
       let weekCount = user.shopLimits?.lesserQiPillWeekly ?? 0;
       const lastReset = user.shopLimits?.lesserQiPillWeekReset ? new Date(user.shopLimits.lesserQiPillWeekReset) : null;
-      if (lastReset) {
-        const msInWeek = 7 * 24 * 60 * 60 * 1000;
-        if (now - lastReset >= msInWeek) weekCount = 0; // reset
-      }
-      if (weekCount >= 2) return { error: "You've already bought 2 Lesser Qi Pills this week. Resets Monday." };
+      if (lastReset && (now - lastReset >= 7 * 24 * 60 * 60 * 1000)) weekCount = 0;
+      if (weekCount + qty > 2) return { error: `You can only buy ${2 - weekCount} more this week.` };
       await User.findOneAndUpdate({ userId: user.userId }, {
-        $inc: { "currency.gold": -cost_pill, "items.lesserQiPill": 1 },
-        "shopLimits.lesserQiPillWeekly": weekCount + 1,
+        $inc: { "currency.gold": -cost, "items.lesserQiPill": qty },
+        "shopLimits.lesserQiPillWeekly": weekCount + qty,
         "shopLimits.lesserQiPillWeekReset": lastReset && (now - lastReset < 7 * 24 * 60 * 60 * 1000) ? lastReset : now,
       });
-      return { msg: `${DANTIAN} **Lesser Qi Pill** added to your items! Use \`/use pill\` to restore your Dantian.` };
+      return { msg: `${DANTIAN} **${qty}× Lesser Qi Pill** added to your bag!` };
     },
   },
 ];
@@ -180,139 +148,97 @@ const JADE_ITEMS = [
   {
     id: "gear_box",
     name: "Gear Box",
-    desc: "A mysterious box containing random gear for your cards.",
-    price: 50,
-    currency: "premiumCurrency",
-    emoji: "📦",
-    limit: "unlimited",
-    buy: async (user) => {
-      const cost_gb = applyDiscount(50, user.isPremium);
-      if ((user.currency?.premiumCurrency ?? 0) < cost_gb) return { error: `Not enough ${JADE} Jade.` };
-      await User.findOneAndUpdate({ userId: user.userId }, {
-        $inc: { "currency.premiumCurrency": -cost_gb, "items.gearBox": 1 },
-      });
-      return { msg: "📦 **Gear Box** added to your items!" };
+    desc: "Random gear for your cards.",
+    price: 50, currency: "premiumCurrency", emoji: "📦", limit: "unlimited",
+    maxQty: 99,
+    buy: async (user, qty) => {
+      const cost = applyDiscount(50, user.isPremium) * qty;
+      if ((user.currency?.premiumCurrency ?? 0) < cost) return { error: `Not enough ${JADE} Jade.` };
+      await User.findOneAndUpdate({ userId: user.userId }, { $inc: { "currency.premiumCurrency": -cost, "items.gearBox": qty } });
+      return { msg: `📦 **${qty}× Gear Box** added to your bag!` };
     },
   },
   {
     id: "pet_treat_box",
     name: "Pet Treat Box",
-    desc: "A box filled with treats to train and bond with your pets.",
-    price: 30,
-    currency: "premiumCurrency",
-    emoji: "🐾",
-    limit: "unlimited",
-    buy: async (user) => {
-      const cost_pb = applyDiscount(30, user.isPremium);
-      if ((user.currency?.premiumCurrency ?? 0) < cost_pb) return { error: `Not enough ${JADE} Jade.` };
-      await User.findOneAndUpdate({ userId: user.userId }, {
-        $inc: { "currency.premiumCurrency": -cost_pb, "items.petTreatBox": 1 },
-      });
-      return { msg: "🐾 **Pet Treat Box** added to your items!" };
+    desc: "Treats to bond with your pets.",
+    price: 30, currency: "premiumCurrency", emoji: "🐾", limit: "unlimited",
+    maxQty: 99,
+    buy: async (user, qty) => {
+      const cost = applyDiscount(30, user.isPremium) * qty;
+      if ((user.currency?.premiumCurrency ?? 0) < cost) return { error: `Not enough ${JADE} Jade.` };
+      await User.findOneAndUpdate({ userId: user.userId }, { $inc: { "currency.premiumCurrency": -cost, "items.petTreatBox": qty } });
+      return { msg: `🐾 **${qty}× Pet Treat Box** added to your bag!` };
     },
   },
   {
     id: "premium",
     name: "Premium Membership",
-    desc: "Unlock Premium status for 30 days — exclusive perks, bonus rewards and special cosmetics.",
-    price: 200,
-    currency: "premiumCurrency",
-    emoji: "💎",
-    limit: "unlimited",
-    buy: async (user) => {
-      if ((user.currency?.premiumCurrency ?? 0) < 200) return { error: `Not enough ${JADE} Jade. You need 200 Jade.` };
+    desc: "30 days of Premium — bonuses, discount & cosmetics.",
+    price: 200, currency: "premiumCurrency", emoji: "💎", limit: "unlimited",
+    maxQty: 12,
+    buy: async (user, qty) => {
+      const cost = 200 * qty;
+      if ((user.currency?.premiumCurrency ?? 0) < cost) return { error: `Not enough ${JADE} Jade. Need ${cost}.` };
       const now = new Date();
-      const currentExpiry = user.premiumUntil && new Date(user.premiumUntil) > now ? new Date(user.premiumUntil) : now;
-      const newExpiry = new Date(currentExpiry.getTime() + 30 * 24 * 60 * 60 * 1000);
-      await User.findOneAndUpdate({ userId: user.userId }, {
-        $inc: { "currency.premiumCurrency": -200 },
-        isPremium: true,
-        premiumUntil: newExpiry,
-      });
-      const d = newExpiry.toISOString().slice(0, 10);
-      return { msg: `💎 **Premium** activated until **${d}**!` };
+      const base = user.premiumUntil && new Date(user.premiumUntil) > now ? new Date(user.premiumUntil) : now;
+      const expiry = new Date(base.getTime() + qty * 30 * 24 * 60 * 60 * 1000);
+      await User.findOneAndUpdate({ userId: user.userId }, { $inc: { "currency.premiumCurrency": -cost }, isPremium: true, premiumUntil: expiry });
+      return { msg: `💎 **Premium** activated until **${expiry.toISOString().slice(0, 10)}**!` };
     },
   },
   {
     id: "special_card_box",
     name: "Special Card Box",
-    desc: "Roll a random **Special** rarity card.",
-    price: 150,
-    currency: "premiumCurrency",
-    emoji: "<:Special:1496599588902273187>",
-    limit: "unlimited",
-    buy: async (user) => {
-      const cost_scb = applyDiscount(150, user.isPremium);
-      if ((user.currency?.premiumCurrency ?? 0) < cost_scb) return { error: `Not enough ${JADE} Jade.` };
-      // Pick a random Special card
-      const specialCards = await Card.find({ rarity: "special", isAvailable: true });
-      if (!specialCards.length) return { error: "No special cards available right now." };
-      const card = specialCards[Math.floor(Math.random() * specialCards.length)];
-      // Add to player collection
-      const existing = await PlayerCard.findOne({ userId: user.userId, cardId: card.cardId });
-      if (existing) {
-        await existing.updateOne({ $inc: { quantity: 1 } });
-      } else {
-        await PlayerCard.create({ userId: user.userId, cardId: card.cardId, quantity: 1, level: 1 });
+    desc: "Roll a random Special rarity card.",
+    price: 150, currency: "premiumCurrency", emoji: "<:Special:1496599588902273187>", limit: "unlimited",
+    maxQty: 10,
+    buy: async (user, qty) => {
+      const cost = applyDiscount(150, user.isPremium) * qty;
+      if ((user.currency?.premiumCurrency ?? 0) < cost) return { error: `Not enough ${JADE} Jade.` };
+      const specials = await Card.find({ rarity: "special", isAvailable: true });
+      if (!specials.length) return { error: "No special cards available." };
+      const names = [];
+      for (let i = 0; i < qty; i++) {
+        const card = specials[Math.floor(Math.random() * specials.length)];
+        const ex = await PlayerCard.findOne({ userId: user.userId, cardId: card.cardId });
+        if (ex) await ex.updateOne({ $inc: { quantity: 1 } });
+        else await PlayerCard.create({ userId: user.userId, cardId: card.cardId, quantity: 1, level: 1 });
+        names.push(card.name);
       }
-      await User.findOneAndUpdate({ userId: user.userId }, {
-        $inc: { "currency.premiumCurrency": -cost_scb, "stats.totalCardsEverObtained": 1 },
-      });
-      return { msg: `<:Special:1496599588902273187> You received **${card.name}** *(${card.anime})* — Special card!`, thumbnail: card.imageUrl };
+      await User.findOneAndUpdate({ userId: user.userId }, { $inc: { "currency.premiumCurrency": -cost, "stats.totalCardsEverObtained": qty } });
+      return { msg: `<:Special:1496599588902273187> You received: **${names.join(", ")}**!` };
     },
   },
 ];
 
-// ─── Embed builders ───────────────────────────────────────────────────────────
-const PREMIUM_DISCOUNT = 0.075; // 7.5% discount for Premium users
-
-function applyDiscount(price, isPremium) {
-  if (!isPremium) return price;
-  return Math.floor(price * (1 - PREMIUM_DISCOUNT));
-}
-
+// ─── Embed + UI ───────────────────────────────────────────────────────────────
 function buildShopEmbed(tab, user) {
-  const items    = tab === "nyang" ? NYANG_ITEMS : JADE_ITEMS;
-  const isPrem   = user?.isPremium ?? false;
-  const balance  = tab === "nyang"
-    ? (user?.currency?.gold ?? 0)
-    : (user?.currency?.premiumCurrency ?? 0);
-  const balStr   = tab === "nyang"
-    ? `${NYAN} **${balance.toLocaleString()}** Nyang`
-    : `${JADE} **${balance.toLocaleString()}** Jade`;
+  const items   = tab === "nyang" ? NYANG_ITEMS : JADE_ITEMS;
+  const isPrem  = user?.isPremium ?? false;
+  const balance = tab === "nyang" ? (user?.currency?.gold ?? 0) : (user?.currency?.premiumCurrency ?? 0);
+  const balStr  = tab === "nyang" ? `${NYAN} **${balance.toLocaleString()}** Nyang` : `${JADE} **${balance.toLocaleString()}** Jade`;
 
-  const sep = "═".repeat(28);
-
-  // Header
-  const headerLines = [
-    balStr,
-    isPrem ? `💎 **Premium** — 7.5% discount applied!` : `💎 Get **Premium** for a 7.5% discount`,
-    ``,
-    `\`${"─".repeat(30)}\``,
-  ];
-
-  const itemLines = items.map((item, i) => {
-    const basePrice = item.price;
-    const finalPrice = applyDiscount(basePrice, isPrem);
-    const priceTag = tab === "nyang"
-      ? `${NYAN} **${finalPrice.toLocaleString()}**${isPrem && finalPrice < basePrice ? ` ~~${basePrice.toLocaleString()}~~` : ""}`
-      : `${JADE} **${finalPrice}**${isPrem && finalPrice < basePrice ? ` ~~${basePrice}~~` : ""}`;
-    const limitTag = item.limit !== "unlimited"
-      ? ` · *${item.limit}*`
-      : "";
-    return `**${i + 1}.** ${item.emoji} **${item.name}**${limitTag} — ${priceTag}`;
+  const lines = items.map((item, i) => {
+    const final = applyDiscount(item.price, isPrem);
+    const cur   = tab === "nyang" ? NYAN : JADE;
+    const price = isPrem && final < item.price
+      ? `${cur} **${final.toLocaleString()}** ~~${item.price.toLocaleString()}~~`
+      : `${cur} **${final.toLocaleString()}**`;
+    const lim   = item.limit !== "unlimited" ? ` · *${item.limit}*` : "";
+    return `**${i + 1}.** ${item.emoji} **${item.name}**${lim} — ${price} each`;
   });
-
-  const description = [
-    ...headerLines,
-    ...itemLines,
-    `\`${"─".repeat(30)}\``,
-    `Use the dropdown below to purchase an item.`,
-  ].join("\n");
 
   return new EmbedBuilder()
     .setTitle(tab === "nyang" ? `${NYAN} Nyang Shop` : `${JADE} Jade Shop`)
-    .setDescription(description)
+    .setDescription([
+      balStr,
+      isPrem ? `💎 **Premium** — 7.5% discount applied!` : `💎 Get **Premium** for a 7.5% discount`,
+      `\`${"─".repeat(30)}\``,
+      ...lines,
+      `\`${"─".repeat(30)}\``,
+      `Select an item below — a window will ask for quantity.`,
+    ].join("\n"))
     .setColor(tab === "nyang" ? 0xf59e0b : 0x7c3aed)
     .setFooter({ text: isPrem ? "💎 Premium discount active — 7.5% off all items" : "Get Premium in the Jade shop for 7.5% off" });
 }
@@ -324,25 +250,18 @@ function buildTabRow(tab) {
   );
 }
 
-function buildBuyDropdown(tab, user) {
+function buildDropdown(tab) {
   const items = tab === "nyang" ? NYANG_ITEMS : JADE_ITEMS;
-  const currency = tab === "nyang" ? "Nyang" : "Jade";
   return new ActionRowBuilder().addComponents(
     new StringSelectMenuBuilder()
-      .setCustomId(`shop_buy_${tab}`)
-      .setPlaceholder(`Select an item to buy...`)
-      .addOptions(items.map(item => {
-        const isPremUser = user?.isPremium ?? false;
-        const discountedPrice = applyDiscount(item.price, isPremUser);
-        const priceStr = tab === "nyang" ? `${discountedPrice.toLocaleString()} Nyang${isPremUser && discountedPrice < item.price ? " (discounted)" : ""}` : `${discountedPrice} Jade${isPremUser && discountedPrice < item.price ? " (discounted)" : ""}`;
-        const opt = new StringSelectMenuOptionBuilder()
+      .setCustomId(`shop_select_${tab}`)
+      .setPlaceholder("Select an item to buy...")
+      .addOptions(items.map(item =>
+        new StringSelectMenuOptionBuilder()
           .setLabel(item.name)
-          .setDescription(`${priceStr} · ${item.limit}`)
-          .setValue(item.id);
-        // Only set emoji for standard Unicode, not custom Discord emojis
-        // emoji removed from select options (Discord rejects unicode emoji IDs)
-        return opt;
-      }))
+          .setDescription(item.desc.slice(0, 100))
+          .setValue(item.id)
+      ))
   );
 }
 
@@ -362,7 +281,7 @@ module.exports = {
 
     const msg = await interaction.editReply({
       embeds: [buildShopEmbed(tab, user)],
-      components: [buildTabRow(tab), buildBuyDropdown(tab, user)],
+      components: [buildTabRow(tab), buildDropdown(tab)],
     });
 
     const collector = msg.createMessageComponentCollector({
@@ -371,47 +290,82 @@ module.exports = {
     });
 
     collector.on("collect", async i => {
-      await i.deferUpdate();
-
-      // Tab switch
+      // Tab switch (buttons)
       if (i.customId === "shop_nyang" || i.customId === "shop_jade") {
-        tab = i.customId === "shop_nyang" ? "nyang" : "jade";
+        await i.deferUpdate();
+        tab  = i.customId === "shop_nyang" ? "nyang" : "jade";
         user = await User.findOne({ userId: interaction.user.id });
         return interaction.editReply({
           embeds: [buildShopEmbed(tab, user)],
-          components: [buildTabRow(tab), buildBuyDropdown(tab, user)],
+          components: [buildTabRow(tab), buildDropdown(tab)],
         });
       }
 
-      // Buy via dropdown
-      if (i.customId === "shop_buy_nyang" || i.customId === "shop_buy_jade") {
-        const itemTab = i.customId === "shop_buy_nyang" ? "nyang" : "jade";
+      // Item selected — show quantity modal
+      if (i.customId === `shop_select_nyang` || i.customId === `shop_select_jade`) {
+        const itemTab = i.customId === "shop_select_nyang" ? "nyang" : "jade";
         const itemId  = i.values[0];
         const items   = itemTab === "nyang" ? NYANG_ITEMS : JADE_ITEMS;
         const item    = items.find(x => x.id === itemId);
-        if (!item) return;
+        if (!item) { await i.deferUpdate(); return; }
 
-        user = await User.findOne({ userId: interaction.user.id });
-        const result = await item.buy(user);
-
-        // Refresh user and update embed
-        user = await User.findOne({ userId: interaction.user.id });
-        const embed = buildShopEmbed(tab, user);
-
-        if (result.error) {
-          await i.followUp({ content: `❌ ${result.error}`, ephemeral: true });
-        } else {
-          const successEmbed = new EmbedBuilder()
-            .setDescription(result.msg)
-            .setColor(0x22c55e);
-          if (result.thumbnail) successEmbed.setThumbnail(result.thumbnail);
-          await i.followUp({ embeds: [successEmbed], ephemeral: true });
+        // One-time items: skip modal, buy directly
+        if (item.maxQty === 1) {
+          await i.deferUpdate();
+          user = await User.findOne({ userId: interaction.user.id });
+          const result = await item.buy(user, 1);
+          user = await User.findOne({ userId: interaction.user.id });
+          const embed = buildShopEmbed(tab, user);
+          if (result.error) embed.setFooter({ text: `❌ ${result.error}` });
+          else embed.setFooter({ text: `✅ ${result.msg.replace(/\*\*/g, "")}` });
+          return interaction.editReply({ embeds: [embed], components: [buildTabRow(tab), buildDropdown(tab)] });
         }
 
-        await interaction.editReply({
-          embeds: [embed],
-          components: [buildTabRow(tab), buildBuyDropdown(tab, user)],
-        });
+        // Show quantity modal
+        const finalPrice = applyDiscount(item.price, user.isPremium);
+        const modal = new ModalBuilder()
+          .setCustomId(`shop_qty_${itemId}`)
+          .setTitle(`Buy ${item.name}`);
+        modal.addComponents(new ActionRowBuilder().addComponents(
+          new TextInputBuilder()
+            .setCustomId("qty")
+            .setLabel(`Quantity (1–${item.maxQty}) · ${finalPrice.toLocaleString()} ${itemTab === "nyang" ? "Nyang" : "Jade"} each`)
+            .setStyle(TextInputStyle.Short)
+            .setPlaceholder("1")
+            .setMinLength(1)
+            .setMaxLength(3)
+            .setRequired(true)
+        ));
+        await i.showModal(modal);
+
+        // Wait for modal submit
+        try {
+          const mi = await i.awaitModalSubmit({
+            filter: m => m.customId === `shop_qty_${itemId}` && m.user.id === interaction.user.id,
+            time: 60_000,
+          });
+          await mi.deferUpdate();
+
+          const raw = mi.fields.getTextInputValue("qty").trim();
+          const qty = parseInt(raw);
+          if (!qty || qty < 1 || qty > item.maxQty) {
+            user = await User.findOne({ userId: interaction.user.id });
+            const embed = buildShopEmbed(tab, user);
+            embed.setFooter({ text: `❌ Invalid quantity. Enter a number between 1 and ${item.maxQty}.` });
+            return interaction.editReply({ embeds: [embed], components: [buildTabRow(tab), buildDropdown(tab)] });
+          }
+
+          user = await User.findOne({ userId: interaction.user.id });
+          const result = await item.buy(user, qty);
+          user = await User.findOne({ userId: interaction.user.id });
+          const embed = buildShopEmbed(tab, user);
+          if (result.error) embed.setFooter({ text: `❌ ${result.error}` });
+          else embed.setFooter({ text: `✅ ${result.msg.replace(/\*\*/g, "")}` });
+          return interaction.editReply({ embeds: [embed], components: [buildTabRow(tab), buildDropdown(tab)] });
+
+        } catch {
+          // Modal timed out — do nothing
+        }
       }
     });
 
