@@ -960,6 +960,92 @@ ${user ? "</div>" : ""}
 }
 
 
+
+// ─── Public API (no auth — used by the web frontend) ─────────────────────────
+
+// CORS for web frontend
+app.use("/api/public", (req, res, next) => {
+  const allowed = process.env.WEB_URL || "*";
+  res.header("Access-Control-Allow-Origin", allowed);
+  res.header("Access-Control-Allow-Methods", "GET");
+  res.header("Access-Control-Allow-Headers", "Content-Type");
+  next();
+});
+
+// GET /api/public/stats — global bot stats
+app.get("/api/public/stats", async (req, res) => {
+  try {
+    const [players, cards] = await Promise.all([
+      User.countDocuments(),
+      Card.countDocuments({ isAvailable: true }),
+    ]);
+    const factions = {
+      heavenly_demon: await User.countDocuments({ faction: "heavenly_demon" }),
+      orthodox:       await User.countDocuments({ faction: "orthodox" }),
+    };
+    res.json({ players, cards, factions });
+  } catch (e) { res.status(500).json({ error: "Server error" }); }
+});
+
+// GET /api/public/cards/featured — random selection of available cards
+app.get("/api/public/cards/featured", async (req, res) => {
+  try {
+    const limit = Math.min(parseInt(req.query.limit) || 8, 20);
+    const cards = await Card.aggregate([
+      { $match: { isAvailable: true, imageUrl: { $exists: true, $ne: "" } } },
+      { $sample: { size: limit } },
+      { $project: { cardId: 1, name: 1, anime: 1, rarity: 1, imageUrl: 1, role: 1 } },
+    ]);
+    res.json(cards);
+  } catch (e) { res.status(500).json({ error: "Server error" }); }
+});
+
+// GET /api/public/cards — browse all cards with filter/pagination
+app.get("/api/public/cards", async (req, res) => {
+  try {
+    const { rarity, anime, page = 1, limit = 24 } = req.query;
+    const filter = { isAvailable: true };
+    if (rarity) filter.rarity = rarity;
+    if (anime)  filter.anime  = { $regex: anime, $options: "i" };
+    const skip  = (parseInt(page) - 1) * parseInt(limit);
+    const [cards, total] = await Promise.all([
+      Card.find(filter).sort({ rarity: 1, name: 1 }).skip(skip).limit(parseInt(limit))
+           .select("cardId name anime rarity imageUrl role"),
+      Card.countDocuments(filter),
+    ]);
+    res.json({ cards, total, page: parseInt(page), pages: Math.ceil(total / parseInt(limit)) });
+  } catch (e) { res.status(500).json({ error: "Server error" }); }
+});
+
+// GET /api/public/leaderboard — top players overall + per faction
+app.get("/api/public/leaderboard", async (req, res) => {
+  try {
+    const { faction, limit = 10 } = req.query;
+    const filter = faction ? { faction } : { faction: { $in: ["heavenly_demon", "orthodox"] } };
+    const players = await User.find(filter)
+      .sort({ factionPoints: -1 })
+      .limit(parseInt(limit))
+      .select("username factionPoints faction accountLevel");
+    res.json(players);
+  } catch (e) { res.status(500).json({ error: "Server error" }); }
+});
+
+// GET /api/public/events — list of events
+app.get("/api/public/events", async (req, res) => {
+  try {
+    const now = new Date();
+    const events = await ScheduledEvent.find()
+      .sort({ startDate: -1 })
+      .limit(20)
+      .select("title type description color startDate endDate");
+    const enriched = events.map(e => ({
+      ...e.toObject(),
+      status: new Date(e.endDate) > now ? "active" : "ended",
+    }));
+    res.json(enriched);
+  } catch (e) { res.status(500).json({ error: "Server error" }); }
+});
+
 // ─── API ──────────────────────────────────────────────────────────────────────
 app.get("/api/notifications", auth, async (req, res) => {
   const logs = await AuditLog.find().sort({ createdAt: -1 }).limit(20);
