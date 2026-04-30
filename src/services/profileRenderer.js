@@ -1,45 +1,4 @@
-const path = require("path");
-let browser = null;
-
-async function getBrowser() {
-  if (browser) return browser;
-  let puppeteer;
-  try {
-    puppeteer = require("puppeteer");
-  } catch {
-    puppeteer = require("puppeteer-core");
-  }
-  const opts = {
-    headless: "new",
-    args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"],
-  };
-  if (process.env.CHROMIUM_PATH) opts.executablePath = process.env.CHROMIUM_PATH;
-  browser = await puppeteer.launch(opts);
-  return browser;
-}
-
-async function inlineImages(html) {
-  const https = require("https");
-  const http  = require("http");
-  const urls  = [...new Set(html.match(/https?:\/\/[^\s"')]+\.(png|jpg|jpeg|webp|gif)/gi) || [])];
-  for (const url of urls) {
-    try {
-      const data = await new Promise((res, rej) => {
-        const mod = url.startsWith("https") ? https : http;
-        mod.get(url, r => {
-          const chunks = [];
-          r.on("data", c => chunks.push(c));
-          r.on("end", () => res(Buffer.concat(chunks)));
-          r.on("error", rej);
-        }).on("error", rej);
-      });
-      const ext  = url.split(".").pop().split("?")[0].toLowerCase();
-      const mime = ext === "jpg" || ext === "jpeg" ? "image/jpeg" : ext === "webp" ? "image/webp" : ext === "gif" ? "image/gif" : "image/png";
-      html = html.replace(new RegExp(url.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g"), `data:${mime};base64,${data.toString("base64")}`);
-    } catch {}
-  }
-  return html;
-}
+const { renderHTML, inlineImages } = require("./renderer");
 
 // Faction background images — set via env vars BG_DEMONIC / BG_ORTHODOX
 const FACTION_BG_URL = {
@@ -204,19 +163,7 @@ body{width:900px;background:transparent;font-family:'Outfit',sans-serif;color:#f
 </div>
 </body></html>`;
 
-  const inlined = await inlineImages(html);
-  const b = await getBrowser();
-  const page = await b.newPage();
-  try {
-    await page.setViewport({ width: 900, height: 500 });
-    await page.setContent(inlined, { waitUntil: "domcontentloaded" });
-    await page.waitForTimeout(400);
-    const el  = await page.$(".root");
-    const buf = await el.screenshot({ type: "png" });
-    return buf;
-  } finally {
-    await page.close();
-  }
+  return await renderHTML(html, { width: 900, height: 500 });
 }
 
 module.exports = { renderProfileCard };
