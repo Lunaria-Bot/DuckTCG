@@ -2483,7 +2483,7 @@ app.get("/media", auth, editorOrAdmin, async (req, res) => {
           <div style="position:relative;overflow:hidden">
             <img src="${fileThumb(f)}" style="width:100%;height:140px;object-fit:cover;display:block"/>
             <div style="position:absolute;top:6px;right:6px;display:flex;gap:4px">
-              <button onclick="(function(b,t){if(navigator.clipboard&&window.isSecureContext){navigator.clipboard.writeText(t).then(()=>{b.textContent='\u2713';setTimeout(()=>b.textContent='Copy',1400)})}else{var x=document.createElement('textarea');x.value=t;x.style.cssText='position:fixed;opacity:0';document.body.appendChild(x);x.select();try{document.execCommand('copy');b.textContent='\u2713';setTimeout(()=>b.textContent='Copy',1400)}catch(e){}document.body.removeChild(x)}})(this,'${url}')"
+              <button onclick="navigator.clipboard.writeText('${url}');this.textContent='✓';setTimeout(()=>this.textContent='Copy',1400)"
                 style="background:rgba(0,0,0,0.75);border:1px solid rgba(255,255,255,0.15);color:#fff;border-radius:5px;padding:4px 8px;cursor:pointer;font-size:10px;font-weight:600;letter-spacing:.04em;backdrop-filter:blur(4px)">
                 Copy
               </button>
