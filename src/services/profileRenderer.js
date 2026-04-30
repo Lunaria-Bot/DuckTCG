@@ -3,11 +3,18 @@ let browser = null;
 
 async function getBrowser() {
   if (browser) return browser;
-  const puppeteer = require("puppeteer");
-  browser = await puppeteer.launch({
+  let puppeteer;
+  try {
+    puppeteer = require("puppeteer");
+  } catch {
+    puppeteer = require("puppeteer-core");
+  }
+  const opts = {
     headless: "new",
     args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"],
-  });
+  };
+  if (process.env.CHROMIUM_PATH) opts.executablePath = process.env.CHROMIUM_PATH;
+  browser = await puppeteer.launch(opts);
   return browser;
 }
 

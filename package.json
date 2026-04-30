@@ -21,7 +21,8 @@
     "cookie-parser": "^1.4.7",
     "cookie-session": "^2.1.0",
     "node-fetch": "^3.3.2",
-    "puppeteer-core": "^22.0.0"
+    "puppeteer-core": "^22.0.0",
+    "puppeteer": "^22.0.0"
   },
   "devDependencies": {
     "nodemon": "^3.1.7"
